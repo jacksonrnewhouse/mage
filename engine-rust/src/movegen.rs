@@ -254,22 +254,61 @@ impl GameState {
     fn effective_cost(&self, def: &CardDef, _controller: PlayerId) -> ManaCost {
         let mut cost = def.mana_cost;
 
-        // Thalia tax: noncreature spells cost {1} more
-        let thalia_active = self.battlefield.iter().any(|p| {
-            p.card_name == CardName::ThaliaGuardianOfThraben
-                && p.controller != _controller
-        });
-        if thalia_active && !def.card_types.contains(&CardType::Creature) {
-            cost.generic += 1;
-        }
+        // Count tax effects from the battlefield
+        for p in &self.battlefield {
+            match p.card_name {
+                // Thalia: noncreature spells cost {1} more (opponent's)
+                CardName::ThaliaGuardianOfThraben if p.controller != _controller => {
+                    if !def.card_types.contains(&CardType::Creature) {
+                        cost.generic += 1;
+                    }
+                }
+                // Archon of Emeria: each player can cast only 1 spell per turn
+                // (cast restriction handled elsewhere, but also nonbasic lands enter tapped)
 
-        // Lodestone Golem: nonartifact spells cost {1} more
-        let lodestone_active = self.battlefield.iter().any(|p| {
-            p.card_name == CardName::LodestoneGolem
-                && p.controller != _controller
-        });
-        if lodestone_active && !def.card_types.contains(&CardType::Artifact) {
-            cost.generic += 1;
+                // Lodestone Golem: nonartifact spells cost {1} more
+                CardName::LodestoneGolem if p.controller != _controller => {
+                    if !def.card_types.contains(&CardType::Artifact) {
+                        cost.generic += 1;
+                    }
+                }
+                // Sphere of Resistance: each spell costs {1} more
+                CardName::SphereOfResistance => {
+                    cost.generic += 1;
+                }
+                // Thorn of Amethyst: noncreature spells cost {1} more
+                CardName::ThornOfAmethyst => {
+                    if !def.card_types.contains(&CardType::Creature) {
+                        cost.generic += 1;
+                    }
+                }
+                // Defense Grid: spells cast not during controller's turn cost {3} more
+                CardName::DefenseGrid if self.active_player != _controller => {
+                    cost.generic += 3;
+                }
+                // Damping Sphere: each spell after the first costs {1} more per spell
+                CardName::DampingSphere => {
+                    let spells_cast = self.players[_controller as usize].spells_cast_this_turn;
+                    if spells_cast > 0 {
+                        cost.generic += spells_cast as u8;
+                    }
+                }
+                // Dovin, Hand of Control: artifacts/instants/sorceries cost {1} more (opponent's)
+                CardName::DovinHandOfControl if p.controller != _controller => {
+                    if def.card_types.contains(&CardType::Artifact)
+                        || def.card_types.contains(&CardType::Instant)
+                        || def.card_types.contains(&CardType::Sorcery) {
+                        cost.generic += 1;
+                    }
+                }
+                // Foundry Inspector: artifact spells cost {1} less (own)
+                CardName::FoundryInspector if p.controller == _controller => {
+                    if def.card_types.contains(&CardType::Artifact) && cost.generic > 0 {
+                        cost.generic -= 1;
+                    }
+                }
+                _ => {}
+            }
         }
 
         // Trinisphere: spells cost at least {3} (when untapped)
@@ -721,6 +760,53 @@ impl GameState {
             _ => {}
         }
 
+        // Karakas: bounce legendary creature
+        if perm.card_name == CardName::Karakas && !perm.tapped {
+            for target in &self.battlefield {
+                if target.is_creature() && self.is_legendary(target) {
+                    abilities.push((1, vec![Target::Object(target.id)]));
+                }
+            }
+        }
+
+        // GhostQuarter: destroy target land
+        if perm.card_name == CardName::GhostQuarter && !perm.tapped {
+            for target in &self.battlefield {
+                if target.is_land() && target.id != perm.id {
+                    abilities.push((1, vec![Target::Object(target.id)]));
+                }
+            }
+        }
+
+        // Bazaar of Baghdad: draw 2, discard 3
+        if perm.card_name == CardName::BazaarOfBaghdad && !perm.tapped {
+            abilities.push((0, vec![]));
+        }
+
+        // Sensei's Divining Top: {T} draw + put on top
+        if perm.card_name == CardName::SenseisDiviningTop && !perm.tapped {
+            abilities.push((0, vec![])); // Look at top 3
+            abilities.push((1, vec![])); // Draw + put on top
+        }
+
+        // Voltaic Key: untap another artifact
+        if perm.card_name == CardName::VoltaicKey && !perm.tapped {
+            for target in &self.battlefield {
+                if target.is_artifact() && target.id != perm.id && target.tapped {
+                    abilities.push((0, vec![Target::Object(target.id)]));
+                }
+            }
+        }
+
+        // Manifold Key: untap another artifact
+        if perm.card_name == CardName::ManifoldKey && !perm.tapped {
+            for target in &self.battlefield {
+                if target.is_artifact() && target.id != perm.id && target.tapped {
+                    abilities.push((0, vec![Target::Object(target.id)]));
+                }
+            }
+        }
+
         // Strip Mine / Wasteland: destroy target land
         match perm.card_name {
             CardName::StripMine if !perm.tapped => {
@@ -783,6 +869,69 @@ impl GameState {
                         }
                     }
                 }
+                CardName::NarsetParterOfVeils => {
+                    // -2: Look at top 4, take noncreature nonland
+                    if perm.loyalty >= 2 {
+                        abilities.push((0, vec![]));
+                    }
+                }
+                CardName::GideonOfTheTrials => {
+                    // +1: Prevent damage from target permanent
+                    for target in &self.battlefield {
+                        abilities.push((0, vec![Target::Object(target.id)]));
+                    }
+                    // 0: Become 4/4 creature
+                    abilities.push((1, vec![]));
+                }
+                CardName::WrennAndSix => {
+                    // +1: Return land from graveyard to hand
+                    abilities.push((0, vec![]));
+                    // -1: Deal 1 damage to any target
+                    if perm.loyalty >= 1 {
+                        for pid in 0..self.num_players {
+                            abilities.push((1, vec![Target::Player(pid)]));
+                        }
+                        for target in &self.battlefield {
+                            if target.is_creature() {
+                                abilities.push((1, vec![Target::Object(target.id)]));
+                            }
+                        }
+                    }
+                }
+                CardName::OkoThiefOfCrowns => {
+                    // +2: Create Food token
+                    abilities.push((0, vec![]));
+                    // +1: Target artifact/creature becomes 3/3 Elk
+                    for target in &self.battlefield {
+                        if target.is_artifact() || target.is_creature() {
+                            abilities.push((1, vec![Target::Object(target.id)]));
+                        }
+                    }
+                }
+                CardName::KarnTheGreatCreator => {
+                    // +1: Target noncreature artifact becomes creature
+                    for target in &self.battlefield {
+                        if target.is_artifact() && !target.is_creature() {
+                            abilities.push((0, vec![Target::Object(target.id)]));
+                        }
+                    }
+                    // -2: Get artifact from sideboard/exile
+                    if perm.loyalty >= 2 {
+                        abilities.push((1, vec![]));
+                    }
+                }
+                CardName::KayaOrzhovUsurper => {
+                    // +1: Exile cards from graveyard
+                    abilities.push((0, vec![]));
+                    // -1: Exile nonland permanent MV 1 or less
+                    if perm.loyalty >= 1 {
+                        for target in &self.battlefield {
+                            if !target.is_land() {
+                                abilities.push((1, vec![Target::Object(target.id)]));
+                            }
+                        }
+                    }
+                }
                 _ => {}
             }
         }
@@ -809,8 +958,8 @@ impl GameState {
         _db: &[CardDef],
     ) -> Vec<Vec<Target>> {
         match card_name {
-            // Target any player or creature
-            CardName::LightningBolt | CardName::ChainLightning => {
+            // Target any player or creature (damage spells)
+            CardName::LightningBolt | CardName::ChainLightning | CardName::ShrapnelBlast => {
                 let mut targets = Vec::new();
                 for pid in 0..self.num_players {
                     targets.push(vec![Target::Player(pid)]);
@@ -823,8 +972,20 @@ impl GameState {
                 targets
             }
 
+            // Target creature or planeswalker (damage-based removal)
+            CardName::Abrade | CardName::RedirectLightning => {
+                let mut targets = Vec::new();
+                for perm in &self.battlefield {
+                    if perm.is_creature() || perm.is_planeswalker() || perm.is_artifact() {
+                        targets.push(vec![Target::Object(perm.id)]);
+                    }
+                }
+                targets
+            }
+
             // Target creature
-            CardName::SwordsToPlowshares | CardName::PathToExile => {
+            CardName::SwordsToPlowshares | CardName::PathToExile | CardName::Dismember
+            | CardName::FatalPush | CardName::SnuffOut => {
                 self.battlefield
                     .iter()
                     .filter(|p| p.is_creature())
@@ -832,8 +993,31 @@ impl GameState {
                     .collect()
             }
 
+            // Target creature or planeswalker
+            CardName::BitterTriumph | CardName::MoltenCollapse | CardName::PrismaticEnding => {
+                self.battlefield
+                    .iter()
+                    .filter(|p| p.is_creature() || p.is_planeswalker())
+                    .map(|p| vec![Target::Object(p.id)])
+                    .collect()
+            }
+
+            // Target nonland permanent
+            CardName::CouncilsJudgment | CardName::MarchOfOtherworldlyLight
+            | CardName::ChainOfVapor | CardName::IntoTheFloodMaw => {
+                self.battlefield
+                    .iter()
+                    .filter(|p| !p.is_land())
+                    .map(|p| vec![Target::Object(p.id)])
+                    .collect()
+            }
+
             // Target spell on stack
-            CardName::Counterspell | CardName::ManaDrain | CardName::MentalMisstep => {
+            CardName::Counterspell | CardName::ManaDrain | CardName::MentalMisstep
+            | CardName::ForceOfWill | CardName::ForceOfNegation | CardName::Flusterstorm
+            | CardName::Daze | CardName::ManaLeak | CardName::MemoryLapse | CardName::Remand
+            | CardName::SpellPierce | CardName::MysticalDispute | CardName::MindbreakTrap
+            | CardName::SinkIntoStupor => {
                 self.stack
                     .items()
                     .iter()
@@ -841,28 +1025,40 @@ impl GameState {
                     .collect()
             }
 
-            // Target player (for Ancestral Recall)
+            // Target activated or triggered ability on stack
+            CardName::Stifle | CardName::ConsignToMemory => {
+                self.stack
+                    .items()
+                    .iter()
+                    .filter(|item| !matches!(item.kind, StackItemKind::Spell { .. }))
+                    .map(|item| vec![Target::Object(item.id)])
+                    .collect()
+            }
+
+            // Target player (for draw/recall)
             CardName::AncestralRecall => {
                 (0..self.num_players)
                     .map(|pid| vec![Target::Player(pid)])
                     .collect()
             }
 
-            // Target player (for discard)
-            CardName::Thoughtseize => {
-                vec![vec![Target::Player(self.opponent(controller))]]
-            }
-            CardName::HymnToTourach => {
+            // Target opponent (discard spells)
+            CardName::Thoughtseize | CardName::Duress | CardName::InquisitionOfKozilek
+            | CardName::Unmask | CardName::HymnToTourach | CardName::MindTwist
+            | CardName::SheoldredsEdict => {
                 vec![vec![Target::Player(self.opponent(controller))]]
             }
 
-            // Target opponent (for Tendrils)
-            CardName::TendrillsOfAgony => {
+            // Target opponent (for damage/drain)
+            CardName::TendrillsOfAgony | CardName::BrainFreeze => {
                 vec![vec![Target::Player(self.opponent(controller))]]
             }
 
             // Target artifact or enchantment
-            CardName::Disenchant => {
+            CardName::Disenchant | CardName::NaturesClaim | CardName::Fragmentize
+            | CardName::AncientGrudge | CardName::ShatteringSpree | CardName::Vandalblast
+            | CardName::Suplex | CardName::UntimellyMalfunction | CardName::Crash
+            | CardName::SunderingEruption | CardName::AbruptDecay | CardName::PestControl => {
                 self.battlefield
                     .iter()
                     .filter(|p| p.is_artifact() || p.is_enchantment())
@@ -870,12 +1066,20 @@ impl GameState {
                     .collect()
             }
 
+            // Target artifact/enchantment opponent controls
+            CardName::ForceOfVigor => {
+                self.battlefield
+                    .iter()
+                    .filter(|p| (p.is_artifact() || p.is_enchantment()) && p.controller != controller)
+                    .map(|p| vec![Target::Object(p.id)])
+                    .collect()
+            }
+
             // Target creature in any graveyard
-            CardName::Reanimate => {
+            CardName::Reanimate | CardName::Exhume => {
                 let mut targets = Vec::new();
                 for pid in 0..self.num_players as usize {
                     for &id in &self.players[pid].graveyard {
-                        // Would need to check if it's a creature card
                         targets.push(vec![Target::Object(id)]);
                     }
                 }
@@ -883,7 +1087,7 @@ impl GameState {
             }
 
             // Target card in own graveyard
-            CardName::Regrowth => {
+            CardName::Regrowth | CardName::NoxiousRevival | CardName::MemorysJourney => {
                 self.players[controller as usize]
                     .graveyard
                     .iter()
@@ -894,19 +1098,16 @@ impl GameState {
             // Blue/red hosers
             CardName::Pyroblast | CardName::RedElementalBlast => {
                 let mut targets = Vec::new();
-                // Target blue permanent
                 for perm in &self.battlefield {
-                    // Simplified: would need to check color
                     targets.push(vec![Target::Object(perm.id)]);
                 }
-                // Target blue spell on stack
                 for item in self.stack.items() {
                     targets.push(vec![Target::Object(item.id)]);
                 }
                 targets
             }
 
-            // No targets needed
+            // No targets needed (tutors, cantrips, board wipes, etc.)
             _ => vec![],
         }
     }

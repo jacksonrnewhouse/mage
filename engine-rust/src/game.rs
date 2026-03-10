@@ -486,19 +486,50 @@ impl GameState {
     }
 
     pub fn is_legendary(&self, perm: &Permanent) -> bool {
-        // Check the card database for supertypes
-        // For now, check card_name for known legendaries
         matches!(
             perm.card_name,
-            CardName::MoxOpal
-                | CardName::SheoldredTheApocalypse
-                | CardName::ThaliaGuardianOfThraben
-                | CardName::RagavanNimblePilferer
-                | CardName::JaceTheMindSculptor
-                | CardName::TeferiTimeRaveler
-                | CardName::LeovoldEmissaryOfTrest
-                | CardName::DackFayden
-                | CardName::TolarianAcademy
+            // Artifacts
+            CardName::MoxOpal | CardName::BolassCitadel | CardName::Shadowspear
+            | CardName::TheOneRing | CardName::UnderworldBreach
+            // Lands
+            | CardName::TolarianAcademy | CardName::GaeasCradle
+            | CardName::UrborgTombOfYawgmoth | CardName::YavimayaCradleOfGrowth
+            | CardName::Karakas | CardName::OtawaraSoaringCity | CardName::BoseijuWhoEndures
+            // White creatures
+            | CardName::ThaliaGuardianOfThraben | CardName::AjaniNacatlPariah
+            | CardName::KatakiWarsWage | CardName::OswaldFiddlebender
+            | CardName::PheliaExuberantShepherd | CardName::SamwiseTheStouthearted
+            | CardName::ArchonOfEmeria | CardName::BoromirWardenOfTheTower
+            | CardName::LoranOfTheThirdPath
+            // Blue creatures
+            | CardName::TamiyoInquisitiveStudent | CardName::EmryLurkerOfTheLoch
+            | CardName::PlagonLordOfTheBeach
+            // Black creatures
+            | CardName::SheoldredTheApocalypse | CardName::Griselbrand
+            | CardName::MaiScornfulStriker
+            // Red creatures
+            | CardName::RagavanNimblePilferer | CardName::ZhaoTheMoonSlayer
+            | CardName::GutTrueSoulZealot | CardName::SqueeGoblinNabob
+            // Green creatures
+            | CardName::DelightedHalfling | CardName::SylvanSafekeeper
+            | CardName::HogaakArisenNecropolis
+            // Colorless creatures
+            | CardName::GolosTirelessPilgrim | CardName::KarnSilverGolem
+            | CardName::EmrakulTheAeonsTorn
+            // Multicolor creatures
+            | CardName::LaviniaAzoriusRenegade | CardName::MakdeeAndItlaSkysnarers
+            | CardName::LurrusOfTheDreamDen | CardName::NaduWingedWisdom
+            | CardName::LeovoldEmissaryOfTrest | CardName::AtraxaGrandUnifier
+            // Planeswalkers (all legendary)
+            | CardName::JaceTheMindSculptor | CardName::TeferiTimeRaveler
+            | CardName::DackFayden | CardName::NarsetParterOfVeils
+            | CardName::GideonOfTheTrials | CardName::KarnTheGreatCreator
+            | CardName::TezzeretCruelCaptain | CardName::WrennAndSix
+            | CardName::MinscAndBooTimelessHeroes | CardName::KayaOrzhovUsurper
+            | CardName::OkoThiefOfCrowns | CardName::CometStellarPup
+            | CardName::DovinHandOfControl
+            // Enchantments
+            | CardName::FableOfTheMirrorBreaker | CardName::HidetsuguConsumesAll
         )
     }
 
