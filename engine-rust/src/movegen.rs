@@ -345,6 +345,122 @@ impl GameState {
                 }
             }
 
+            // Shock lands (two options each)
+            CardName::HallowedFountain => vec![Some(Color::White), Some(Color::Blue)],
+            CardName::WateryGrave => vec![Some(Color::Blue), Some(Color::Black)],
+            CardName::BloodCrypt => vec![Some(Color::Black), Some(Color::Red)],
+            CardName::StompingGround => vec![Some(Color::Red), Some(Color::Green)],
+            CardName::TempleGarden => vec![Some(Color::Green), Some(Color::White)],
+            CardName::GodlessShrine => vec![Some(Color::White), Some(Color::Black)],
+            CardName::SteamVents => vec![Some(Color::Blue), Some(Color::Red)],
+            CardName::OvergrownTomb => vec![Some(Color::Black), Some(Color::Green)],
+            CardName::SacredFoundry => vec![Some(Color::Red), Some(Color::White)],
+            CardName::BreedingPool => vec![Some(Color::Green), Some(Color::Blue)],
+
+            // Survey/Misc dual lands
+            CardName::MeticulousArchive => vec![Some(Color::White), Some(Color::Blue)],
+            CardName::UndercitySewers => vec![Some(Color::Blue), Some(Color::Black)],
+            CardName::ThunderingFalls => vec![Some(Color::Red), Some(Color::Green)],
+            CardName::HedgeMaze => vec![Some(Color::Green), Some(Color::White)],
+
+            // Other utility lands producing colored mana
+            CardName::Karakas => vec![Some(Color::White)],
+            CardName::OtawaraSoaringCity => vec![Some(Color::Blue)],
+            CardName::BoseijuWhoEndures => vec![Some(Color::Green)],
+            CardName::GaeasCradle => {
+                let creature_count = self.creatures_controlled_by(perm.controller).count();
+                if creature_count > 0 {
+                    vec![Some(Color::Green)]
+                } else {
+                    vec![]
+                }
+            }
+
+            // Lands producing colorless
+            CardName::CityOfTraitors | CardName::GhostQuarter
+            | CardName::SpireOfIndustry | CardName::TheMycoSynthGardens
+            | CardName::UrzasSaga | CardName::TalonGatesOfMadara => vec![None],
+
+            // Lands producing any color
+            CardName::ForbiddenOrchard | CardName::StartingTown => vec![
+                Some(Color::White), Some(Color::Blue), Some(Color::Black),
+                Some(Color::Red), Some(Color::Green),
+            ],
+
+            // Urborg makes all lands Swamps (they tap for black)
+            // Yavimaya makes all lands Forests (they tap for green)
+            // These are handled as static effects on the lands themselves
+            CardName::UrborgTombOfYawgmoth => vec![Some(Color::Black)],
+            CardName::YavimayaCradleOfGrowth => vec![Some(Color::Green)],
+
+            // Bazaar of Baghdad: doesn't produce mana, only draw/discard (activated ability)
+            // Dryad Arbor: it's a forest, taps for green
+            CardName::DryadArbor => vec![Some(Color::Green)],
+
+            // Gleemox: any color
+            CardName::Gleemox => vec![
+                Some(Color::White), Some(Color::Blue), Some(Color::Black),
+                Some(Color::Red), Some(Color::Green),
+            ],
+
+            // Chrome Mox, Mox Diamond, Mox Opal: any color (simplified)
+            CardName::ChromeMox | CardName::MoxDiamond | CardName::MoxOpal => vec![
+                Some(Color::White), Some(Color::Blue), Some(Color::Black),
+                Some(Color::Red), Some(Color::Green),
+            ],
+
+            // Chromatic Star: any color
+            CardName::ChromaticStar => vec![
+                Some(Color::White), Some(Color::Blue), Some(Color::Black),
+                Some(Color::Red), Some(Color::Green),
+            ],
+
+            // Delighted Halfling: colorless, or any color for legendaries (simplified as any)
+            CardName::DelightedHalfling => vec![
+                None,
+                Some(Color::White), Some(Color::Blue), Some(Color::Black),
+                Some(Color::Red), Some(Color::Green),
+            ],
+
+            // Deathrite Shaman: mana from exiling land cards
+            CardName::DeathriteShaman => {
+                // Check if any graveyard has land cards
+                let has_land_in_gy = self.players.iter().any(|p| {
+                    p.graveyard.iter().any(|&id| {
+                        if let Some(name) = self.card_name_for_id(id) {
+                            if let Some(def) = find_card(&[], name) { // would need db
+                                return def.card_types.contains(&CardType::Land);
+                            }
+                        }
+                        false
+                    })
+                });
+                if has_land_in_gy {
+                    vec![Some(Color::White), Some(Color::Blue), Some(Color::Black),
+                         Some(Color::Red), Some(Color::Green)]
+                } else {
+                    vec![]
+                }
+            }
+
+            // Undermountain Adventurer: any color
+            CardName::UndermountainAdventurer => vec![
+                Some(Color::White), Some(Color::Blue), Some(Color::Black),
+                Some(Color::Red), Some(Color::Green),
+            ],
+
+            // The Mightstone and Weakstone: {T} for CC
+            CardName::TheMightstoneAndWeakstone => vec![None],
+
+            // Coveted Jewel: 3 mana of one color
+            CardName::CovetedJewel => vec![
+                Some(Color::White), Some(Color::Blue), Some(Color::Black),
+                Some(Color::Red), Some(Color::Green),
+            ],
+
+            // KCI: sacrifice artifact (activated ability, not mana ability for options)
+            // Voltaic Key, Manifold Key: untap abilities (not mana producers)
+
             _ => vec![],
         }
     }
@@ -393,7 +509,40 @@ impl GameState {
             | CardName::MoxJet
             | CardName::MoxRuby
             | CardName::MoxEmerald
-            | CardName::BirdsOfParadise => {
+            | CardName::BirdsOfParadise
+            // Shock lands
+            | CardName::HallowedFountain
+            | CardName::WateryGrave
+            | CardName::BloodCrypt
+            | CardName::StompingGround
+            | CardName::TempleGarden
+            | CardName::GodlessShrine
+            | CardName::SteamVents
+            | CardName::OvergrownTomb
+            | CardName::SacredFoundry
+            | CardName::BreedingPool
+            // Survey dual lands
+            | CardName::MeticulousArchive
+            | CardName::UndercitySewers
+            | CardName::ThunderingFalls
+            | CardName::HedgeMaze
+            // Other colored-producing lands
+            | CardName::Karakas
+            | CardName::OtawaraSoaringCity
+            | CardName::BoseijuWhoEndures
+            | CardName::UrborgTombOfYawgmoth
+            | CardName::YavimayaCradleOfGrowth
+            | CardName::DryadArbor
+            // Any-color mana producers
+            | CardName::ForbiddenOrchard
+            | CardName::StartingTown
+            | CardName::Gleemox
+            | CardName::ChromeMox
+            | CardName::MoxDiamond
+            | CardName::MoxOpal
+            | CardName::ChromaticStar
+            | CardName::DelightedHalfling
+            | CardName::UndermountainAdventurer => {
                 if let Some(perm) = self.find_permanent_mut(permanent_id) {
                     perm.tapped = true;
                 }
@@ -440,8 +589,11 @@ impl GameState {
                 true
             }
 
-            // Strip Mine / Wasteland: {T} for {C}
-            CardName::StripMine | CardName::Wasteland | CardName::LibraryOfAlexandria => {
+            // Strip Mine / Wasteland / other colorless-producing lands: {T} for {C}
+            CardName::StripMine | CardName::Wasteland | CardName::LibraryOfAlexandria
+            | CardName::GhostQuarter | CardName::SpireOfIndustry
+            | CardName::TheMycoSynthGardens | CardName::UrzasSaga
+            | CardName::TalonGatesOfMadara => {
                 if let Some(perm) = self.find_permanent_mut(permanent_id) {
                     perm.tapped = true;
                 }
@@ -455,6 +607,50 @@ impl GameState {
                     perm.tapped = true;
                 }
                 self.players[controller as usize].mana_pool.colorless += 3;
+                true
+            }
+
+            // City of Traitors: {T} for {C}{C}
+            CardName::CityOfTraitors => {
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.tapped = true;
+                }
+                self.players[controller as usize].mana_pool.colorless += 2;
+                true
+            }
+
+            // Gaea's Cradle: {T} for {G} per creature
+            CardName::GaeasCradle => {
+                let creature_count = self.creatures_controlled_by(controller).count() as u8;
+                if creature_count == 0 {
+                    return false;
+                }
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.tapped = true;
+                }
+                self.players[controller as usize]
+                    .mana_pool
+                    .add(Some(Color::Green), creature_count);
+                true
+            }
+
+            // The Mightstone and Weakstone: {T} for {C}{C}
+            CardName::TheMightstoneAndWeakstone => {
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.tapped = true;
+                }
+                self.players[controller as usize].mana_pool.colorless += 2;
+                true
+            }
+
+            // Coveted Jewel: {T} for 3 of one color
+            CardName::CovetedJewel => {
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.tapped = true;
+                }
+                self.players[controller as usize]
+                    .mana_pool
+                    .add(color_choice, 3);
                 true
             }
 
@@ -472,6 +668,9 @@ impl GameState {
                     .add(Some(Color::Blue), artifact_count);
                 true
             }
+
+            // KCI: sacrifice for {C}{C} - handled as activated ability
+            CardName::KrarkClanIronworks => false, // Not a tap ability
 
             _ => false,
         }
