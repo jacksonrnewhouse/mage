@@ -46,6 +46,15 @@ pub enum TriggeredEffect {
     DarkConfidantUpkeep,
     WurmcoilDeath,
     SkullclampDeath,
+    /// OrcishBowmasters: amass 1 and deal 1 damage
+    OrcishBowmastersETB,
+    /// Grief/Solitude evoke ETB
+    GriefETB,
+    SolitudeETB,
+    /// Archon of Cruelty ETB/attack
+    ArchonOfCrueltyTrigger,
+    /// Orcish Bowmasters opponent draw trigger
+    OrcishBowmastersOpponentDraw,
     /// Generic: deal N damage to target
     DealDamage(u16),
     /// Generic: draw N cards
@@ -75,6 +84,40 @@ pub enum ActivatedEffect {
     TeferiBounce,
     /// Generic: draw cards
     DrawCards(u8),
+    /// Bazaar of Baghdad: draw 2, discard 3
+    BazaarDraw,
+    /// Sensei's Divining Top: look at top 3
+    TopLook,
+    /// Sensei's Divining Top: draw + put on top
+    TopDraw,
+    /// Voltaic Key / Manifold Key: untap artifact
+    UntapArtifact,
+    /// Karakas: bounce legendary creature
+    KarakasBounce,
+    /// Ghost Quarter: destroy land
+    GhostQuarterDestroy,
+    /// Narset -2: look at top 4
+    NarsetMinus,
+    /// Oko +2: create Food
+    OkoFood,
+    /// Oko +1: Elkify
+    OkoElkify,
+    /// Wrenn +1: return land from graveyard
+    WrennReturn,
+    /// Wrenn -1: deal 1 damage
+    WrennPing,
+    /// Karn +1: animate artifact
+    KarnAnimate,
+    /// Karn -2: wish for artifact
+    KarnWish,
+    /// Gideon 0: become creature
+    GideonCreature,
+    /// Gideon +1: prevent damage
+    GideonPrevent,
+    /// Kaya +1: exile from graveyard
+    KayaExile,
+    /// Kaya -1: exile permanent
+    KayaMinus,
 }
 
 /// The game stack.

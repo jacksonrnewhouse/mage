@@ -1331,9 +1331,107 @@ impl GameState {
         }
     }
 
-    fn handle_etb(&mut self, card_name: CardName, _card_id: ObjectId, _controller: PlayerId) {
+    fn handle_etb(&mut self, card_name: CardName, _card_id: ObjectId, controller: PlayerId) {
         match card_name {
-            // ETB triggers would be queued here
+            // Orcish Bowmasters: amass 1 and deal 1
+            CardName::OrcishBowmasters => {
+                let opp = self.opponent(controller);
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: _card_id,
+                        source_name: card_name,
+                        effect: TriggeredEffect::OrcishBowmastersETB,
+                    },
+                    controller,
+                    vec![Target::Player(opp)],
+                );
+            }
+            // Grief: target opponent reveals hand, discard nonland
+            CardName::Grief => {
+                let opp = self.opponent(controller);
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: _card_id,
+                        source_name: card_name,
+                        effect: TriggeredEffect::GriefETB,
+                    },
+                    controller,
+                    vec![Target::Player(opp)],
+                );
+            }
+            // Solitude: exile creature
+            CardName::Solitude => {
+                let targets: Vec<_> = self.battlefield.iter()
+                    .filter(|p| p.is_creature() && p.id != _card_id)
+                    .map(|p| p.id)
+                    .collect();
+                if let Some(&target_id) = targets.first() {
+                    self.stack.push(
+                        StackItemKind::TriggeredAbility {
+                            source_id: _card_id,
+                            source_name: card_name,
+                            effect: TriggeredEffect::SolitudeETB,
+                        },
+                        controller,
+                        vec![Target::Object(target_id)],
+                    );
+                }
+            }
+            // Archon of Cruelty: drain + discard + sac
+            CardName::ArchonOfCruelty => {
+                let opp = self.opponent(controller);
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: _card_id,
+                        source_name: card_name,
+                        effect: TriggeredEffect::ArchonOfCrueltyTrigger,
+                    },
+                    controller,
+                    vec![Target::Player(opp)],
+                );
+            }
+            // Thought Monitor: draw 2
+            CardName::ThoughtMonitor => {
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: _card_id,
+                        source_name: card_name,
+                        effect: TriggeredEffect::DrawCards(2),
+                    },
+                    controller,
+                    vec![],
+                );
+            }
+            // Snapcaster Mage: give flashback (simplified: no-op)
+            CardName::SnapcasterMage => {}
+            // Stoneforge Mystic: search for equipment
+            CardName::StoneforgeMystic => {}
+            // Palace Jailer: become monarch, exile creature
+            CardName::PalaceJailer => {}
+            // Manglehorn: destroy artifact
+            CardName::Manglehorn => {
+                let targets: Vec<ObjectId> = self.battlefield.iter()
+                    .filter(|p| p.is_artifact() && p.controller != controller)
+                    .map(|p| p.id)
+                    .collect();
+                if let Some(&target_id) = targets.first() {
+                    if let Some(perm) = self.remove_permanent(target_id) {
+                        self.players[perm.owner as usize].graveyard.push(perm.id);
+                    }
+                }
+            }
+            // Loran of the Third Path: destroy artifact or enchantment
+            CardName::LoranOfTheThirdPath => {
+                let targets: Vec<ObjectId> = self.battlefield.iter()
+                    .filter(|p| (p.is_artifact() || p.is_enchantment()) && p.controller != controller)
+                    .map(|p| p.id)
+                    .collect();
+                if let Some(&target_id) = targets.first() {
+                    if let Some(perm) = self.remove_permanent(target_id) {
+                        self.players[perm.owner as usize].graveyard.push(perm.id);
+                    }
+                }
+            }
             _ => {}
         }
     }
@@ -1413,6 +1511,58 @@ impl GameState {
                     self.battlefield.push(token);
                 }
             }
+            TriggeredEffect::OrcishBowmastersETB | TriggeredEffect::OrcishBowmastersOpponentDraw => {
+                // Deal 1 damage to any target and amass Orcs 1 (create 1/1 token)
+                if let Some(target) = targets.first() {
+                    self.deal_damage_to_target(*target, 1, controller);
+                }
+                let token_id = self.new_object_id();
+                let mut token = Permanent::new(
+                    token_id, card_name_for_token(), controller, controller,
+                    Some(1), Some(1), None, Keywords::empty(), &[CardType::Creature],
+                );
+                token.is_token = true;
+                self.battlefield.push(token);
+            }
+            TriggeredEffect::GriefETB => {
+                // Target opponent reveals hand, you choose nonland to discard
+                if let Some(Target::Player(opp)) = targets.first() {
+                    let pid = *opp as usize;
+                    if !self.players[pid].hand.is_empty() {
+                        let options = self.players[pid].hand.clone();
+                        self.pending_choice = Some(PendingChoice {
+                            player: controller,
+                            kind: ChoiceKind::ChooseFromList {
+                                options,
+                                reason: ChoiceReason::ThoughtseizeDiscard,
+                            },
+                        });
+                    }
+                }
+            }
+            TriggeredEffect::SolitudeETB => {
+                // Exile target creature
+                if let Some(Target::Object(creature_id)) = targets.first() {
+                    if let Some(perm) = self.remove_permanent(*creature_id) {
+                        let power = perm.power();
+                        self.players[perm.controller as usize].life += power as i32;
+                        self.exile.push((perm.id, perm.card_name, perm.owner));
+                    }
+                }
+            }
+            TriggeredEffect::ArchonOfCrueltyTrigger => {
+                // Opponent: sacrifice creature, discard, lose 3
+                // You: draw, gain 3, create Treasure
+                if let Some(Target::Player(opp)) = targets.first() {
+                    let opid = *opp as usize;
+                    self.players[opid].life -= 3;
+                    if let Some(id) = self.players[opid].hand.pop() {
+                        self.players[opid].graveyard.push(id);
+                    }
+                    self.draw_cards(controller, 1);
+                    self.players[controller as usize].life += 3;
+                }
+            }
             _ => {}
         }
     }
@@ -1455,7 +1605,172 @@ impl GameState {
             ActivatedEffect::DrawCards(n) => {
                 self.draw_cards(controller, n as usize);
             }
-            _ => {}
+            ActivatedEffect::BazaarDraw => {
+                // Draw 2, discard 3
+                self.draw_cards(controller, 2);
+                let pid = controller as usize;
+                for _ in 0..3 {
+                    if let Some(id) = self.players[pid].hand.pop() {
+                        self.players[pid].graveyard.push(id);
+                    }
+                }
+            }
+            ActivatedEffect::TopLook => {
+                // Sensei's Divining Top: look at top 3, rearrange
+                // Simplified: no-op (hidden information)
+            }
+            ActivatedEffect::TopDraw => {
+                // Sensei's Divining Top: draw a card, put Top on top of library
+                // Find Top on the battlefield and return it to top of library
+                let top_id = self.battlefield.iter()
+                    .find(|p| p.card_name == CardName::SenseisDiviningTop && p.controller == controller)
+                    .map(|p| p.id);
+                if let Some(id) = top_id {
+                    if let Some(perm) = self.remove_permanent(id) {
+                        self.players[perm.owner as usize].library.push(perm.id);
+                    }
+                }
+                self.draw_cards(controller, 1);
+            }
+            ActivatedEffect::UntapArtifact => {
+                // Voltaic Key / Manifold Key: untap target artifact
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    if let Some(perm) = self.find_permanent_mut(*target_id) {
+                        perm.tapped = false;
+                    }
+                }
+            }
+            ActivatedEffect::KarakasBounce => {
+                // Bounce target legendary creature to owner's hand
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    if let Some(perm) = self.remove_permanent(*target_id) {
+                        self.players[perm.owner as usize].hand.push(perm.id);
+                    }
+                }
+            }
+            ActivatedEffect::GhostQuarterDestroy => {
+                // Destroy target land (opponent may search for basic)
+                // Simplified: just destroy the land
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    if let Some(perm) = self.remove_permanent(*target_id) {
+                        self.players[perm.owner as usize].graveyard.push(perm.id);
+                    }
+                }
+            }
+            ActivatedEffect::NarsetMinus => {
+                // Narset -2: look at top 4, may reveal noncreature/nonland
+                // Simplified: draw 1 card (approximation)
+                self.draw_cards(controller, 1);
+            }
+            ActivatedEffect::OkoFood => {
+                // Oko +2: create a Food token (artifact)
+                let token_id = self.new_object_id();
+                let token = Permanent {
+                    id: token_id,
+                    card_name: CardName::Plains, // placeholder for token
+                    controller,
+                    owner: controller,
+                    tapped: false,
+                    base_power: 0,
+                    base_toughness: 0,
+                    power_mod: 0,
+                    toughness_mod: 0,
+                    damage: 0,
+                    keywords: Keywords::empty(),
+                    counters: Counters::default(),
+                    entered_this_turn: true,
+                    attacked_this_turn: false,
+                    loyalty: 0,
+                    loyalty_activated_this_turn: false,
+                    card_types: vec![CardType::Artifact],
+                    is_token: true,
+                };
+                self.battlefield.push(token);
+            }
+            ActivatedEffect::OkoElkify => {
+                // Oko +1: target artifact or creature becomes a 3/3 Elk
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    if let Some(perm) = self.find_permanent_mut(*target_id) {
+                        perm.base_power = 3;
+                        perm.base_toughness = 3;
+                        perm.power_mod = 0;
+                        perm.toughness_mod = 0;
+                        // Becomes a creature, loses other types except artifact
+                        if !perm.card_types.contains(&CardType::Creature) {
+                            perm.card_types.push(CardType::Creature);
+                        }
+                        // Remove all abilities (simplified: clear keywords)
+                        perm.keywords = Keywords::empty();
+                    }
+                }
+            }
+            ActivatedEffect::WrennReturn => {
+                // Wrenn and Six +1: return target land from graveyard to hand
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    let pid = controller as usize;
+                    if let Some(pos) = self.players[pid].graveyard.iter().position(|&id| id == *target_id) {
+                        let id = self.players[pid].graveyard.remove(pos);
+                        self.players[pid].hand.push(id);
+                    }
+                }
+            }
+            ActivatedEffect::WrennPing => {
+                // Wrenn and Six -1: deal 1 damage to any target
+                if let Some(&target) = targets.first() {
+                    self.deal_damage_to_target(target, 1, controller);
+                }
+            }
+            ActivatedEffect::KarnAnimate => {
+                // Karn +1: animate target noncreature artifact (simplified: no-op)
+            }
+            ActivatedEffect::KarnWish => {
+                // Karn -2: wish for artifact from sideboard/exile
+                // Simplified: no-op (sideboard not modeled)
+            }
+            ActivatedEffect::GideonCreature => {
+                // Gideon 0: becomes a 4/4 creature until end of turn
+                // Simplified: find Gideon and make it a creature
+                if let Some(perm) = self.battlefield.iter_mut()
+                    .find(|p| p.card_name == CardName::GideonOfTheTrials && p.controller == controller)
+                {
+                    if !perm.card_types.contains(&CardType::Creature) {
+                        perm.card_types.push(CardType::Creature);
+                    }
+                    perm.base_power = 4;
+                    perm.base_toughness = 4;
+                    perm.keywords.add(Keyword::Indestructible);
+                }
+            }
+            ActivatedEffect::GideonPrevent => {
+                // Gideon +1: prevent all damage from a source (simplified: no-op)
+            }
+            ActivatedEffect::KayaExile => {
+                // Kaya +1: exile target card from a graveyard
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    // Check both players' graveyards
+                    for pid in 0..self.players.len() {
+                        if let Some(pos) = self.players[pid].graveyard.iter().position(|&id| id == *target_id) {
+                            let id = self.players[pid].graveyard.remove(pos);
+                            let card_name = self.card_name_for_id(id).unwrap_or(CardName::Plains);
+                            self.exile.push((id, card_name, pid as PlayerId));
+                            break;
+                        }
+                    }
+                }
+            }
+            ActivatedEffect::KayaMinus => {
+                // Kaya -1: exile target nonland permanent, owner gains 2 life
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    if let Some(perm) = self.remove_permanent(*target_id) {
+                        let owner = perm.owner as usize;
+                        self.exile.push((perm.id, perm.card_name, perm.owner));
+                        self.players[owner].life += 2;
+                    }
+                }
+            }
+            ActivatedEffect::PlaneswalkerAbility { .. } => {
+                // Generic planeswalker ability - handled by specific variants above
+            }
         }
     }
 
