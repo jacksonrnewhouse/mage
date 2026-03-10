@@ -926,23 +926,9 @@ pub fn build_card_db() -> Vec<CardDef> {
         "+1: Target player draws two cards, then discards two cards. -2: Gain control of target artifact. -6: You get an emblem with \"Whenever you cast a spell that targets one or more permanents, gain control of those permanents.\"");
 
     // === Colorless Artifacts ===
-    card!(LodestoneGolem, "Lodestone Golem", ManaCost::generic(4), &[Artifact, Creature], &[],
-        Some(5), Some(3), None, kw(), &[],
-        "Nonartifact spells cost {1} more to cast.");
-    card!(WurmcoilEngine, "Wurmcoil Engine", ManaCost::generic(6), &[Artifact, Creature], &[],
-        Some(6), Some(6), None, {
-            let mut k = Keywords::empty();
-            k.add(Keyword::Deathtouch);
-            k.add(Keyword::Lifelink);
-            k
-        }, &[],
-        "Deathtouch, lifelink. When Wurmcoil Engine dies, create a 3/3 colorless Wurm artifact creature token with deathtouch and a 3/3 colorless Wurm artifact creature token with lifelink.");
     card!(Batterskull, "Batterskull", ManaCost::generic(5), &[Artifact], &[],
         None, None, None, kw(), &[],
         "Living weapon. Equipped creature gets +4/+4 and has vigilance and lifelink. {3}: Return Batterskull to its owner's hand. Equip {5}.");
-    card!(Trinisphere, "Trinisphere", ManaCost::generic(3), &[Artifact], &[],
-        None, None, None, kw(), &[],
-        "As long as Trinisphere is untapped, each spell that would cost less than {3} costs {3} to cast.");
     card!(SkullClamp, "Skullclamp", ManaCost::generic(1), &[Artifact], &[],
         None, None, None, kw(), &[],
         "Equipped creature gets +1/-1. When equipped creature dies, draw two cards. Equip {1}.");
@@ -1541,6 +1527,254 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(KishlaSkimmer, "Kishla Skimmer", ManaCost { black: 1, green: 1, generic: 1, ..c }, &[Creature], &[],
         Some(3), Some(2), None, flying(), &[Black, Green],
         "Flying. When Kishla Skimmer enters, mill three cards.");
+
+    // === Colorless Creatures ===
+    card!(StonecoilSerpent, "Stonecoil Serpent", c, &[Artifact, Creature], &[],
+        Some(0), Some(0), None, {
+            let mut k = Keywords::empty();
+            k.add(Keyword::Reach);
+            k.add(Keyword::Trample);
+            k
+        }, &[],
+        "Reach, trample, protection from multicolored. Stonecoil Serpent enters with X +1/+1 counters on it.");
+    card!(WalkingBallista, "Walking Ballista", c, &[Artifact, Creature], &[],
+        Some(0), Some(0), None, kw(), &[],
+        "Walking Ballista enters with X +1/+1 counters on it. {4}: Put a +1/+1 counter on Walking Ballista. Remove a +1/+1 counter from Walking Ballista: It deals 1 damage to any target.");
+    card!(PhyrexianDreadnought, "Phyrexian Dreadnought", ManaCost::generic(1), &[Artifact, Creature], &[],
+        Some(12), Some(12), None, trample(), &[],
+        "Trample. When Phyrexian Dreadnought enters, unless you sacrifice any number of creatures with total power 12 or greater, sacrifice it.");
+    card!(MyrRetriever, "Myr Retriever", ManaCost::generic(2), &[Artifact, Creature], &[],
+        Some(1), Some(1), None, kw(), &[],
+        "When Myr Retriever dies, return another target artifact card from your graveyard to your hand.");
+    card!(PatchworkAutomaton, "Patchwork Automaton", ManaCost::generic(2), &[Artifact, Creature], &[],
+        Some(1), Some(1), None, kw(), &[],
+        "Ward - Discard a card. Whenever you cast an artifact spell, put a +1/+1 counter on Patchwork Automaton.");
+    card!(PhyrexianRevoker, "Phyrexian Revoker", ManaCost::generic(2), &[Artifact, Creature], &[],
+        Some(2), Some(1), None, kw(), &[],
+        "As Phyrexian Revoker enters, choose a nonland card name. Activated abilities of sources with the chosen name can't be activated.");
+    card!(FoundryInspector, "Foundry Inspector", ManaCost::generic(3), &[Artifact, Creature], &[],
+        Some(3), Some(2), None, kw(), &[],
+        "Artifact spells you cast cost {1} less to cast.");
+    card!(GlaringFleshraker, "Glaring Fleshraker", ManaCost::generic(3), &[Artifact, Creature], &[],
+        Some(2), Some(2), None, kw(), &[],
+        "Whenever you cast a colorless spell, create a 0/1 colorless Eldrazi Spawn creature token with \"Sacrifice this creature: Add {C}.\" Whenever a creature token enters under your control, Glaring Fleshraker deals 1 damage to each opponent.");
+    card!(PhyrexianMetamorph, "Phyrexian Metamorph", ManaCost { blue: 1, generic: 3, ..c }, &[Artifact, Creature], &[],
+        Some(0), Some(0), None, kw(), &[Blue],
+        "You may pay 2 life and {1} instead of {U}. You may have Phyrexian Metamorph enter as a copy of any artifact or creature on the battlefield, except it's an artifact in addition to its other types.");
+    card!(ScrapTrawler, "Scrap Trawler", ManaCost::generic(3), &[Artifact, Creature], &[],
+        Some(3), Some(2), None, kw(), &[],
+        "Whenever Scrap Trawler or another artifact you control is put into a graveyard from the battlefield, return target artifact card in your graveyard with lesser mana value to your hand.");
+    card!(ScrawlingCrawler, "Scrawling Crawler", ManaCost::generic(3), &[Artifact, Creature], &[],
+        Some(3), Some(3), None, kw(), &[],
+        "Scrawling Crawler can't be blocked. Whenever Scrawling Crawler deals combat damage to a player, draw a card.");
+    card!(LodestoneGolem, "Lodestone Golem", ManaCost::generic(4), &[Artifact, Creature], &[],
+        Some(5), Some(3), None, kw(), &[],
+        "Nonartifact spells cost {1} more to cast.");
+    card!(ArgentumMasticore, "Argentum Masticore", ManaCost::generic(5), &[Artifact, Creature], &[],
+        Some(5), Some(5), None, first_strike(), &[],
+        "First strike, protection from multicolored. At the beginning of your upkeep, sacrifice Argentum Masticore unless you discard a card. Whenever Argentum Masticore deals damage to an opponent, destroy target permanent that player controls.");
+    card!(GolosTirelessPilgrim, "Golos, Tireless Pilgrim", ManaCost::generic(5), &[Artifact, Creature], &[Legendary],
+        Some(3), Some(5), None, kw(), &[],
+        "When Golos enters, you may search your library for a land card, put it tapped, then shuffle. {2}{W}{U}{B}{R}{G}: Exile the top three cards of your library. You may play them this turn without paying their mana costs.");
+    card!(KarnSilverGolem, "Karn, Silver Golem", ManaCost::generic(5), &[Artifact, Creature], &[Legendary],
+        Some(4), Some(4), None, kw(), &[],
+        "Whenever Karn blocks or becomes blocked, it gets -4/+4 until end of turn. {1}: Target noncreature artifact becomes an artifact creature with power and toughness each equal to its mana value until end of turn.");
+    card!(WurmcoilEngine, "Wurmcoil Engine", ManaCost::generic(6), &[Artifact, Creature], &[],
+        Some(6), Some(6), None, deathtouch_lifelink(), &[],
+        "Deathtouch, lifelink. When Wurmcoil Engine dies, create a 3/3 colorless Wurm artifact creature token with deathtouch and a 3/3 colorless Wurm artifact creature token with lifelink.");
+    card!(EmrakulTheAeonsTorn, "Emrakul, the Aeons Torn", ManaCost::generic(15), &[Creature], &[Legendary],
+        Some(15), Some(15), None, {
+            let mut k = Keywords::empty();
+            k.add(Keyword::Flying);
+            k.add(Keyword::Trample);
+            k
+        }, &[],
+        "This spell can't be countered. When you cast this spell, take an extra turn after this one. Flying, protection from spells that are one or more colors, annihilator 6. When Emrakul is put into a graveyard from anywhere, its owner shuffles their graveyard into their library.");
+
+    // === Colorless Planeswalkers ===
+    card!(TezzeretCruelCaptain, "Tezzeret, Cruel Captain", ManaCost { blue: 1, black: 1, generic: 2, ..c }, &[Planeswalker], &[Legendary],
+        None, None, Some(4), kw(), &[Blue, Black],
+        "+1: Draw a card if you control an artifact. -2: Create a 1/1 colorless Thopter artifact creature token with flying. -7: You get an emblem with \"Whenever you cast an artifact spell, search your library for an artifact card, put it onto the battlefield, then shuffle.\"");
+    card!(KarnTheGreatCreator, "Karn, the Great Creator", ManaCost::generic(4), &[Planeswalker], &[Legendary],
+        None, None, Some(5), kw(), &[],
+        "Activated abilities of artifacts your opponents control can't be activated. +1: Until your next turn, up to one target noncreature artifact becomes an artifact creature with power and toughness each equal to its mana value. -2: You may reveal an artifact card you own from outside the game or in exile and put it into your hand.");
+
+    // === Colorless Spells ===
+    card!(MindbreakTrap, "Mindbreak Trap", ManaCost { blue: 2, generic: 2, ..c }, &[Instant], &[], None, None, None, kw(), &[Blue],
+        "If an opponent cast three or more spells this turn, you may cast this spell without paying its mana cost. Exile any number of target spells.");
+    card!(NoxiousRevival, "Noxious Revival", ManaCost::g(1), &[Instant], &[], None, None, None, kw(), &[Green],
+        "You may pay 2 life instead of {G}. Put target card from a graveyard on top of its owner's library.");
+    card!(Dismember, "Dismember", ManaCost { black: 1, generic: 2, ..c }, &[Instant], &[], None, None, None, kw(), &[Black],
+        "You may pay 4 life instead of {B}{B}. Target creature gets -5/-5 until end of turn.");
+    card!(KozileksCommand, "Kozilek's Command", ManaCost { colorless: 2, generic: 2, ..c }, &[Instant], &[], None, None, None, kw(), &[],
+        "Choose two: Target player draws two cards and loses 2 life. Create a 0/1 Eldrazi Spawn token with \"Sacrifice: Add {C}.\" Destroy target artifact or enchantment with mana value 3 or less. Target creature gets -3/-3 until end of turn.");
+    card!(GitaxianProbe, "Gitaxian Probe", ManaCost::u(1), &[Sorcery], &[], None, None, None, kw(), &[Blue],
+        "You may pay 2 life instead of {U}. Look at target player's hand. Draw a card.");
+
+    // === Colorless Artifacts ===
+    card!(ChaliceOfTheVoid, "Chalice of the Void", c, &[Artifact], &[], None, None, None, kw(), &[],
+        "Chalice of the Void enters with X charge counters on it. Whenever a player casts a spell with mana value equal to the number of charge counters on Chalice of the Void, counter that spell.");
+    card!(ClownCar, "Clown Car", c, &[Artifact], &[], None, None, None, kw(), &[],
+        "When Clown Car enters, roll X six-sided dice. For each odd result, create a 1/1 white Clown Robot artifact creature token. Crew 2.");
+    card!(EngineeredExplosives, "Engineered Explosives", c, &[Artifact], &[], None, None, None, kw(), &[],
+        "Sunburst. {2}, Sacrifice Engineered Explosives: Destroy each nonland permanent with mana value equal to the number of charge counters on Engineered Explosives.");
+    card!(Gleemox, "Gleemox", c, &[Artifact], &[], None, None, None, kw(), &[],
+        "{T}: Add one mana of any color.");
+    card!(TormodsCrypt, "Tormod's Crypt", c, &[Artifact], &[], None, None, None, kw(), &[],
+        "{T}, Sacrifice Tormod's Crypt: Exile target player's graveyard.");
+    card!(UrzasBauble, "Urza's Bauble", c, &[Artifact], &[], None, None, None, kw(), &[],
+        "{T}, Sacrifice Urza's Bauble: Look at a card at random in target player's hand. You draw a card at the beginning of the next turn's upkeep.");
+    card!(MishrasBauble, "Mishra's Bauble", c, &[Artifact], &[], None, None, None, kw(), &[],
+        "{T}, Sacrifice Mishra's Bauble: Look at the top card of target player's library. You draw a card at the beginning of the next turn's upkeep.");
+    card!(ChromaticStar, "Chromatic Star", ManaCost::generic(1), &[Artifact], &[], None, None, None, kw(), &[],
+        "{1}, {T}, Sacrifice Chromatic Star: Add one mana of any color. When Chromatic Star is put into a graveyard from the battlefield, draw a card.");
+    card!(GrafdiggersCage, "Grafdigger's Cage", ManaCost::generic(1), &[Artifact], &[], None, None, None, kw(), &[],
+        "Creature cards in graveyards and libraries can't enter the battlefield. Players can't cast spells from graveyards or libraries.");
+    card!(LavaspurBoots, "Lavaspur Boots", ManaCost::generic(1), &[Artifact], &[], None, None, None, kw(), &[],
+        "Equipped creature gets +1/+0 and has haste and menace. Equip {1}.");
+    card!(ManifoldKey, "Manifold Key", ManaCost::generic(1), &[Artifact], &[], None, None, None, kw(), &[],
+        "{1}, {T}: Untap another target artifact. {3}, {T}: Target creature can't be blocked this turn.");
+    card!(PithingNeedle, "Pithing Needle", ManaCost::generic(1), &[Artifact], &[], None, None, None, kw(), &[],
+        "As Pithing Needle enters, choose a card name. Activated abilities of sources with the chosen name can't be activated unless they're mana abilities.");
+    card!(SenseisDiviningTop, "Sensei's Divining Top", ManaCost::generic(1), &[Artifact], &[], None, None, None, kw(), &[],
+        "{1}: Look at the top three cards of your library, then put them back in any order. {T}: Draw a card, then put Sensei's Divining Top on top of its owner's library.");
+    card!(Shadowspear, "Shadowspear", ManaCost::generic(1), &[Artifact], &[Legendary], None, None, None, kw(), &[],
+        "Equipped creature gets +1/+1 and has trample and lifelink. {1}: Permanents your opponents control lose hexproof and indestructible until end of turn. Equip {2}.");
+    card!(Shuko, "Shuko", ManaCost::generic(1), &[Artifact], &[], None, None, None, kw(), &[],
+        "Equipped creature gets +1/+0. Equip {0}.");
+    card!(SoulGuideLantern, "Soul-Guide Lantern", ManaCost::generic(1), &[Artifact], &[], None, None, None, kw(), &[],
+        "When Soul-Guide Lantern enters, exile target card from a graveyard. {T}, Sacrifice Soul-Guide Lantern: Draw a card. {1}, {T}, Sacrifice Soul-Guide Lantern: Exile each opponent's graveyard.");
+    card!(VexingBauble, "Vexing Bauble", ManaCost::generic(1), &[Artifact], &[], None, None, None, kw(), &[],
+        "Whenever a player casts a spell, if no mana was spent to cast it, counter that spell. {1}, {T}, Sacrifice Vexing Bauble: Draw a card.");
+    card!(VoltaicKey, "Voltaic Key", ManaCost::generic(1), &[Artifact], &[], None, None, None, kw(), &[],
+        "{1}, {T}: Untap target artifact.");
+    card!(DampingSphere, "Damping Sphere", ManaCost::generic(2), &[Artifact], &[], None, None, None, kw(), &[],
+        "If a land is tapped for two or more mana, it produces {C} instead of any other type and amount. Each spell a player casts costs {1} more to cast for each other spell that player has cast this turn.");
+    card!(DefenseGrid, "Defense Grid", ManaCost::generic(2), &[Artifact], &[], None, None, None, kw(), &[],
+        "Each spell that isn't cast during its controller's turn costs {3} more to cast.");
+    card!(DisruptorFlute, "Disruptor Flute", ManaCost::generic(2), &[Artifact], &[], None, None, None, kw(), &[],
+        "As Disruptor Flute enters, choose a card name. Activated abilities of sources with the chosen name can't be activated. Spells with the chosen name cost {3} more to cast.");
+    card!(IchorWellspring, "Ichor Wellspring", ManaCost::generic(2), &[Artifact], &[], None, None, None, kw(), &[],
+        "When Ichor Wellspring enters or is put into a graveyard from the battlefield, draw a card.");
+    card!(NullRod, "Null Rod", ManaCost::generic(2), &[Artifact], &[], None, None, None, kw(), &[],
+        "Activated abilities of artifacts can't be activated.");
+    card!(SphereOfResistance, "Sphere of Resistance", ManaCost::generic(2), &[Artifact], &[], None, None, None, kw(), &[],
+        "Each spell costs {1} more to cast.");
+    card!(ThornOfAmethyst, "Thorn of Amethyst", ManaCost::generic(2), &[Artifact], &[], None, None, None, kw(), &[],
+        "Noncreature spells cost {1} more to cast.");
+    card!(TimeVault, "Time Vault", ManaCost::generic(2), &[Artifact], &[], None, None, None, kw(), &[],
+        "Time Vault enters tapped. Time Vault doesn't untap during your untap step. If you would begin an extra turn, you may skip that turn instead. If you do, untap Time Vault. {T}: Take an extra turn after this one.");
+    card!(TorporOrb, "Torpor Orb", ManaCost::generic(2), &[Artifact], &[], None, None, None, kw(), &[],
+        "Creatures entering the battlefield don't cause abilities to trigger.");
+    card!(VoidMirror, "Void Mirror", ManaCost::generic(2), &[Artifact], &[], None, None, None, kw(), &[],
+        "Whenever a player casts a spell, if no colored mana was spent to cast it, counter that spell.");
+    card!(CrucibleOfWorlds, "Crucible of Worlds", ManaCost::generic(3), &[Artifact], &[], None, None, None, kw(), &[],
+        "You may play lands from your graveyard.");
+    card!(Nettlecyst, "Nettlecyst", ManaCost::generic(3), &[Artifact], &[], None, None, None, kw(), &[],
+        "Living weapon. Equipped creature gets +1/+1 for each artifact and/or enchantment you control. Equip {2}.");
+    card!(Trinisphere, "Trinisphere", ManaCost::generic(3), &[Artifact], &[], None, None, None, kw(), &[],
+        "As long as Trinisphere is untapped, each spell that would cost less than {3} costs {3} to cast.");
+    card!(KrarkClanIronworks, "Krark-Clan Ironworks", ManaCost::generic(4), &[Artifact], &[], None, None, None, kw(), &[],
+        "Sacrifice an artifact: Add {C}{C}.");
+    card!(MysticForge, "Mystic Forge", ManaCost::generic(4), &[Artifact], &[], None, None, None, kw(), &[],
+        "You may look at the top card of your library any time. You may cast artifact spells and colorless spells from the top of your library. {T}, Pay 1 life: Exile the top card of your library.");
+    card!(TheOneRing, "The One Ring", ManaCost::generic(4), &[Artifact], &[Legendary], None, None, None, kw(), &[],
+        "Indestructible. When The One Ring enters, if you cast it, you gain protection from everything until your next turn. At the beginning of your upkeep, you lose 1 life for each burden counter on The One Ring. {T}: Put a burden counter on The One Ring, then draw a card for each burden counter on it.");
+    card!(MemoryJar, "Memory Jar", ManaCost::generic(5), &[Artifact], &[], None, None, None, kw(), &[],
+        "{T}, Sacrifice Memory Jar: Each player exiles their hand face down and draws seven cards. At the beginning of the next end step, each player discards their hand and returns cards exiled this way to their hand.");
+    card!(TheMightstoneAndWeakstone, "The Mightstone and Weakstone", ManaCost::generic(5), &[Artifact], &[Legendary], None, None, None, kw(), &[],
+        "When The Mightstone and Weakstone enters, choose one: Draw two cards. Target creature gets -5/-5 until end of turn. {T}: Add {C}{C}.");
+    card!(CovetedJewel, "Coveted Jewel", ManaCost::generic(6), &[Artifact], &[], None, None, None, kw(), &[],
+        "When Coveted Jewel enters, draw three cards. {T}: Add three mana of any one color. Whenever one or more creatures an opponent controls deal combat damage to you, that player draws three cards and gains control of Coveted Jewel.");
+    card!(PortalToPhyrexia, "Portal to Phyrexia", ManaCost::generic(9), &[Artifact], &[], None, None, None, kw(), &[],
+        "When Portal to Phyrexia enters, each opponent sacrifices three creatures. At the beginning of your upkeep, put target creature card from a graveyard onto the battlefield under your control. It's a Phyrexian in addition to its other types.");
+
+    // === Azorius (WU) ===
+    card!(LaviniaAzoriusRenegade, "Lavinia, Azorius Renegade", ManaCost { white: 1, blue: 1, ..c }, &[Creature], &[Legendary],
+        Some(2), Some(2), None, kw(), &[White, Blue],
+        "Each opponent can't cast noncreature spells with mana value greater than the number of lands that player controls. Whenever an opponent casts a spell, if no mana was spent to cast it, counter that spell.");
+    card!(MakdeeAndItlaSkysnarers, "Makdee and Itla, Skysnarers", ManaCost { white: 1, blue: 1, generic: 2, ..c }, &[Creature], &[Legendary],
+        Some(3), Some(4), None, flying(), &[White, Blue],
+        "Flying. Whenever Makdee and Itla attacks, exile up to one target nonland permanent an opponent controls until Makdee and Itla leaves the battlefield.");
+    card!(DovinHandOfControl, "Dovin, Hand of Control", ManaCost { white: 1, blue: 1, generic: 1, ..c }, &[Planeswalker], &[Legendary],
+        None, None, Some(5), kw(), &[White, Blue],
+        "Artifact, instant, and sorcery spells your opponents cast cost {1} more to cast. -1: Until your next turn, prevent all damage that would be dealt to and dealt by target permanent.");
+
+    // === Dimir (UB) ===
+    card!(PsychicFrog, "Psychic Frog", ManaCost { blue: 1, black: 1, ..c }, &[Creature], &[],
+        Some(1), Some(2), None, kw(), &[Blue, Black],
+        "Discard a card: Psychic Frog gets +1/+1 until end of turn. Whenever Psychic Frog deals combat damage to a player, you may exile a card from your graveyard. If you do, draw a card. {1}{U}{B}: Psychic Frog gains flying until end of turn.");
+
+    // === Rakdos (BR) ===
+    card!(MoltenCollapse, "Molten Collapse", ManaCost { black: 1, red: 1, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Black, Red],
+        "Destroy target nonland permanent with mana value 2 or less. If you descended this turn, destroy target nonland permanent instead.");
+    card!(HidetsuguConsumesAll, "Hidetsugu Consumes All", ManaCost { black: 1, red: 1, generic: 1, ..c }, &[Enchantment], &[Legendary], None, None, None, kw(), &[Black, Red],
+        "I: Destroy each nonland permanent with mana value 1 or less. II: Exile all graveyards. III: Exile this Saga, then return it as Vessel of the All-Consuming, a legendary 3/3 creature that gains abilities from exiled cards.");
+
+    // === Gruul (RG) ===
+    card!(AncientGrudge, "Ancient Grudge", ManaCost { red: 1, generic: 1, ..c }, &[Instant], &[], None, None, None, kw(), &[Red, Green],
+        "Destroy target artifact. Flashback {G}.");
+    card!(Cindervines, "Cindervines", ManaCost { red: 1, green: 1, ..c }, &[Enchantment], &[], None, None, None, kw(), &[Red, Green],
+        "Whenever an opponent casts a noncreature spell, Cindervines deals 1 damage to that player. {1}, Sacrifice Cindervines: Destroy target artifact or enchantment. Cindervines deals 2 damage to that permanent's controller.");
+    card!(WrennAndSix, "Wrenn and Six", ManaCost { red: 1, green: 1, ..c }, &[Planeswalker], &[Legendary],
+        None, None, Some(3), kw(), &[Red, Green],
+        "+1: Return up to one target land card from your graveyard to your hand. -1: Wrenn and Six deals 1 damage to any target. -7: You get an emblem with \"Instant and sorcery cards in your graveyard have retrace.\"");
+    card!(MinscAndBooTimelessHeroes, "Minsc & Boo, Timeless Heroes", ManaCost { red: 1, green: 1, generic: 2, ..c }, &[Planeswalker], &[Legendary],
+        None, None, Some(3), kw(), &[Red, Green],
+        "+1: Create Boo, a legendary 1/1 red Hamster creature token with trample and haste. 0: Choose target creature. It deals damage equal to its power to another target creature, player, or planeswalker. -2: Sacrifice a creature. When you do, Minsc deals X damage to any target, where X is that creature's power, and you draw X cards.");
+
+    // === Selesnya (GW) ===
+    card!(DryadMilitant, "Dryad Militant", ManaCost { green: 1, ..c }, &[Creature], &[],
+        Some(2), Some(1), None, kw(), &[Green, White],
+        "If an instant or sorcery card would be put into a graveyard from anywhere, exile it instead.");
+
+    // === Orzhov (WB) ===
+    card!(PestControl, "Pest Control", ManaCost { white: 1, black: 1, ..c }, &[Instant], &[], None, None, None, kw(), &[White, Black],
+        "Choose one: Destroy target artifact or enchantment. Create two 1/1 black and green Pest creature tokens with \"When this creature dies, you gain 1 life.\"");
+    card!(KayaOrzhovUsurper, "Kaya, Orzhov Usurper", ManaCost { white: 1, black: 1, generic: 1, ..c }, &[Planeswalker], &[Legendary],
+        None, None, Some(3), kw(), &[White, Black],
+        "+1: Exile up to two target cards from a single graveyard. You gain 2 life if at least one creature card was exiled this way. -1: Exile target nonland permanent with mana value 1 or less. -5: Kaya deals damage to target player equal to the number of cards that player owns in exile and you gain that much life.");
+    card!(LurrusOfTheDreamDen, "Lurrus of the Dream-Den", ManaCost { white: 1, black: 1, generic: 1, ..c }, &[Creature], &[Legendary],
+        Some(3), Some(2), None, lifelink(), &[White, Black],
+        "Companion - Each permanent card in your starting deck has mana value 2 or less. Lifelink. During each of your turns, you may cast one permanent spell with mana value 2 or less from your graveyard.");
+
+    // === Izzet (UR) ===
+    card!(ExpressiveIteration, "Expressive Iteration", ManaCost { blue: 1, red: 1, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Blue, Red],
+        "Look at the top three cards of your library. Put one into your hand, put one on the bottom, and exile one. You may play the exiled card this turn.");
+    card!(FlameOfAnor, "Flame of Anor", ManaCost { blue: 1, red: 1, generic: 1, ..c }, &[Instant], &[], None, None, None, kw(), &[Blue, Red],
+        "Choose two: Target creature you control gets +2/+2 and gains flying until end of turn. Destroy target artifact. Draw two cards. Flame of Anor deals 5 damage to target creature if you control a Wizard.");
+    card!(PinnacleEmissary, "Pinnacle Emissary", ManaCost { blue: 1, red: 1, generic: 3, ..c }, &[Creature], &[],
+        Some(4), Some(4), None, flash_flying(), &[Blue, Red],
+        "Flash. Flying. When Pinnacle Emissary enters, it deals 3 damage to target creature or planeswalker.");
+
+    // === Golgari (BG) ===
+    card!(DeathriteShaman, "Deathrite Shaman", ManaCost { green: 1, ..c }, &[Creature], &[],
+        Some(1), Some(2), None, kw(), &[Black, Green],
+        "{T}: Exile target land card from a graveyard. Add one mana of any color. {B}, {T}: Exile target instant or sorcery card from a graveyard. Each opponent loses 2 life. {G}, {T}: Exile target creature card from a graveyard. You gain 2 life.");
+    card!(AbruptDecay, "Abrupt Decay", ManaCost { black: 1, green: 1, ..c }, &[Instant], &[], None, None, None, kw(), &[Black, Green],
+        "This spell can't be countered. Destroy target nonland permanent with mana value 3 or less.");
+
+    // === Boros (RW) ===
+    card!(ForthEorlingas, "Forth Eorlingas!", ManaCost { red: 1, white: 1, generic: 2, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Red, White],
+        "Create two 2/2 red Human Knight creature tokens with trample and haste. You become the monarch.");
+    card!(CometStellarPup, "Comet, Stellar Pup", ManaCost { red: 1, white: 1, generic: 2, ..c }, &[Planeswalker], &[Legendary],
+        None, None, Some(5), kw(), &[Red, White],
+        "0: Roll a six-sided die. 1-2: +2 loyalty, create two 1/1 Ragavan tokens. 3-4: -1 loyalty, deal damage and gain life. 5-6: -3 loyalty, return a card from graveyard to hand.");
+
+    // === Simic (GU) ===
+    card!(MemorysJourney, "Memory's Journey", ManaCost { blue: 1, generic: 1, ..c }, &[Instant], &[], None, None, None, kw(), &[Blue, Green],
+        "Target player shuffles up to three target cards from their graveyard into their library. Flashback {G}.");
+    card!(NaduWingedWisdom, "Nadu, Winged Wisdom", ManaCost { green: 1, blue: 1, generic: 1, ..c }, &[Creature], &[Legendary],
+        Some(3), Some(4), None, flying(), &[Green, Blue],
+        "Flying. Whenever a creature you control becomes the target of a spell or ability, reveal the top card of your library. If it's a land, put it tapped. Otherwise, put it into your hand. This ability triggers only twice each turn for each creature.");
+    card!(OkoThiefOfCrowns, "Oko, Thief of Crowns", ManaCost { green: 1, blue: 1, generic: 1, ..c }, &[Planeswalker], &[Legendary],
+        None, None, Some(4), kw(), &[Green, Blue],
+        "+2: Create a Food token. +1: Target artifact or creature loses all abilities and becomes a green Elk creature with base power and toughness 3/3. -5: Exchange control of target artifact or creature you control and target creature an opponent controls with power 3 or less.");
+
+    // === Multicolor (3+) ===
+    card!(AtraxaGrandUnifier, "Atraxa, Grand Unifier", ManaCost { green: 1, white: 1, blue: 1, black: 1, generic: 3, ..c }, &[Creature], &[Legendary],
+        Some(7), Some(7), None, flying_vigilance_deathtouch_lifelink(), &[Green, White, Blue, Black],
+        "Flying, vigilance, deathtouch, lifelink. When Atraxa enters, reveal the top ten cards of your library. For each card type, you may put a card of that type from among the revealed cards into your hand. Put the rest on the bottom in a random order.");
 
     db
 }
