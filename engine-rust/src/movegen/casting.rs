@@ -1045,7 +1045,7 @@ impl GameState {
                 // Basic lands
                 CardName::Plains | CardName::Island
                 // Dual lands (Alpha/Beta)
-                | CardName::Tundra | CardName::Savannah | CardName::Scrubland
+                | CardName::Tundra | CardName::Savannah | CardName::Scrubland | CardName::Plateau
                 | CardName::UndergroundSea | CardName::VolcanicIsland | CardName::TropicalIsland
                 // Shock lands with Plains subtype
                 | CardName::HallowedFountain | CardName::TempleGarden | CardName::GodlessShrine | CardName::SacredFoundry
@@ -1062,7 +1062,7 @@ impl GameState {
                 CardName::Island | CardName::Swamp
                 // Dual lands
                 | CardName::UndergroundSea | CardName::TropicalIsland | CardName::VolcanicIsland
-                | CardName::Badlands | CardName::Bayou | CardName::Tundra
+                | CardName::Badlands | CardName::Bayou | CardName::Tundra | CardName::Scrubland
                 // Shock lands with Island subtype
                 | CardName::WateryGrave | CardName::SteamVents | CardName::BreedingPool
                 | CardName::HallowedFountain
@@ -1077,7 +1077,7 @@ impl GameState {
                 // Basic lands
                 CardName::Swamp | CardName::Mountain
                 // Dual lands
-                | CardName::Badlands | CardName::UndergroundSea | CardName::Bayou
+                | CardName::Badlands | CardName::UndergroundSea | CardName::Bayou | CardName::Scrubland
                 | CardName::VolcanicIsland | CardName::Plateau | CardName::Taiga
                 // Shock lands with Swamp subtype
                 | CardName::BloodCrypt | CardName::OvergrownTomb | CardName::WateryGrave | CardName::GodlessShrine
@@ -1159,7 +1159,7 @@ impl GameState {
                 // Basic lands
                 CardName::Swamp | CardName::Forest
                 // Dual lands
-                | CardName::Bayou | CardName::UndergroundSea | CardName::Badlands
+                | CardName::Bayou | CardName::UndergroundSea | CardName::Badlands | CardName::Scrubland
                 | CardName::TropicalIsland | CardName::Savannah | CardName::Taiga
                 // Shock lands with Swamp subtype
                 | CardName::OvergrownTomb | CardName::BloodCrypt | CardName::WateryGrave | CardName::GodlessShrine

@@ -133,6 +133,254 @@ fn test_fetch_finds_survey_lands() {
     }
 }
 
+/// Full fetch land flow: activate → choose land → land enters battlefield, fetch sacrificed, 1 life lost.
+#[test]
+fn test_fetch_full_resolution_puts_land_on_battlefield() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // Island at index 32 (bottom portion), FloodedStrand at top (index 39).
+    // After drawing 7 cards: FloodedStrand + 6 Plains in hand; Island stays in library.
+    let deck: Vec<CardName> = std::iter::repeat(CardName::Plains)
+        .take(32)
+        .chain(std::iter::once(CardName::Island))
+        .chain(std::iter::repeat(CardName::Plains).take(6))
+        .chain(std::iter::once(CardName::FloodedStrand))
+        .collect();
+    state.load_deck(0, &deck, &db);
+    state.load_deck(1, &(vec![CardName::Mountain; 40]), &db);
+    state.start_game();
+
+    state.phase = Phase::PreCombatMain;
+    state.step = None;
+
+    let starting_life = state.players[0].life;
+
+    // Play Flooded Strand from hand
+    let strand_id = state.players[0]
+        .hand
+        .iter()
+        .find(|&&id| state.card_name_for_id(id) == Some(CardName::FloodedStrand))
+        .copied()
+        .expect("Flooded Strand should be in hand");
+    state.apply_action(&Action::PlayLand(strand_id), &db);
+
+    // Activate Flooded Strand
+    let perm_id = state
+        .permanents_controlled_by(0)
+        .find(|p| p.card_name == CardName::FloodedStrand)
+        .expect("Flooded Strand should be on battlefield")
+        .id;
+
+    let activate = state.legal_actions(&db)
+        .into_iter()
+        .find(|a| matches!(a, Action::ActivateAbility { permanent_id, .. } if *permanent_id == perm_id))
+        .expect("Should be able to activate Flooded Strand");
+    state.apply_action(&activate, &db);
+
+    // Fetch land should be destroyed and 1 life paid
+    assert_eq!(state.players[0].life, starting_life - 1, "Should lose 1 life from fetch");
+    assert!(
+        state.permanents_controlled_by(0).find(|p| p.card_name == CardName::FloodedStrand).is_none(),
+        "Flooded Strand should be sacrificed"
+    );
+
+    // Resolve the search choice: pick the Island
+    let choice = state.pending_choice.as_ref().expect("Should have pending search choice");
+    let island_id = if let ChoiceKind::ChooseFromList { ref options, .. } = choice.kind {
+        options.iter()
+            .copied()
+            .find(|&id| state.card_name_for_id(id) == Some(CardName::Island))
+            .expect("Island should be searchable")
+    } else {
+        panic!("Expected ChooseFromList");
+    };
+
+    state.apply_action(&Action::ChooseCard(island_id), &db);
+
+    // Island should now be on battlefield, not in library
+    assert!(
+        state.permanents_controlled_by(0).find(|p| p.card_name == CardName::Island).is_some(),
+        "Fetched Island should enter the battlefield"
+    );
+    assert!(
+        state.players[0].library.iter().all(|&id| state.card_name_for_id(id) != Some(CardName::Island)),
+        "Island should no longer be in library"
+    );
+}
+
+/// Fetch land can fetch Plateau (Mountain+Plains), which was previously missing.
+#[test]
+fn test_flooded_strand_fetches_plateau() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // Plateau at index 32; FloodedStrand at top (index 39). After 7 draws Plateau stays in library.
+    let deck: Vec<CardName> = std::iter::repeat(CardName::Plains)
+        .take(32)
+        .chain(std::iter::once(CardName::Plateau))
+        .chain(std::iter::repeat(CardName::Plains).take(6))
+        .chain(std::iter::once(CardName::FloodedStrand))
+        .collect();
+    state.load_deck(0, &deck, &db);
+    state.load_deck(1, &(vec![CardName::Mountain; 40]), &db);
+    state.start_game();
+
+    state.phase = Phase::PreCombatMain;
+    state.step = None;
+
+    let strand_id = state.players[0]
+        .hand
+        .iter()
+        .find(|&&id| state.card_name_for_id(id) == Some(CardName::FloodedStrand))
+        .copied()
+        .expect("Flooded Strand should be in hand");
+    state.apply_action(&Action::PlayLand(strand_id), &db);
+
+    let perm_id = state
+        .permanents_controlled_by(0)
+        .find(|p| p.card_name == CardName::FloodedStrand)
+        .expect("Flooded Strand should be on battlefield")
+        .id;
+
+    let activate = state.legal_actions(&db)
+        .into_iter()
+        .find(|a| matches!(a, Action::ActivateAbility { permanent_id, .. } if *permanent_id == perm_id))
+        .expect("Should be able to activate Flooded Strand");
+    state.apply_action(&activate, &db);
+
+    assert!(state.pending_choice.is_some(), "Should have pending choice");
+    if let Some(choice) = &state.pending_choice {
+        if let ChoiceKind::ChooseFromList { options, .. } = &choice.kind {
+            let found = options.iter().any(|&id| state.card_name_for_id(id) == Some(CardName::Plateau));
+            assert!(found, "Flooded Strand should be able to fetch Plateau (has Plains subtype)");
+        } else {
+            panic!("Expected ChooseFromList");
+        }
+    }
+}
+
+/// Polluted Delta can fetch Scrubland (Plains+Swamp, has Swamp subtype).
+#[test]
+fn test_polluted_delta_fetches_scrubland() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // Scrubland at index 32; PollutedDelta at top (index 39). After 7 draws Scrubland stays in library.
+    let deck: Vec<CardName> = std::iter::repeat(CardName::Swamp)
+        .take(32)
+        .chain(std::iter::once(CardName::Scrubland))
+        .chain(std::iter::repeat(CardName::Swamp).take(6))
+        .chain(std::iter::once(CardName::PollutedDelta))
+        .collect();
+    state.load_deck(0, &deck, &db);
+    state.load_deck(1, &(vec![CardName::Mountain; 40]), &db);
+    state.start_game();
+
+    state.phase = Phase::PreCombatMain;
+    state.step = None;
+
+    let delta_id = state.players[0]
+        .hand
+        .iter()
+        .find(|&&id| state.card_name_for_id(id) == Some(CardName::PollutedDelta))
+        .copied()
+        .expect("Polluted Delta should be in hand");
+    state.apply_action(&Action::PlayLand(delta_id), &db);
+
+    let perm_id = state
+        .permanents_controlled_by(0)
+        .find(|p| p.card_name == CardName::PollutedDelta)
+        .expect("Polluted Delta should be on battlefield")
+        .id;
+
+    let activate = state.legal_actions(&db)
+        .into_iter()
+        .find(|a| matches!(a, Action::ActivateAbility { permanent_id, .. } if *permanent_id == perm_id))
+        .expect("Should be able to activate Polluted Delta");
+    state.apply_action(&activate, &db);
+
+    assert!(state.pending_choice.is_some(), "Should have pending choice");
+    if let Some(choice) = &state.pending_choice {
+        if let ChoiceKind::ChooseFromList { options, .. } = &choice.kind {
+            let found = options.iter().any(|&id| state.card_name_for_id(id) == Some(CardName::Scrubland));
+            assert!(found, "Polluted Delta should be able to fetch Scrubland (has Swamp subtype)");
+        } else {
+            panic!("Expected ChooseFromList");
+        }
+    }
+}
+
+/// Fetching a shock land triggers the shock land ETB choice (pay 2 life or enter tapped).
+#[test]
+fn test_fetch_shock_land_triggers_etb_choice() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // HallowedFountain at index 32; FloodedStrand at top (index 39). After 7 draws fountain stays in library.
+    let deck: Vec<CardName> = std::iter::repeat(CardName::Island)
+        .take(32)
+        .chain(std::iter::once(CardName::HallowedFountain))
+        .chain(std::iter::repeat(CardName::Island).take(6))
+        .chain(std::iter::once(CardName::FloodedStrand))
+        .collect();
+    state.load_deck(0, &deck, &db);
+    state.load_deck(1, &(vec![CardName::Mountain; 40]), &db);
+    state.start_game();
+
+    state.phase = Phase::PreCombatMain;
+    state.step = None;
+
+    let strand_id = state.players[0]
+        .hand
+        .iter()
+        .find(|&&id| state.card_name_for_id(id) == Some(CardName::FloodedStrand))
+        .copied()
+        .expect("Flooded Strand should be in hand");
+    state.apply_action(&Action::PlayLand(strand_id), &db);
+
+    let perm_id = state
+        .permanents_controlled_by(0)
+        .find(|p| p.card_name == CardName::FloodedStrand)
+        .expect("Flooded Strand should be on battlefield")
+        .id;
+
+    let activate = state.legal_actions(&db)
+        .into_iter()
+        .find(|a| matches!(a, Action::ActivateAbility { permanent_id, .. } if *permanent_id == perm_id))
+        .expect("Should be able to activate Flooded Strand");
+    state.apply_action(&activate, &db);
+
+    // Resolve the search: pick Hallowed Fountain
+    let fountain_id = if let Some(choice) = &state.pending_choice {
+        if let ChoiceKind::ChooseFromList { ref options, .. } = choice.kind {
+            options.iter()
+                .copied()
+                .find(|&id| state.card_name_for_id(id) == Some(CardName::HallowedFountain))
+                .expect("HallowedFountain should be searchable")
+        } else {
+            panic!("Expected ChooseFromList");
+        }
+    } else {
+        panic!("Expected pending search choice");
+    };
+
+    state.apply_action(&Action::ChooseCard(fountain_id), &db);
+
+    // After fetching shock land, there should be a pending shock land ETB choice
+    assert!(
+        state.pending_choice.is_some(),
+        "Should have a pending choice for shock land ETB after fetching"
+    );
+    assert!(
+        matches!(
+            state.pending_choice.as_ref().unwrap().kind,
+            ChoiceKind::ChooseNumber { reason: ChoiceReason::ShockLandETB { .. }, .. }
+        ),
+        "Pending choice should be shock land ETB (pay 2 life or enter tapped)"
+    );
+}
+
 #[test]
 fn test_crop_rotation_searches_for_land() {
     let db = build_card_db();
