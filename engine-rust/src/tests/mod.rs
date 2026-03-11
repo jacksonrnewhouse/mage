@@ -5,6 +5,7 @@ use crate::types::*;
 mod alt_cost;
 mod basic;
 mod combat;
+mod monarch;
 mod cost_reduction;
 mod cycling;
 mod dynamic_pt;

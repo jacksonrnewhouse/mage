@@ -971,6 +971,8 @@ impl GameState {
                     token.is_token = true;
                     self.battlefield.push(token);
                 }
+                // You become the monarch.
+                self.become_monarch(controller);
             }
 
             // === Doomsday ===
@@ -1142,8 +1144,19 @@ impl GameState {
             CardName::SnapcasterMage => {}
             // Stoneforge Mystic: search for equipment
             CardName::StoneforgeMystic => {}
-            // Palace Jailer: become monarch, exile creature
-            CardName::PalaceJailer => {}
+            // Palace Jailer: become monarch, exile target opponent's creature
+            CardName::PalaceJailer => {
+                self.become_monarch(controller);
+                // Exile target creature an opponent controls (simplified: pick first opponent creature)
+                let target_id = self.battlefield.iter()
+                    .find(|p| p.controller != controller && p.is_creature())
+                    .map(|p| p.id);
+                if let Some(tid) = target_id {
+                    // Track the exile link: when Palace Jailer leaves, the creature returns.
+                    self.exile_linked.push((_card_id, tid));
+                    self.remove_permanent_to_zone(tid, DestinationZone::Exile);
+                }
+            }
             // Manglehorn: destroy artifact
             CardName::Manglehorn => {
                 let targets: Vec<ObjectId> = self.battlefield.iter()
@@ -1604,6 +1617,10 @@ impl GameState {
                     token.is_token = true;
                     self.battlefield.push(token);
                 }
+            }
+            TriggeredEffect::MonarchEndStep => {
+                // The monarch draws a card at the beginning of their end step.
+                self.draw_cards(controller, 1);
             }
             _ => {}
         }

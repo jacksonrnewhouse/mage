@@ -80,6 +80,12 @@ pub struct GameState {
     /// Maps (exiling_permanent_id, token_mv) for Skyclave Apparition.
     /// When Skyclave Apparition leaves, the opponent gets a token with MV equal to the exiled card's MV.
     pub skyclave_token_mv: Vec<(ObjectId, u32)>,
+
+    // --- Monarch ---
+    /// The player who is currently the monarch, if any. The monarch draws a card
+    /// at the beginning of their end step. When a creature deals combat damage to
+    /// the monarch, that creature's controller becomes the new monarch.
+    pub monarch: Option<PlayerId>,
 }
 
 /// When the game needs a player to make a choice (tutor, discard, etc.)
@@ -161,6 +167,7 @@ impl GameState {
             snapcaster_flashback_cards: Vec::new(),
             exile_linked: Vec::new(),
             skyclave_token_mv: Vec::new(),
+            monarch: None,
         }
     }
 
@@ -292,6 +299,20 @@ impl GameState {
             (Phase::PostCombatMain, _) => {
                 self.phase = Phase::Ending;
                 self.step = Some(Step::End);
+                // Monarch draws a card at the beginning of their end step.
+                if let Some(monarch_id) = self.monarch {
+                    if monarch_id == self.active_player {
+                        self.stack.push(
+                            crate::stack::StackItemKind::TriggeredAbility {
+                                source_id: 0,
+                                source_name: crate::card::CardName::Plains, // placeholder
+                                effect: crate::stack::TriggeredEffect::MonarchEndStep,
+                            },
+                            monarch_id,
+                            vec![],
+                        );
+                    }
+                }
                 self.give_priority_to_active();
             }
             (Phase::Ending, Some(Step::End)) => {
@@ -643,6 +664,12 @@ impl GameState {
             }
         }
         dest
+    }
+
+    /// Make a player the monarch. The monarch draws a card at the beginning of their
+    /// end step. If there's already a monarch, they lose the designation.
+    pub fn become_monarch(&mut self, player_id: PlayerId) {
+        self.monarch = Some(player_id);
     }
 
     /// Change the controller of a permanent. Does not fire triggers.

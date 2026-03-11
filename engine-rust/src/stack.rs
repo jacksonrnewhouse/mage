@@ -102,6 +102,8 @@ pub enum TriggeredEffect {
     SkyclaveApparitionLeaves { apparition_id: ObjectId, token_mv: u32, opponent: PlayerId },
     /// Exile-until-leaves return trigger: return an exiled card to the battlefield
     ExileLinkedReturn { card_id: ObjectId, card_owner: PlayerId },
+    /// Monarch end-step trigger: the monarch draws a card
+    MonarchEndStep,
 }
 
 /// Activated ability effects.

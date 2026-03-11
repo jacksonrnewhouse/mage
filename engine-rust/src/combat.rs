@@ -83,6 +83,12 @@ impl GameState {
                         vec![],
                     );
                 }
+
+                // Monarch: if the defending player is the monarch, the attacker's
+                // controller becomes the new monarch.
+                if self.monarch == Some(defending_player) {
+                    self.monarch = Some(attacker_controller);
+                }
             } else {
                 // Blocked - assign damage to blockers
                 let mut remaining_damage = attacker_power;
@@ -116,6 +122,10 @@ impl GameState {
                 // Trample: excess damage goes to defending player
                 if attacker_has_trample && remaining_damage > 0 {
                     damage_to_players.push((defending_player, remaining_damage as i32));
+                    // Monarch: trample damage reaching the defending player steals the monarchy
+                    if self.monarch == Some(defending_player) {
+                        self.monarch = Some(attacker_controller);
+                    }
                 }
             }
 
