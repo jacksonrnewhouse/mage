@@ -518,9 +518,17 @@ impl GameState {
         let is_artifact = perm.is_artifact();
         let is_token = perm.is_token;
 
+        // Apply graveyard-replacement effects: if Rest in Peace is on the battlefield,
+        // any card that would go to the graveyard goes to exile instead.
+        let actual_destination = if destination == DestinationZone::Graveyard {
+            self.graveyard_destination(owner)
+        } else {
+            destination
+        };
+
         // Place in destination zone (tokens cease to exist, but we still fire triggers)
         if !is_token {
-            match destination {
+            match actual_destination {
                 DestinationZone::Graveyard => {
                     self.players[owner as usize].graveyard.push(perm_id);
                 }
@@ -536,22 +544,25 @@ impl GameState {
             }
         }
 
-        // Check dies triggers (only when going to graveyard)
-        if destination == DestinationZone::Graveyard {
+        // Check dies triggers (only when actually going to graveyard)
+        if actual_destination == DestinationZone::Graveyard {
             self.check_dies_triggers(perm_id, perm_name, controller, is_artifact);
         }
 
-        // Fire Skullclamp trigger: when equipped creature dies, draw 2
-        if let Some((skullclamp_id, skullclamp_controller)) = skullclamp_trigger {
-            self.stack.push(
-                StackItemKind::TriggeredAbility {
-                    source_id: skullclamp_id,
-                    source_name: CardName::SkullClamp,
-                    effect: TriggeredEffect::SkullclampDeath,
-                },
-                skullclamp_controller,
-                vec![],
-            );
+        // Fire Skullclamp trigger: when equipped creature dies (goes to graveyard), draw 2.
+        // With Rest in Peace the creature goes to exile, so Skullclamp does NOT trigger.
+        if actual_destination == DestinationZone::Graveyard {
+            if let Some((skullclamp_id, skullclamp_controller)) = skullclamp_trigger {
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: skullclamp_id,
+                        source_name: CardName::SkullClamp,
+                        effect: TriggeredEffect::SkullclampDeath,
+                    },
+                    skullclamp_controller,
+                    vec![],
+                );
+            }
         }
 
         // Check leaves-battlefield triggers (for all removals)
@@ -561,8 +572,64 @@ impl GameState {
     }
 
     /// Convenience: destroy a permanent (move to graveyard with triggers).
+    /// If a graveyard-replacement effect (Rest in Peace) is active, the permanent goes to exile instead.
     pub fn destroy_permanent(&mut self, id: ObjectId) -> Option<Permanent> {
-        self.remove_permanent_to_zone(id, DestinationZone::Graveyard)
+        let owner = self.find_permanent(id).map(|p| p.owner);
+        let dest = owner
+            .map(|o| self.graveyard_destination(o))
+            .unwrap_or(DestinationZone::Graveyard);
+        self.remove_permanent_to_zone(id, dest)
+    }
+
+    /// Check whether a graveyard-replacement effect is in play for the given card owner.
+    /// Returns the actual destination zone (Exile when Rest in Peace is on the battlefield,
+    /// Graveyard otherwise).
+    pub fn graveyard_destination(&self, _owner: PlayerId) -> DestinationZone {
+        let rest_in_peace_on_battlefield = self
+            .battlefield
+            .iter()
+            .any(|p| p.card_name == CardName::RestInPeace);
+        if rest_in_peace_on_battlefield {
+            DestinationZone::Exile
+        } else {
+            DestinationZone::Graveyard
+        }
+    }
+
+    /// Check whether Grafdigger's Cage is on the battlefield.
+    /// When true, creature cards from graveyards and libraries can't enter the battlefield,
+    /// and players can't cast spells from graveyards or libraries.
+    pub fn grafdiggers_cage_active(&self) -> bool {
+        self.battlefield
+            .iter()
+            .any(|p| p.card_name == CardName::GrafdiggersCage)
+    }
+
+    /// Check whether Containment Priest is on the battlefield.
+    /// When true, nontoken creatures that weren't cast are exiled instead of entering.
+    pub fn containment_priest_active(&self) -> bool {
+        self.battlefield
+            .iter()
+            .any(|p| p.card_name == CardName::ContainmentPriest)
+    }
+
+    /// Send a card (by id and name) from any zone directly to the graveyard,
+    /// applying graveyard-replacement effects (Rest in Peace → exile instead).
+    /// Returns the actual destination zone used.
+    pub fn send_to_graveyard(&mut self, card_id: ObjectId, card_name: CardName, owner: PlayerId) -> DestinationZone {
+        let dest = self.graveyard_destination(owner);
+        match dest {
+            DestinationZone::Graveyard => {
+                self.players[owner as usize].graveyard.push(card_id);
+            }
+            DestinationZone::Exile => {
+                self.exile.push((card_id, card_name, owner));
+            }
+            _ => {
+                self.players[owner as usize].graveyard.push(card_id);
+            }
+        }
+        dest
     }
 
     /// Change the controller of a permanent. Does not fire triggers.

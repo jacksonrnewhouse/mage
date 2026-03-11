@@ -44,18 +44,31 @@ impl GameState {
                         }
                     }
                     ChoiceReason::GenericSearch => {
-                        // Fetch land: put onto battlefield
+                        // Fetch land: put onto battlefield, or apply replacement effects.
                         let pid = choice.player as usize;
+                        // Check if the card is coming from library (Natural Order puts creature onto battlefield).
+                        let from_library = self.players[pid].library.iter().any(|&id| id == card_id);
+                        let cage_active = self.grafdiggers_cage_active();
+                        let priest_active = self.containment_priest_active();
                         if let Some(pos) = self.players[pid].library.iter().position(|&id| id == card_id) {
                             self.players[pid].library.remove(pos);
                             let card_name = self.card_name_for_id(card_id);
                             if let Some(cn) = card_name {
                                 if let Some(def) = find_card(db, cn) {
-                                    let perm = Permanent::new(
-                                        card_id, cn, choice.player, choice.player,
-                                        def.power, def.toughness, def.loyalty, def.keywords, def.card_types,
-                                    );
-                                    self.battlefield.push(perm);
+                                    let is_creature = def.card_types.contains(&CardType::Creature);
+                                    // Grafdigger's Cage: creature cards from libraries can't enter the battlefield.
+                                    // Containment Priest: nontoken creatures that weren't cast are exiled instead.
+                                    if from_library && is_creature && (cage_active || priest_active) {
+                                        // Card is exiled instead of entering
+                                        self.exile.push((card_id, cn, choice.player));
+                                    } else {
+                                        let perm = Permanent::new(
+                                            card_id, cn, choice.player, choice.player,
+                                            def.power, def.toughness, def.loyalty, def.keywords, def.card_types,
+                                        );
+                                        self.battlefield.push(perm);
+                                        self.handle_etb(cn, card_id, choice.player);
+                                    }
                                 }
                             }
                         }

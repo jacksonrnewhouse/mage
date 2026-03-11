@@ -206,6 +206,8 @@ impl GameState {
         // --- Cast spells from graveyard (flashback / Yawgmoth's Will / Snapcaster Mage) ---
         // Check if any graveyard spell-casting effect is active.
         let yawgmoth_active = self.players[player_id as usize].yawgmoth_will_active;
+        // Grafdigger's Cage: players can't cast spells from graveyards or libraries.
+        let cage_blocks_graveyard = self.grafdiggers_cage_active();
         {
             let graveyard: Vec<ObjectId> = self.players[player_id as usize].graveyard.clone();
             for card_id in graveyard {
@@ -213,6 +215,10 @@ impl GameState {
                     if let Some(def) = find_card(db, card_name) {
                         // Skip lands (Yawgmoth's Will lets you play lands, handled separately for now)
                         if def.card_types.contains(&CardType::Land) {
+                            continue;
+                        }
+                        // Grafdigger's Cage prevents casting from graveyard entirely.
+                        if cage_blocks_graveyard {
                             continue;
                         }
                         // Determine if this card can be cast from graveyard and what cost to use.

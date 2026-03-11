@@ -89,7 +89,8 @@ impl GameState {
                 // The card was already removed from graveyard when cast; just push to exile.
                 self.exile.push((card_id, card_name, controller));
             } else {
-                self.players[controller as usize].graveyard.push(card_id);
+                // Apply graveyard-replacement effects (Rest in Peace).
+                self.send_to_graveyard(card_id, card_name, controller);
             }
         }
     }
@@ -419,11 +420,18 @@ impl GameState {
             CardName::HymnToTourach => {
                 if let Some(Target::Player(target_player)) = targets.first() {
                     let pid = *target_player as usize;
+                    let owner = *target_player;
                     // Discard 2 at random - for deterministic search, pick last 2
                     let count = 2.min(self.players[pid].hand.len());
+                    let mut discarded = Vec::new();
                     for _ in 0..count {
-                        let id = self.players[pid].hand.pop().unwrap();
-                        self.players[pid].graveyard.push(id);
+                        if let Some(id) = self.players[pid].hand.pop() {
+                            discarded.push(id);
+                        }
+                    }
+                    for id in discarded {
+                        let cn = self.card_name_for_id(id).unwrap_or(CardName::Plains);
+                        self.send_to_graveyard(id, cn, owner);
                     }
                 }
             }
@@ -803,6 +811,10 @@ impl GameState {
 
             // === Reanimation ===
             CardName::Reanimate => {
+                // Grafdigger's Cage: creature cards from graveyards can't enter the battlefield.
+                // Containment Priest: nontoken creatures that weren't cast are exiled instead.
+                let cage_active = self.grafdiggers_cage_active();
+                let priest_active = self.containment_priest_active();
                 if let Some(Target::Object(target_id)) = targets.first() {
                     // Find card in any graveyard
                     for pid in 0..self.num_players as usize {
@@ -810,14 +822,20 @@ impl GameState {
                             let card_id = self.players[pid].graveyard.remove(pos);
                             let card_name = self.card_name_for_id(card_id);
                             if let Some(cn) = card_name {
-                                // TODO: look up proper stats from db
-                                let perm = Permanent::new(
-                                    card_id, cn, controller, pid as PlayerId,
-                                    Some(0), Some(0), None, Keywords::empty(), &[CardType::Creature],
-                                );
-                                self.battlefield.push(perm);
-                                // Lose life equal to CMC - simplified
-                                self.players[controller as usize].life -= 5;
+                                if cage_active || priest_active {
+                                    // Grafdigger's Cage / Containment Priest: exile the card instead
+                                    self.exile.push((card_id, cn, pid as PlayerId));
+                                } else {
+                                    // TODO: look up proper stats from db
+                                    let perm = Permanent::new(
+                                        card_id, cn, controller, pid as PlayerId,
+                                        Some(0), Some(0), None, Keywords::empty(), &[CardType::Creature],
+                                    );
+                                    self.battlefield.push(perm);
+                                    self.handle_etb(cn, card_id, controller);
+                                    // Lose life equal to CMC - simplified
+                                    self.players[controller as usize].life -= 5;
+                                }
                             }
                             break;
                         }
@@ -1205,6 +1223,20 @@ impl GameState {
             CardName::EngineeredExplosives => {
                 if let Some(perm) = self.find_permanent_mut(_card_id) {
                     perm.counters.add(CounterType::Charge, x_value as i16);
+                }
+            }
+
+            // Rest in Peace: exile all graveyards when it enters the battlefield.
+            // Its static replacement effect (cards go to exile instead of graveyard) is
+            // applied at the point of send_to_graveyard / remove_permanent_to_zone.
+            CardName::RestInPeace => {
+                let num_players = self.num_players as usize;
+                for pid in 0..num_players {
+                    let graveyard = std::mem::take(&mut self.players[pid].graveyard);
+                    for card_id in graveyard {
+                        let card_name = self.card_name_for_id(card_id).unwrap_or(CardName::Plains);
+                        self.exile.push((card_id, card_name, pid as PlayerId));
+                    }
                 }
             }
 

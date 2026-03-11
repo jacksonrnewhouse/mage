@@ -10,6 +10,7 @@ mod cycling;
 mod dynamic_pt;
 mod equipment;
 mod flashback;
+mod replacement_effects;
 mod spells;
 mod statics;
 mod triggers;
