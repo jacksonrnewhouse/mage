@@ -86,13 +86,18 @@ impl GameState {
                 if let Some(cn) = card_name {
                     if let Some(def) = find_card(db, cn) {
                         // Determine whether we're paying an alternate cost or normal mana cost.
+                        let is_artifact = def.card_types.contains(&CardType::Artifact);
                         let paid = if let Some(alt) = alt_cost {
                             self.pay_alt_cost(player_id, *card_id, alt)
                         } else if *from_graveyard {
                             // Flashback / Yawgmoth's Will: pay the flashback cost.
                             let base_cost = def.flashback_cost.unwrap_or(def.mana_cost);
                             let taxed = self.effective_cost_with_base(def, player_id, base_cost);
-                            self.players[player_id as usize].mana_pool.pay(&taxed)
+                            if is_artifact {
+                                self.players[player_id as usize].mana_pool.pay_for_artifact(&taxed)
+                            } else {
+                                self.players[player_id as usize].mana_pool.pay(&taxed)
+                            }
                         } else if *from_library_top {
                             // Casting from top of library.
                             // Check if the card is actually on top of the library.
@@ -120,7 +125,11 @@ impl GameState {
                                         let x_cost = (*x_value as u16) * (def.x_multiplier as u16);
                                         cost.generic = cost.generic.saturating_add(x_cost as u8);
                                     }
-                                    self.players[player_id as usize].mana_pool.pay(&cost)
+                                    if is_artifact {
+                                        self.players[player_id as usize].mana_pool.pay_for_artifact(&cost)
+                                    } else {
+                                        self.players[player_id as usize].mana_pool.pay(&cost)
+                                    }
                                 }
                             }
                         } else {
@@ -131,7 +140,11 @@ impl GameState {
                                 let x_cost = (*x_value as u16) * (def.x_multiplier as u16);
                                 cost.generic = cost.generic.saturating_add(x_cost as u8);
                             }
-                            self.players[player_id as usize].mana_pool.pay(&cost)
+                            if is_artifact {
+                                self.players[player_id as usize].mana_pool.pay_for_artifact(&cost)
+                            } else {
+                                self.players[player_id as usize].mana_pool.pay(&cost)
+                            }
                         };
 
                         if paid {

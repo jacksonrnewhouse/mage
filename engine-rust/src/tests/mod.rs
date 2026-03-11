@@ -3,6 +3,7 @@ use crate::game::*;
 use crate::types::*;
 
 mod alt_cost;
+mod mana_restrictions;
 mod companion;
 mod copy_spell;
 mod coin_flip;

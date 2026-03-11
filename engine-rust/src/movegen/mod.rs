@@ -146,29 +146,52 @@ impl GameState {
 
                     // Check mana cost (including Thalia tax, etc.)
                     let effective_cost = self.effective_cost(def, player_id);
+                    let is_artifact = def.card_types.contains(&CardType::Artifact);
 
                     // For X spells, determine the range of valid X values
                     let x_values: Vec<u8> = if def.has_x_cost {
                         // Check if we can afford at least the base cost (X=0)
-                        if !player.mana_pool.can_pay(&effective_cost) {
+                        let can_afford_base = if is_artifact {
+                            player.mana_pool.can_pay_for_artifact(&effective_cost)
+                        } else {
+                            player.mana_pool.can_pay(&effective_cost)
+                        };
+                        if !can_afford_base {
                             continue;
                         }
                         // Compute remaining mana after paying the base cost
                         let mut temp_pool = player.mana_pool;
-                        temp_pool.pay(&effective_cost);
-                        let remaining = temp_pool.total() as u8;
-                        // Max X is limited by remaining mana divided by x_multiplier
-                        let max_x = if def.x_multiplier > 0 {
-                            remaining / def.x_multiplier
+                        if is_artifact {
+                            temp_pool.pay_for_artifact(&effective_cost);
+                            let remaining = temp_pool.total_for_artifact() as u8;
+                            let max_x = if def.x_multiplier > 0 {
+                                remaining / def.x_multiplier
+                            } else {
+                                remaining
+                            };
+                            let cap = max_x.min(10);
+                            (0..=cap).collect()
                         } else {
-                            remaining
-                        };
-                        // Generate X values from 0 to max_x (inclusive)
-                        // For search efficiency, cap at a reasonable limit
-                        let cap = max_x.min(10);
-                        (0..=cap).collect()
+                            temp_pool.pay(&effective_cost);
+                            let remaining = temp_pool.total() as u8;
+                            // Max X is limited by remaining mana divided by x_multiplier
+                            let max_x = if def.x_multiplier > 0 {
+                                remaining / def.x_multiplier
+                            } else {
+                                remaining
+                            };
+                            // Generate X values from 0 to max_x (inclusive)
+                            // For search efficiency, cap at a reasonable limit
+                            let cap = max_x.min(10);
+                            (0..=cap).collect()
+                        }
                     } else {
-                        if !player.mana_pool.can_pay(&effective_cost) {
+                        let can_afford = if is_artifact {
+                            player.mana_pool.can_pay_for_artifact(&effective_cost)
+                        } else {
+                            player.mana_pool.can_pay(&effective_cost)
+                        };
+                        if !can_afford {
                             // Can't pay - but first check if we could tap lands to get mana
                             // For search, we generate mana ability actions separately
                             continue;
@@ -314,7 +337,12 @@ impl GameState {
                         // Check mana affordability using the flashback cost (with taxes applied)
                         let effective_flashback_cost = self.effective_cost_with_base(def, player_id, flashback_base_cost);
 
-                        if !player.mana_pool.can_pay(&effective_flashback_cost) {
+                        let can_afford_flashback = if def.card_types.contains(&CardType::Artifact) {
+                            player.mana_pool.can_pay_for_artifact(&effective_flashback_cost)
+                        } else {
+                            player.mana_pool.can_pay(&effective_flashback_cost)
+                        };
+                        if !can_afford_flashback {
                             continue;
                         }
 
@@ -424,12 +452,21 @@ impl GameState {
                                             // When both citadel and mana-based options available,
                                             // check if either payment is affordable
                                             let cost = self.effective_cost(top_def, player_id);
+                                            let can_pay_mana = if is_artifact {
+                                                player.mana_pool.can_pay_for_artifact(&cost)
+                                            } else {
+                                                player.mana_pool.can_pay(&cost)
+                                            };
                                             player.life > top_def.mana_cost.cmc() as i32
-                                                || player.mana_pool.can_pay(&cost)
+                                                || can_pay_mana
                                         } else {
                                             // Future Sight / Mystic Forge / Frenzy: pay mana
                                             let cost = self.effective_cost(top_def, player_id);
-                                            player.mana_pool.can_pay(&cost)
+                                            if is_artifact {
+                                                player.mana_pool.can_pay_for_artifact(&cost)
+                                            } else {
+                                                player.mana_pool.can_pay(&cost)
+                                            }
                                         };
 
                                         if can_afford {
@@ -1253,12 +1290,14 @@ impl GameState {
                 true
             }
 
-            // Mishra's Workshop: {T} for {C}{C}{C} (only for artifacts - enforced at cast time)
+            // Mishra's Workshop: {T} for {C}{C}{C} restricted to artifact spells.
+            // The mana is tracked in the separate `workshop` pool so the engine only
+            // offers it when generating actions for artifact spells.
             CardName::MishrasWorkshop => {
                 if let Some(perm) = self.find_permanent_mut(permanent_id) {
                     perm.tapped = true;
                 }
-                self.players[controller as usize].mana_pool.colorless += 3;
+                self.players[controller as usize].mana_pool.add_workshop(3);
                 true
             }
 

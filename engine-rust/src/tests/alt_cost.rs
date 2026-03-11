@@ -604,6 +604,7 @@ fn test_fow_can_still_be_cast_for_mana() {
         red: 0,
         green: 0,
         colorless: 3,
+        workshop: 0,
     };
 
     let stack_item_id = push_spell_on_stack(&mut state, CardName::LightningBolt, 1);
