@@ -68,10 +68,14 @@ impl GameState {
                             if !def.card_types.contains(&CardType::Artifact) {
                                 self.players[player_id as usize].nonartifact_spells_cast_this_turn += 1;
                             }
-                            if !def.card_types.contains(&CardType::Creature) {
+                            let is_noncreature = !def.card_types.contains(&CardType::Creature);
+                            if is_noncreature {
                                 self.players[player_id as usize].noncreature_spells_cast_this_turn += 1;
                             }
                             self.storm_count += 1;
+                            if is_noncreature {
+                                self.check_noncreature_cast_triggers(player_id);
+                            }
                             self.reset_priority_passes();
                         }
                     }

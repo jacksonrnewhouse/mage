@@ -89,4 +89,43 @@ impl GameState {
         // Future: handle leaves-battlefield triggers like
         // Oblivion Ring, Flickerwisp, etc.
     }
+
+    /// Check for noncreature spell cast triggers.
+    /// Called after a noncreature spell is pushed to the stack.
+    /// Handles Young Pyromancer (1/1 red Elemental) and Monastery Mentor (1/1 white Monk with prowess).
+    pub(crate) fn check_noncreature_cast_triggers(&mut self, caster: PlayerId) {
+        // Collect triggers to fire: (source_id, source_name, effect, controller)
+        let triggers: Vec<(ObjectId, CardName, TriggeredEffect, PlayerId)> = self
+            .battlefield
+            .iter()
+            .filter(|p| p.controller == caster)
+            .filter_map(|p| match p.card_name {
+                CardName::YoungPyromancer => Some((
+                    p.id,
+                    p.card_name,
+                    TriggeredEffect::YoungPyromancerCast,
+                    p.controller,
+                )),
+                CardName::MonasteryMentor => Some((
+                    p.id,
+                    p.card_name,
+                    TriggeredEffect::MonasteryMentorCast,
+                    p.controller,
+                )),
+                _ => None,
+            })
+            .collect();
+
+        for (source_id, source_name, effect, controller) in triggers {
+            self.stack.push(
+                StackItemKind::TriggeredAbility {
+                    source_id,
+                    source_name,
+                    effect,
+                },
+                controller,
+                vec![],
+            );
+        }
+    }
 }

@@ -452,3 +452,174 @@ fn test_exchange_control() {
     );
     let _ = db;
 }
+
+#[test]
+fn test_young_pyromancer_triggers_on_noncreature_spell() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // Put Young Pyromancer on the battlefield under P0's control
+    let pyro_id = state.new_object_id();
+    state.card_registry.push((pyro_id, CardName::YoungPyromancer));
+    let def = find_card(&db, CardName::YoungPyromancer).unwrap();
+    let mut perm = crate::permanent::Permanent::new(
+        pyro_id, CardName::YoungPyromancer, 0, 0,
+        def.power, def.toughness, None, def.keywords, def.card_types,
+    );
+    perm.entered_this_turn = false;
+    state.battlefield.push(perm);
+
+    // Give P0 enough mana to cast Lightning Bolt
+    state.players[0].mana_pool.red += 1;
+
+    // Put Lightning Bolt in P0's hand
+    let bolt_id = state.new_object_id();
+    state.card_registry.push((bolt_id, CardName::LightningBolt));
+    state.players[0].hand.push(bolt_id);
+
+    // Set up priority
+    state.phase = Phase::PreCombatMain;
+    state.step = None;
+    state.active_player = 0;
+    state.priority_player = 0;
+
+    // Apply CastSpell action
+    state.apply_action(
+        &crate::action::Action::CastSpell {
+            card_id: bolt_id,
+            targets: vec![Target::Player(1)],
+        },
+        &db,
+    );
+
+    // Stack should have both the spell and the trigger
+    assert!(
+        state.stack.len() >= 2,
+        "Stack should have the spell and the Young Pyromancer trigger, got {} items",
+        state.stack.len()
+    );
+
+    // Resolve both stack items (trigger first, then spell — or spell resolves first depending on order)
+    // Pass priority twice to resolve the top item
+    state.pass_priority(&db);
+    state.pass_priority(&db);
+    state.pass_priority(&db);
+    state.pass_priority(&db);
+
+    // Young Pyromancer should have created a 1/1 Elemental token
+    let tokens: Vec<_> = state.battlefield.iter().filter(|p| p.is_token).collect();
+    assert_eq!(tokens.len(), 1, "Young Pyromancer should create exactly 1 token");
+    assert_eq!(tokens[0].power(), 1, "Token should be 1/1");
+    assert_eq!(tokens[0].toughness(), 1, "Token should be 1/1");
+}
+
+#[test]
+fn test_young_pyromancer_does_not_trigger_on_creature_spell() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // Put Young Pyromancer on the battlefield under P0's control
+    let pyro_id = state.new_object_id();
+    state.card_registry.push((pyro_id, CardName::YoungPyromancer));
+    let def = find_card(&db, CardName::YoungPyromancer).unwrap();
+    let mut perm = crate::permanent::Permanent::new(
+        pyro_id, CardName::YoungPyromancer, 0, 0,
+        def.power, def.toughness, None, def.keywords, def.card_types,
+    );
+    perm.entered_this_turn = false;
+    state.battlefield.push(perm);
+
+    // Give P0 enough mana to cast Goblin Guide (1R) — 2 red covers the generic {1} as well
+    state.players[0].mana_pool.red += 2;
+
+    // Put Goblin Guide in P0's hand
+    let goblin_id = state.new_object_id();
+    state.card_registry.push((goblin_id, CardName::GoblinGuide));
+    state.players[0].hand.push(goblin_id);
+
+    // Set up priority
+    state.phase = Phase::PreCombatMain;
+    state.step = None;
+    state.active_player = 0;
+    state.priority_player = 0;
+
+    // Apply CastSpell action for Goblin Guide (a creature spell)
+    state.apply_action(
+        &crate::action::Action::CastSpell {
+            card_id: goblin_id,
+            targets: vec![],
+        },
+        &db,
+    );
+
+    // Stack should have exactly 1 item (the spell, no trigger)
+    assert_eq!(
+        state.stack.len(),
+        1,
+        "Casting a creature should not trigger Young Pyromancer, got {} items",
+        state.stack.len()
+    );
+}
+
+#[test]
+fn test_monastery_mentor_triggers_on_noncreature_spell() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // Put Monastery Mentor on the battlefield under P0's control
+    let mentor_id = state.new_object_id();
+    state.card_registry.push((mentor_id, CardName::MonasteryMentor));
+    let def = find_card(&db, CardName::MonasteryMentor).unwrap();
+    let mut perm = crate::permanent::Permanent::new(
+        mentor_id, CardName::MonasteryMentor, 0, 0,
+        def.power, def.toughness, None, def.keywords, def.card_types,
+    );
+    perm.entered_this_turn = false;
+    state.battlefield.push(perm);
+
+    // Give P0 enough mana to cast Lightning Bolt
+    state.players[0].mana_pool.red += 1;
+
+    // Put Lightning Bolt in P0's hand
+    let bolt_id = state.new_object_id();
+    state.card_registry.push((bolt_id, CardName::LightningBolt));
+    state.players[0].hand.push(bolt_id);
+
+    // Set up priority
+    state.phase = Phase::PreCombatMain;
+    state.step = None;
+    state.active_player = 0;
+    state.priority_player = 0;
+
+    // Apply CastSpell action
+    state.apply_action(
+        &crate::action::Action::CastSpell {
+            card_id: bolt_id,
+            targets: vec![Target::Player(1)],
+        },
+        &db,
+    );
+
+    // Stack should have both the spell and the trigger
+    assert!(
+        state.stack.len() >= 2,
+        "Stack should have the spell and the Monastery Mentor trigger, got {} items",
+        state.stack.len()
+    );
+
+    // Resolve all stack items
+    state.pass_priority(&db);
+    state.pass_priority(&db);
+    state.pass_priority(&db);
+    state.pass_priority(&db);
+
+    // Monastery Mentor should have created a 1/1 Monk token with Prowess
+    let tokens: Vec<_> = state.battlefield.iter().filter(|p| p.is_token).collect();
+    assert_eq!(tokens.len(), 1, "Monastery Mentor should create exactly 1 token");
+    assert_eq!(tokens[0].power(), 1, "Monk token should be 1/1");
+    assert_eq!(tokens[0].toughness(), 1, "Monk token should be 1/1");
+    assert!(
+        tokens[0].keywords.has(crate::types::Keyword::Prowess),
+        "Monk token should have Prowess"
+    );
+}
