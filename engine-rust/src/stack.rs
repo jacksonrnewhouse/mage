@@ -110,6 +110,8 @@ pub enum TriggeredEffect {
     DackEmblemControl,
     /// Tezzeret, Cruel Captain emblem: search library for an artifact and put it onto the battlefield.
     TezzeretEmblemArtifact,
+    /// Delayed sacrifice: sacrifice a specific permanent (used by Sneak Attack and similar).
+    SacrificeTarget { permanent_id: ObjectId },
 }
 
 /// Activated ability effects.

@@ -1750,6 +1750,16 @@ impl GameState {
                     });
                 }
             }
+            TriggeredEffect::SacrificeTarget { permanent_id } => {
+                // Sacrifice a specific permanent (e.g. Sneak Attack end-of-turn sacrifice).
+                // Only sacrifice if it's still on the battlefield and still controlled by controller.
+                let still_on_field = self.find_permanent(permanent_id)
+                    .map(|p| p.controller == controller)
+                    .unwrap_or(false);
+                if still_on_field {
+                    self.remove_permanent_to_zone(permanent_id, DestinationZone::Graveyard);
+                }
+            }
             _ => {}
         }
         let _ = db; // suppress unused warning when db not used in all arms

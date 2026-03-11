@@ -303,6 +303,37 @@ pub enum GameResult {
     InProgress,
 }
 
+/// Condition for when a delayed trigger fires.
+/// Delayed triggers fire at a specific game step for a specific player.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DelayedTriggerCondition {
+    /// Fires at the beginning of the end step for the specified player.
+    /// `player` is the player whose end step triggers this.
+    AtBeginningOfEndStep { player: PlayerId },
+    /// Fires at the beginning of the upkeep step for the specified player.
+    AtBeginningOfUpkeep { player: PlayerId },
+    /// Fires at the beginning of the end step for *any* player.
+    AtBeginningOfNextEndStep,
+    /// Fires at the beginning of the next upkeep for *any* player.
+    AtBeginningOfNextUpkeep,
+}
+
+/// A delayed triggered ability that will fire at a later point in the game.
+/// Created by effects like Sneak Attack ("at the beginning of the next end step,
+/// sacrifice the creature you put into play") or Ancestral Vision suspend
+/// ("at the beginning of your upkeep, draw 3 cards").
+#[derive(Debug, Clone)]
+pub struct DelayedTrigger {
+    /// When this trigger fires.
+    pub condition: DelayedTriggerCondition,
+    /// The effect that goes on the stack when this triggers.
+    pub effect: crate::stack::TriggeredEffect,
+    /// The controller of this trigger (who controls the triggered ability).
+    pub controller: PlayerId,
+    /// If true, this trigger is removed after it fires once.
+    pub fires_once: bool,
+}
+
 /// A temporary effect that lasts until end of turn.
 /// These are applied immediately and automatically reversed during cleanup.
 #[derive(Debug, Clone)]

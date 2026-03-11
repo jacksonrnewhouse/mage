@@ -4,6 +4,7 @@ use crate::types::*;
 
 mod alt_cost;
 mod annihilator_extra_turn;
+mod delayed_triggers;
 mod basic;
 mod dredge;
 mod emblem;

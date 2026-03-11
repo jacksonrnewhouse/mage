@@ -108,6 +108,12 @@ pub struct GameState {
     /// Emblems created by planeswalker ultimates (and similar). Each entry is
     /// (owner, emblem_kind). Emblems can't be removed and persist for the rest of the game.
     pub emblems: Vec<(PlayerId, Emblem)>,
+
+    // --- Delayed triggers ---
+    /// Delayed triggered abilities that will fire at a future step/phase.
+    /// Examples: "at the beginning of the next end step, sacrifice this" (Sneak Attack evoke-like),
+    ///           "at the beginning of your next upkeep, draw a card".
+    pub delayed_triggers: Vec<DelayedTrigger>,
 }
 
 /// When the game needs a player to make a choice (tutor, discard, etc.)
@@ -225,6 +231,7 @@ impl GameState {
             skyclave_token_mv: Vec::new(),
             monarch: None,
             emblems: Vec::new(),
+            delayed_triggers: Vec::new(),
         }
     }
 
@@ -278,6 +285,7 @@ impl GameState {
         match (self.phase, self.step) {
             (Phase::Beginning, Some(Step::Untap)) => {
                 self.step = Some(Step::Upkeep);
+                self.check_delayed_triggers();
                 self.give_priority_to_active();
             }
             (Phase::Beginning, Some(Step::Upkeep)) => {
@@ -370,6 +378,7 @@ impl GameState {
                         );
                     }
                 }
+                self.check_delayed_triggers();
                 self.give_priority_to_active();
             }
             (Phase::Ending, Some(Step::End)) => {
@@ -792,6 +801,82 @@ impl GameState {
     /// Check whether any player has a specific emblem.
     pub fn any_player_has_emblem(&self, emblem: Emblem) -> bool {
         self.emblems.iter().any(|&(_, e)| e == emblem)
+    }
+
+    /// Register a delayed trigger. It will fire at the specified condition
+    /// and be removed after firing if `fires_once` is true.
+    pub fn add_delayed_trigger(&mut self, trigger: DelayedTrigger) {
+        self.delayed_triggers.push(trigger);
+    }
+
+    /// Check and fire delayed triggers for the current step.
+    /// Called after entering each step that delayed triggers can target.
+    /// Fires all matching triggers by pushing them onto the stack;
+    /// removes one-shot triggers after firing.
+    pub fn check_delayed_triggers(&mut self) {
+        let active = self.active_player;
+        let step = self.step;
+        let phase = self.phase;
+
+        // Collect indices of triggers that should fire
+        let firing: Vec<usize> = self.delayed_triggers
+            .iter()
+            .enumerate()
+            .filter(|(_, dt)| {
+                match dt.condition {
+                    DelayedTriggerCondition::AtBeginningOfEndStep { player } => {
+                        phase == Phase::Ending && step == Some(Step::End) && active == player
+                    }
+                    DelayedTriggerCondition::AtBeginningOfUpkeep { player } => {
+                        phase == Phase::Beginning && step == Some(Step::Upkeep) && active == player
+                    }
+                    DelayedTriggerCondition::AtBeginningOfNextEndStep => {
+                        phase == Phase::Ending && step == Some(Step::End)
+                    }
+                    DelayedTriggerCondition::AtBeginningOfNextUpkeep => {
+                        phase == Phase::Beginning && step == Some(Step::Upkeep)
+                    }
+                }
+            })
+            .map(|(i, _)| i)
+            .collect();
+
+        if firing.is_empty() {
+            return;
+        }
+
+        // Collect triggers to fire (clone data needed for stack push)
+        let to_fire: Vec<(TriggeredEffect, PlayerId, bool)> = firing
+            .iter()
+            .map(|&i| {
+                let dt = &self.delayed_triggers[i];
+                (dt.effect.clone(), dt.controller, dt.fires_once)
+            })
+            .collect();
+
+        // Remove one-shot triggers (in reverse index order to preserve indices)
+        let mut to_remove: Vec<usize> = firing
+            .iter()
+            .copied()
+            .filter(|&i| self.delayed_triggers[i].fires_once)
+            .collect();
+        to_remove.sort_unstable_by(|a, b| b.cmp(a));
+        for i in to_remove {
+            self.delayed_triggers.swap_remove(i);
+        }
+
+        // Push triggered abilities onto the stack
+        for (effect, controller, _) in to_fire {
+            self.stack.push(
+                StackItemKind::TriggeredAbility {
+                    source_id: 0,
+                    source_name: crate::card::CardName::Plains, // placeholder source
+                    effect,
+                },
+                controller,
+                vec![],
+            );
+        }
     }
 
     /// Change the controller of a permanent. Does not fire triggers.
