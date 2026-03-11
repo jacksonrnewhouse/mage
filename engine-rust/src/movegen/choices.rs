@@ -290,6 +290,13 @@ impl GameState {
                             self.draw_cards(choice.player, 1);
                         }
                     }
+                    ChoiceReason::CoinFlip => {
+                        // 0 = heads: win the flip — no consequence.
+                        // 1 = tails: lose the flip — Mana Crypt deals 3 damage to the controller.
+                        if n == 1 {
+                            self.players[choice.player as usize].life -= 3;
+                        }
+                    }
                     ChoiceReason::DredgeChoice { dredge_card_id, dredge_n, remaining_draws } => {
                         // n == 0: draw normally (don't dredge)
                         // n == 1: dredge — mill N cards, return the dredge card from graveyard to hand

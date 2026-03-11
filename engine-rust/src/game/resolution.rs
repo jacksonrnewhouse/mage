@@ -1569,6 +1569,20 @@ impl GameState {
                 );
             }
 
+            // Mana Crypt: register a recurring "at the beginning of your upkeep, flip a coin"
+            // trigger. The trigger fires every upkeep for the controller and creates a
+            // PendingChoice so both outcomes can be explored by the search tree.
+            CardName::ManaCrypt => {
+                self.add_delayed_trigger(crate::types::DelayedTrigger {
+                    condition: crate::types::DelayedTriggerCondition::AtBeginningOfUpkeep {
+                        player: controller,
+                    },
+                    effect: TriggeredEffect::ManaCryptUpkeep,
+                    controller,
+                    fires_once: false,
+                });
+            }
+
             _ => {}
         }
     }
@@ -1576,9 +1590,17 @@ impl GameState {
     fn resolve_triggered(&mut self, effect: TriggeredEffect, controller: PlayerId, targets: &[Target], db: &[CardDef]) {
         match effect {
             TriggeredEffect::ManaCryptUpkeep => {
-                // Flip coin - simplified: 50% chance of 3 damage
-                // For deterministic search: always deal damage (worst case)
-                self.players[controller as usize].life -= 3;
+                // Create a coin-flip pending choice so the search tree can explore both outcomes.
+                // 0 = heads (win the flip, no damage)
+                // 1 = tails (lose the flip, Mana Crypt deals 3 damage to you)
+                self.pending_choice = Some(PendingChoice {
+                    player: controller,
+                    kind: ChoiceKind::ChooseNumber {
+                        min: 0,
+                        max: 1,
+                        reason: ChoiceReason::CoinFlip,
+                    },
+                });
             }
             TriggeredEffect::DealDamage(amount) => {
                 if let Some(target) = targets.first() {

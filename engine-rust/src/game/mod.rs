@@ -213,6 +213,13 @@ pub enum ChoiceReason {
         dredge_n: u8,
         remaining_draws: usize,
     },
+    /// Coin flip for random effects (e.g. Mana Crypt upkeep trigger).
+    /// For game tree search, the "chance player" chooses the outcome:
+    ///   0 = heads (win the flip — no negative consequence)
+    ///   1 = tails (lose the flip — negative consequence applies)
+    /// This models randomness as a two-branch decision node so search can
+    /// explore both outcomes (MCTS handles variance correctly this way).
+    CoinFlip,
 }
 impl GameState {
     /// Create a new two-player game.

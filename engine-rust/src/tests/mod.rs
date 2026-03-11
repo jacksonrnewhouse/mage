@@ -3,6 +3,7 @@ use crate::game::*;
 use crate::types::*;
 
 mod alt_cost;
+mod coin_flip;
 mod annihilator_extra_turn;
 mod delayed_triggers;
 mod basic;
