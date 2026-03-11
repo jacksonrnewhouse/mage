@@ -227,7 +227,19 @@ impl GameState {
                         // Priority: own flashback_cost > snapcaster grant > yawgmoth (normal cost)
                         let has_own_flashback = def.flashback_cost.is_some();
                         let has_snapcaster_flashback = self.snapcaster_flashback_cards.contains(&card_id);
-                        let can_cast_from_gyd = has_own_flashback || has_snapcaster_flashback || yawgmoth_active;
+                        // Wrenn and Six emblem: instant and sorcery cards in your graveyard have retrace.
+                        // Retrace: you may cast this card from your graveyard by discarding a land.
+                        let has_wrenn_retrace = self.has_emblem(player_id, crate::game::Emblem::WrennAndSix)
+                            && (def.card_types.contains(&CardType::Instant)
+                                || def.card_types.contains(&CardType::Sorcery));
+                        // Check if the player has a land to discard (retrace cost)
+                        let can_retrace = has_wrenn_retrace && self.players[player_id as usize].hand.iter().any(|&id| {
+                            self.card_name_for_id(id)
+                                .and_then(|cn| find_card(db, cn))
+                                .map(|d| d.card_types.contains(&CardType::Land))
+                                .unwrap_or(false)
+                        });
+                        let can_cast_from_gyd = has_own_flashback || has_snapcaster_flashback || yawgmoth_active || can_retrace;
 
                         if !can_cast_from_gyd {
                             continue;
@@ -1408,6 +1420,10 @@ impl GameState {
                             }
                         }
                     }
+                    // -6: Create emblem
+                    if perm.loyalty >= 6 {
+                        abilities.push((2, vec![]));
+                    }
                 }
                 CardName::NarsetParterOfVeils => {
                     // -2: Look at top 4, take noncreature nonland
@@ -1422,6 +1438,8 @@ impl GameState {
                     }
                     // 0: Become 4/4 creature
                     abilities.push((1, vec![]));
+                    // +0 emblem: create Gideon emblem (no loyalty cost, can always activate)
+                    abilities.push((2, vec![]));
                 }
                 CardName::WrennAndSix => {
                     // +1: Return land from graveyard to hand
@@ -1436,6 +1454,10 @@ impl GameState {
                                 abilities.push((1, vec![Target::Object(target.id)]));
                             }
                         }
+                    }
+                    // -7: Create emblem
+                    if perm.loyalty >= 7 {
+                        abilities.push((2, vec![]));
                     }
                 }
                 CardName::OkoThiefOfCrowns => {
@@ -1470,6 +1492,18 @@ impl GameState {
                                 abilities.push((1, vec![Target::Object(target.id)]));
                             }
                         }
+                    }
+                }
+                CardName::TezzeretCruelCaptain => {
+                    // +1: Draw a card if you control an artifact
+                    abilities.push((0, vec![]));
+                    // -2: Create a 1/1 colorless Thopter artifact creature token with flying
+                    if perm.loyalty >= 2 {
+                        abilities.push((1, vec![]));
+                    }
+                    // -7: Create emblem
+                    if perm.loyalty >= 7 {
+                        abilities.push((2, vec![]));
                     }
                 }
                 _ => {}

@@ -3,7 +3,7 @@
 use crate::action::*;
 use crate::card::*;
 use super::card_name_for_token;
-use crate::game::{ChoiceKind, ChoiceReason, DestinationZone, GameState, PendingChoice};
+use crate::game::{ChoiceKind, ChoiceReason, DestinationZone, Emblem, GameState, PendingChoice};
 use crate::permanent::*;
 use crate::stack::*;
 use crate::types::*;
@@ -1691,6 +1691,36 @@ impl GameState {
                 // When you cast Emrakul, take an extra turn after this one.
                 self.players[controller as usize].extra_turns += 1;
             }
+            TriggeredEffect::DackEmblemControl => {
+                // Dack Fayden emblem: gain control of target permanent.
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    self.gain_control(*target_id, controller);
+                }
+            }
+            TriggeredEffect::TezzeretEmblemArtifact => {
+                // Tezzeret, Cruel Captain emblem: search library for an artifact, put it
+                // onto the battlefield. Simplified: present as a search choice.
+                let options: Vec<ObjectId> = self.players[controller as usize]
+                    .library
+                    .iter()
+                    .filter(|&&id| {
+                        self.card_name_for_id(id)
+                            .and_then(|cn| crate::card::find_card(db, cn))
+                            .map(|def| def.card_types.contains(&crate::types::CardType::Artifact))
+                            .unwrap_or(false)
+                    })
+                    .copied()
+                    .collect();
+                if !options.is_empty() {
+                    self.pending_choice = Some(PendingChoice {
+                        player: controller,
+                        kind: ChoiceKind::ChooseFromList {
+                            options,
+                            reason: ChoiceReason::GenericSearch,
+                        },
+                    });
+                }
+            }
             _ => {}
         }
         let _ = db; // suppress unused warning when db not used in all arms
@@ -1961,6 +1991,102 @@ impl GameState {
                 if let Some(Target::Object(target_id)) = targets.first() {
                     self.remove_permanent_to_zone(*target_id, DestinationZone::Hand);
                 }
+            }
+
+            // === Dack Fayden ===
+            ActivatedEffect::DackDraw => {
+                // +1: Target player draws 2 cards, then discards 2.
+                if let Some(Target::Player(pid)) = targets.first() {
+                    let pid = *pid;
+                    self.draw_cards(pid, 2);
+                    let player = &mut self.players[pid as usize];
+                    for _ in 0..2 {
+                        if let Some(id) = player.hand.pop() {
+                            player.graveyard.push(id);
+                        }
+                    }
+                } else {
+                    self.draw_cards(controller, 2);
+                    let player = &mut self.players[controller as usize];
+                    for _ in 0..2 {
+                        if let Some(id) = player.hand.pop() {
+                            player.graveyard.push(id);
+                        }
+                    }
+                }
+            }
+            ActivatedEffect::DackSteal => {
+                // -2: Gain control of target artifact.
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    self.gain_control(*target_id, controller);
+                }
+            }
+            ActivatedEffect::DackUltimate => {
+                // -6: You get an emblem with "Whenever you cast a spell that targets one or more
+                // permanents, gain control of those permanents."
+                self.create_emblem(controller, Emblem::DackFayden);
+            }
+
+            // === Wrenn and Six ===
+            ActivatedEffect::WrennUltimate => {
+                // -7: You get an emblem with "Instant and sorcery cards in your graveyard have retrace."
+                self.create_emblem(controller, Emblem::WrennAndSix);
+            }
+
+            // === Tezzeret, Cruel Captain ===
+            ActivatedEffect::TezzeretDraw => {
+                // +1: Draw a card if you control an artifact.
+                let controls_artifact = self.battlefield.iter()
+                    .any(|p| p.controller == controller && p.is_artifact());
+                if controls_artifact {
+                    self.draw_cards(controller, 1);
+                }
+            }
+            ActivatedEffect::TezzeretThopter => {
+                // -2: Create a 1/1 colorless Thopter artifact creature token with flying.
+                let token_id = self.new_object_id();
+                let mut kw = Keywords::empty();
+                kw.add(Keyword::Flying);
+                let token = Permanent {
+                    id: token_id,
+                    card_name: CardName::ThopterToken,
+                    controller,
+                    owner: controller,
+                    tapped: false,
+                    base_power: 1,
+                    base_toughness: 1,
+                    power_mod: 0,
+                    toughness_mod: 0,
+                    damage: 0,
+                    keywords: kw,
+                    counters: Counters::default(),
+                    entered_this_turn: true,
+                    attacked_this_turn: false,
+                    doesnt_untap: false,
+                    loyalty: 0,
+                    loyalty_activated_this_turn: false,
+                    card_types: vec![CardType::Artifact, CardType::Creature],
+                    creature_types: vec![CreatureType::Thopter],
+                    cavern_creature_type: None,
+                    protections: Vec::new(),
+                    colors: Vec::new(),
+                    is_token: true,
+                    attached_to: None,
+                    attachments: Vec::new(),
+                };
+                self.battlefield.push(token);
+            }
+            ActivatedEffect::TezzeretUltimate => {
+                // -7: You get an emblem with "Whenever you cast an artifact spell, search your
+                // library for an artifact card, put it onto the battlefield, then shuffle."
+                self.create_emblem(controller, Emblem::TezzeretCruelCaptain);
+            }
+
+            // === Gideon of the Trials ===
+            ActivatedEffect::GideonEmblem => {
+                // +0: You get an emblem with "As long as you control a Gideon planeswalker,
+                // you can't lose the game and your opponents can't win the game."
+                self.create_emblem(controller, Emblem::GideonOfTheTrials);
             }
         }
     }

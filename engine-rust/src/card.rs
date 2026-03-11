@@ -520,6 +520,8 @@ pub enum CardName {
     // === Tokens ===
     /// Represents a Treasure token (artifact: "Sacrifice: Add one mana of any color.")
     TreasureToken,
+    /// Represents a Thopter token (1/1 colorless Thopter artifact creature with flying).
+    ThopterToken,
 
     // Sentinel value for array sizing
     _Count,

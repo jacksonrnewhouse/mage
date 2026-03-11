@@ -106,6 +106,10 @@ pub enum TriggeredEffect {
     MonarchEndStep,
     /// Emrakul, the Aeons Torn cast trigger: take an extra turn after this one
     EmrakulCast,
+    /// Dack Fayden emblem: gain control of a permanent (targets[0] is the permanent).
+    DackEmblemControl,
+    /// Tezzeret, Cruel Captain emblem: search library for an artifact and put it onto the battlefield.
+    TezzeretEmblemArtifact,
 }
 
 /// Activated ability effects.
@@ -147,6 +151,8 @@ pub enum ActivatedEffect {
     WrennReturn,
     /// Wrenn -1: deal 1 damage
     WrennPing,
+    /// Wrenn -7 ultimate: create Wrenn and Six emblem
+    WrennUltimate,
     /// Karn +1: animate artifact
     KarnAnimate,
     /// Karn -2: wish for artifact
@@ -155,6 +161,8 @@ pub enum ActivatedEffect {
     GideonCreature,
     /// Gideon +1: prevent damage
     GideonPrevent,
+    /// Gideon +0: create the Gideon of the Trials emblem
+    GideonEmblem,
     /// Kaya +1: exile from graveyard
     KayaExile,
     /// Kaya -1: exile permanent
@@ -171,6 +179,18 @@ pub enum ActivatedEffect {
     BoseijuChannel,
     /// Otawara channel: return target artifact, creature, or planeswalker to owner's hand.
     OtawaraChannel,
+    /// Dack Fayden +1: target player draws 2 cards, then discards 2.
+    DackDraw,
+    /// Dack Fayden -2: gain control of target artifact.
+    DackSteal,
+    /// Dack Fayden -6: create the Dack Fayden emblem.
+    DackUltimate,
+    /// Tezzeret, Cruel Captain +1: draw a card if you control an artifact.
+    TezzeretDraw,
+    /// Tezzeret, Cruel Captain -2: create a 1/1 Thopter artifact creature token with flying.
+    TezzeretThopter,
+    /// Tezzeret, Cruel Captain -7: create the Tezzeret emblem.
+    TezzeretUltimate,
 }
 
 /// The game stack.

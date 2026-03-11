@@ -1,7 +1,7 @@
 /// State-based actions and legend rule.
 
 use crate::card::*;
-use crate::game::GameState;
+use crate::game::{Emblem, GameState};
 use crate::permanent::*;
 use crate::types::*;
 
@@ -12,10 +12,20 @@ impl GameState {
             changes = false;
 
             // Player loses if life <= 0
+            // Exception: Gideon of the Trials emblem — "As long as you control a Gideon
+            // planeswalker, you can't lose the game and your opponents can't win the game."
             for i in 0..self.num_players as usize {
                 if self.players[i].life <= 0 && !self.players[i].has_lost {
-                    self.players[i].has_lost = true;
-                    changes = true;
+                    let pid = i as PlayerId;
+                    let gideon_protected = self.has_emblem(pid, Emblem::GideonOfTheTrials)
+                        && self.battlefield.iter().any(|p| {
+                            p.controller == pid && p.is_planeswalker()
+                                && matches!(p.card_name, CardName::GideonOfTheTrials)
+                        });
+                    if !gideon_protected {
+                        self.players[i].has_lost = true;
+                        changes = true;
+                    }
                 }
             }
 

@@ -200,6 +200,42 @@ impl GameState {
                                     vec![],
                                 );
                             }
+                            // Dack Fayden emblem: "Whenever you cast a spell that targets one or
+                            // more permanents, gain control of those permanents."
+                            let permanent_targets: Vec<Target> = targets.iter()
+                                .filter(|t| matches!(t, Target::Object(_)))
+                                .copied()
+                                .collect();
+                            if !permanent_targets.is_empty()
+                                && self.has_emblem(player_id, crate::game::Emblem::DackFayden)
+                            {
+                                for &tgt in &permanent_targets {
+                                    self.stack.push(
+                                        crate::stack::StackItemKind::TriggeredAbility {
+                                            source_id: 0,
+                                            source_name: crate::card::CardName::Plains,
+                                            effect: crate::stack::TriggeredEffect::DackEmblemControl,
+                                        },
+                                        player_id,
+                                        vec![tgt],
+                                    );
+                                }
+                            }
+                            // Tezzeret, Cruel Captain emblem: "Whenever you cast an artifact spell,
+                            // search your library for an artifact card, put it onto the battlefield."
+                            if def.card_types.contains(&CardType::Artifact)
+                                && self.has_emblem(player_id, crate::game::Emblem::TezzeretCruelCaptain)
+                            {
+                                self.stack.push(
+                                    crate::stack::StackItemKind::TriggeredAbility {
+                                        source_id: 0,
+                                        source_name: crate::card::CardName::Plains,
+                                        effect: crate::stack::TriggeredEffect::TezzeretEmblemArtifact,
+                                    },
+                                    player_id,
+                                    vec![],
+                                );
+                            }
                             self.reset_priority_passes();
                         }
                     }
@@ -548,6 +584,306 @@ impl GameState {
                                     source_id: permanent_id,
                                     source_name: card_name,
                                     effect,
+                                },
+                                controller,
+                                targets.to_vec(),
+                            );
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            CardName::DackFayden => {
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.loyalty_activated_this_turn = true;
+                    match ability_index {
+                        0 => {
+                            perm.loyalty += 1;
+                            self.stack.push(
+                                StackItemKind::ActivatedAbility {
+                                    source_id: permanent_id,
+                                    source_name: card_name,
+                                    effect: ActivatedEffect::DackDraw,
+                                },
+                                controller,
+                                targets.to_vec(),
+                            );
+                        }
+                        1 => {
+                            perm.loyalty -= 2;
+                            self.stack.push(
+                                StackItemKind::ActivatedAbility {
+                                    source_id: permanent_id,
+                                    source_name: card_name,
+                                    effect: ActivatedEffect::DackSteal,
+                                },
+                                controller,
+                                targets.to_vec(),
+                            );
+                        }
+                        2 => {
+                            perm.loyalty -= 6;
+                            self.stack.push(
+                                StackItemKind::ActivatedAbility {
+                                    source_id: permanent_id,
+                                    source_name: card_name,
+                                    effect: ActivatedEffect::DackUltimate,
+                                },
+                                controller,
+                                vec![],
+                            );
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            CardName::WrennAndSix => {
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.loyalty_activated_this_turn = true;
+                    match ability_index {
+                        0 => {
+                            perm.loyalty += 1;
+                            self.stack.push(
+                                StackItemKind::ActivatedAbility {
+                                    source_id: permanent_id,
+                                    source_name: card_name,
+                                    effect: ActivatedEffect::WrennReturn,
+                                },
+                                controller,
+                                targets.to_vec(),
+                            );
+                        }
+                        1 => {
+                            perm.loyalty -= 1;
+                            self.stack.push(
+                                StackItemKind::ActivatedAbility {
+                                    source_id: permanent_id,
+                                    source_name: card_name,
+                                    effect: ActivatedEffect::WrennPing,
+                                },
+                                controller,
+                                targets.to_vec(),
+                            );
+                        }
+                        2 => {
+                            perm.loyalty -= 7;
+                            self.stack.push(
+                                StackItemKind::ActivatedAbility {
+                                    source_id: permanent_id,
+                                    source_name: card_name,
+                                    effect: ActivatedEffect::WrennUltimate,
+                                },
+                                controller,
+                                vec![],
+                            );
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            CardName::TezzeretCruelCaptain => {
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.loyalty_activated_this_turn = true;
+                    match ability_index {
+                        0 => {
+                            perm.loyalty += 1;
+                            self.stack.push(
+                                StackItemKind::ActivatedAbility {
+                                    source_id: permanent_id,
+                                    source_name: card_name,
+                                    effect: ActivatedEffect::TezzeretDraw,
+                                },
+                                controller,
+                                vec![],
+                            );
+                        }
+                        1 => {
+                            perm.loyalty -= 2;
+                            self.stack.push(
+                                StackItemKind::ActivatedAbility {
+                                    source_id: permanent_id,
+                                    source_name: card_name,
+                                    effect: ActivatedEffect::TezzeretThopter,
+                                },
+                                controller,
+                                vec![],
+                            );
+                        }
+                        2 => {
+                            perm.loyalty -= 7;
+                            self.stack.push(
+                                StackItemKind::ActivatedAbility {
+                                    source_id: permanent_id,
+                                    source_name: card_name,
+                                    effect: ActivatedEffect::TezzeretUltimate,
+                                },
+                                controller,
+                                vec![],
+                            );
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            CardName::GideonOfTheTrials => {
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.loyalty_activated_this_turn = true;
+                    match ability_index {
+                        0 => {
+                            perm.loyalty += 1;
+                            self.stack.push(
+                                StackItemKind::ActivatedAbility {
+                                    source_id: permanent_id,
+                                    source_name: card_name,
+                                    effect: ActivatedEffect::GideonPrevent,
+                                },
+                                controller,
+                                targets.to_vec(),
+                            );
+                        }
+                        1 => {
+                            // 0: Become 4/4 creature (no loyalty change)
+                            self.stack.push(
+                                StackItemKind::ActivatedAbility {
+                                    source_id: permanent_id,
+                                    source_name: card_name,
+                                    effect: ActivatedEffect::GideonCreature,
+                                },
+                                controller,
+                                vec![],
+                            );
+                        }
+                        2 => {
+                            // +0: Create emblem (no loyalty change)
+                            self.stack.push(
+                                StackItemKind::ActivatedAbility {
+                                    source_id: permanent_id,
+                                    source_name: card_name,
+                                    effect: ActivatedEffect::GideonEmblem,
+                                },
+                                controller,
+                                vec![],
+                            );
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            CardName::NarsetParterOfVeils => {
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.loyalty_activated_this_turn = true;
+                    match ability_index {
+                        0 => {
+                            perm.loyalty -= 2;
+                            self.stack.push(
+                                StackItemKind::ActivatedAbility {
+                                    source_id: permanent_id,
+                                    source_name: card_name,
+                                    effect: ActivatedEffect::NarsetMinus,
+                                },
+                                controller,
+                                vec![],
+                            );
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            CardName::OkoThiefOfCrowns => {
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.loyalty_activated_this_turn = true;
+                    match ability_index {
+                        0 => {
+                            perm.loyalty += 2;
+                            self.stack.push(
+                                StackItemKind::ActivatedAbility {
+                                    source_id: permanent_id,
+                                    source_name: card_name,
+                                    effect: ActivatedEffect::OkoFood,
+                                },
+                                controller,
+                                vec![],
+                            );
+                        }
+                        1 => {
+                            perm.loyalty += 1;
+                            self.stack.push(
+                                StackItemKind::ActivatedAbility {
+                                    source_id: permanent_id,
+                                    source_name: card_name,
+                                    effect: ActivatedEffect::OkoElkify,
+                                },
+                                controller,
+                                targets.to_vec(),
+                            );
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            CardName::KarnTheGreatCreator => {
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.loyalty_activated_this_turn = true;
+                    match ability_index {
+                        0 => {
+                            perm.loyalty += 1;
+                            self.stack.push(
+                                StackItemKind::ActivatedAbility {
+                                    source_id: permanent_id,
+                                    source_name: card_name,
+                                    effect: ActivatedEffect::KarnAnimate,
+                                },
+                                controller,
+                                targets.to_vec(),
+                            );
+                        }
+                        1 => {
+                            perm.loyalty -= 2;
+                            self.stack.push(
+                                StackItemKind::ActivatedAbility {
+                                    source_id: permanent_id,
+                                    source_name: card_name,
+                                    effect: ActivatedEffect::KarnWish,
+                                },
+                                controller,
+                                vec![],
+                            );
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            CardName::KayaOrzhovUsurper => {
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.loyalty_activated_this_turn = true;
+                    match ability_index {
+                        0 => {
+                            perm.loyalty += 1;
+                            self.stack.push(
+                                StackItemKind::ActivatedAbility {
+                                    source_id: permanent_id,
+                                    source_name: card_name,
+                                    effect: ActivatedEffect::KayaExile,
+                                },
+                                controller,
+                                targets.to_vec(),
+                            );
+                        }
+                        1 => {
+                            perm.loyalty -= 1;
+                            self.stack.push(
+                                StackItemKind::ActivatedAbility {
+                                    source_id: permanent_id,
+                                    source_name: card_name,
+                                    effect: ActivatedEffect::KayaMinus,
                                 },
                                 controller,
                                 targets.to_vec(),

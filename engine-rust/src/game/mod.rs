@@ -13,6 +13,23 @@ use crate::player::*;
 use crate::stack::*;
 use crate::types::*;
 
+/// Emblem types. Emblems are permanent game objects owned by a player that can't be removed.
+/// They provide continuous effects or triggered abilities for the rest of the game.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Emblem {
+    /// Dack Fayden -6: "Whenever you cast a spell that targets one or more permanents,
+    /// gain control of those permanents."
+    DackFayden,
+    /// Wrenn and Six -7: "Instant and sorcery cards in your graveyard have retrace."
+    WrennAndSix,
+    /// Tezzeret, Cruel Captain -7: "Whenever you cast an artifact spell, search your library
+    /// for an artifact card, put it onto the battlefield, then shuffle."
+    TezzeretCruelCaptain,
+    /// Gideon of the Trials +0 emblem: "As long as you control a Gideon planeswalker,
+    /// you can't lose the game and your opponents can't win the game."
+    GideonOfTheTrials,
+}
+
 /// Where a permanent goes when it leaves the battlefield.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DestinationZone {
@@ -86,6 +103,11 @@ pub struct GameState {
     /// at the beginning of their end step. When a creature deals combat damage to
     /// the monarch, that creature's controller becomes the new monarch.
     pub monarch: Option<PlayerId>,
+
+    // --- Emblems ---
+    /// Emblems created by planeswalker ultimates (and similar). Each entry is
+    /// (owner, emblem_kind). Emblems can't be removed and persist for the rest of the game.
+    pub emblems: Vec<(PlayerId, Emblem)>,
 }
 
 /// When the game needs a player to make a choice (tutor, discard, etc.)
@@ -185,6 +207,7 @@ impl GameState {
             exile_linked: Vec::new(),
             skyclave_token_mv: Vec::new(),
             monarch: None,
+            emblems: Vec::new(),
         }
     }
 
@@ -737,6 +760,21 @@ impl GameState {
     /// end step. If there's already a monarch, they lose the designation.
     pub fn become_monarch(&mut self, player_id: PlayerId) {
         self.monarch = Some(player_id);
+    }
+
+    /// Create an emblem for a player. Emblems can't be removed and persist for the rest of the game.
+    pub fn create_emblem(&mut self, player_id: PlayerId, emblem: Emblem) {
+        self.emblems.push((player_id, emblem));
+    }
+
+    /// Check whether a player has a specific emblem.
+    pub fn has_emblem(&self, player_id: PlayerId, emblem: Emblem) -> bool {
+        self.emblems.iter().any(|&(pid, e)| pid == player_id && e == emblem)
+    }
+
+    /// Check whether any player has a specific emblem.
+    pub fn any_player_has_emblem(&self, emblem: Emblem) -> bool {
+        self.emblems.iter().any(|&(_, e)| e == emblem)
     }
 
     /// Change the controller of a permanent. Does not fire triggers.
