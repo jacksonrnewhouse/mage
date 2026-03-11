@@ -454,4 +454,61 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_crop_rotation_searches_for_land() {
+        let db = build_card_db();
+        let mut state = GameState::new_two_player();
+
+        let forest_id = state.new_object_id();
+        let crop_id = state.new_object_id();
+        state.card_registry.push((forest_id, CardName::Forest));
+        state.card_registry.push((crop_id, CardName::CropRotation));
+        state.players[0].hand.push(crop_id);
+
+        // Put a Forest on the battlefield to sacrifice
+        let def = find_card(&db, CardName::Forest).unwrap();
+        let perm = crate::permanent::Permanent::new(
+            forest_id, CardName::Forest, 0, 0,
+            def.power, def.toughness, None, def.keywords, def.card_types,
+        );
+        state.battlefield.push(perm);
+
+        // Put a land in library to find
+        let gaea_id = state.new_object_id();
+        state.card_registry.push((gaea_id, CardName::GaeasCradle));
+        state.players[0].library.push(gaea_id);
+
+        state.turn_number = 1;
+        state.phase = Phase::PreCombatMain;
+        state.step = None;
+        state.active_player = 0;
+        state.priority_player = 0;
+        state.players[0].mana_pool.green = 1;
+
+        // Cast Crop Rotation targeting the Forest to sacrifice
+        state.apply_action(
+            &Action::CastSpell {
+                card_id: crop_id,
+                targets: vec![Target::Object(forest_id)],
+            },
+            &db,
+        );
+
+        // Both players pass priority to resolve
+        state.pass_priority(&db);
+        state.pass_priority(&db);
+
+        // Forest should be gone (sacrificed)
+        let has_forest = state.battlefield.iter().any(|p| p.card_name == CardName::Forest);
+        assert!(!has_forest, "Forest should have been sacrificed");
+
+        // Gaea's Cradle should be on battlefield (via GenericSearch resolution)
+        // or we should have a pending choice to search
+        let has_cradle = state.battlefield.iter().any(|p| p.card_name == CardName::GaeasCradle);
+        assert!(
+            has_cradle || state.pending_choice.is_some(),
+            "Should have searched for a land (Gaea's Cradle on battlefield) or have pending choice"
+        );
+    }
 }

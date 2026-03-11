@@ -600,7 +600,7 @@ impl GameState {
         card_name: CardName,
         controller: PlayerId,
         targets: &[Target],
-        _db: &[CardDef],
+        db: &[CardDef],
     ) {
         match card_name {
             // === Draw spells ===
@@ -1124,7 +1124,7 @@ impl GameState {
 
             CardName::Disenchant | CardName::NaturesClaim | CardName::Fragmentize
             | CardName::AbruptDecay | CardName::AncientGrudge | CardName::ShatteringSpree
-            | CardName::Vandalblast | CardName::Suplex | CardName::CropRotation
+            | CardName::Vandalblast | CardName::Suplex
             | CardName::MoltenCollapse | CardName::PrismaticEnding | CardName::FatalPush
             | CardName::BitterTriumph | CardName::SheoldredsEdict | CardName::SnuffOut
             | CardName::UntimellyMalfunction | CardName::Crash | CardName::CouncilsJudgment
@@ -1138,6 +1138,38 @@ impl GameState {
                 // Nature's Claim: controller gains 4 life
                 if card_name == CardName::NaturesClaim {
                     // target's controller already handled
+                }
+            }
+
+            // Crop Rotation: sacrifice a land you control, search your library for any land,
+            // put it onto the battlefield.
+            CardName::CropRotation => {
+                // Sacrifice the targeted land
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    if let Some(perm) = self.remove_permanent(*target_id) {
+                        self.players[perm.owner as usize].graveyard.push(perm.id);
+                    }
+                }
+                // Search library for any land card
+                let searchable: Vec<ObjectId> = self.players[controller as usize]
+                    .library
+                    .iter()
+                    .filter(|&&id| {
+                        self.card_name_for_id(id)
+                            .and_then(|cn| find_card(db, cn))
+                            .map(|def| def.card_types.contains(&CardType::Land))
+                            .unwrap_or(false)
+                    })
+                    .copied()
+                    .collect();
+                if !searchable.is_empty() {
+                    self.pending_choice = Some(PendingChoice {
+                        player: controller,
+                        kind: ChoiceKind::ChooseFromList {
+                            options: searchable,
+                            reason: ChoiceReason::GenericSearch,
+                        },
+                    });
                 }
             }
 
