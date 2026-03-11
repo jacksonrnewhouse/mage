@@ -363,3 +363,19 @@ pub enum TemporaryEffect {
         saved_keywords: Keywords,
     },
 }
+
+/// Rooms in the Undercity dungeon (used for the Initiative mechanic).
+/// The player with the Initiative ventures deeper each upkeep.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UndercityRoom {
+    /// Room 0 → Undercity Entrance: gain 1 life.
+    Entrance,
+    /// Room 1 → Archives: create a Treasure token.
+    Archives,
+    /// Room 2 → Lost Well: draw a card.
+    LostWell,
+    /// Room 3 → Forge: create a 4/1 red Devil creature token.
+    Forge,
+    /// Room 4 → Inner Sanctum (dungeon complete): draw 3 cards.
+    InnerSanctum,
+}

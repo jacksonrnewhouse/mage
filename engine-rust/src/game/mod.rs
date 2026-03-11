@@ -125,6 +125,16 @@ pub struct GameState {
     /// the monarch, that creature's controller becomes the new monarch.
     pub monarch: Option<PlayerId>,
 
+    // --- Initiative ---
+    /// The player who currently has the initiative, if any. The initiative player
+    /// ventures into the Undercity at the beginning of their upkeep. When a creature
+    /// deals combat damage to the initiative player, the attacker's controller takes
+    /// the initiative.
+    pub initiative: Option<PlayerId>,
+    /// Tracks each player's progress through the Undercity dungeon (0 = not started,
+    /// 1-4 = rooms cleared, 4 = completed). Indexed by PlayerId.
+    pub undercity_room: [u8; 2],
+
     // --- Emblems ---
     /// Emblems created by planeswalker ultimates (and similar). Each entry is
     /// (owner, emblem_kind). Emblems can't be removed and persist for the rest of the game.
@@ -284,6 +294,8 @@ impl GameState {
             hideaway_exiled: Vec::new(),
             adventure_exiled: Vec::new(),
             monarch: None,
+            initiative: None,
+            undercity_room: [0; 2],
             emblems: Vec::new(),
             delayed_triggers: Vec::new(),
         }
@@ -352,6 +364,21 @@ impl GameState {
             (Phase::Beginning, Some(Step::Untap)) => {
                 self.step = Some(Step::Upkeep);
                 self.check_delayed_triggers();
+                // Initiative: the player with initiative ventures into the Undercity
+                // at the beginning of their upkeep.
+                if let Some(initiative_id) = self.initiative {
+                    if initiative_id == self.active_player {
+                        self.stack.push(
+                            crate::stack::StackItemKind::TriggeredAbility {
+                                source_id: 0,
+                                source_name: crate::card::CardName::Plains, // placeholder
+                                effect: crate::stack::TriggeredEffect::InitiativeUpkeep,
+                            },
+                            initiative_id,
+                            vec![],
+                        );
+                    }
+                }
                 self.give_priority_to_active();
             }
             (Phase::Beginning, Some(Step::Upkeep)) => {
@@ -893,6 +920,45 @@ impl GameState {
     /// end step. If there's already a monarch, they lose the designation.
     pub fn become_monarch(&mut self, player_id: PlayerId) {
         self.monarch = Some(player_id);
+    }
+
+    /// Give a player the initiative and venture into the Undercity.
+    /// The previous initiative holder (if any) loses it.
+    pub fn take_initiative(&mut self, player_id: PlayerId) {
+        self.initiative = Some(player_id);
+        self.venture_into_undercity(player_id);
+    }
+
+    /// Venture into the Undercity dungeon for the given player.
+    /// Advances the player's room counter and pushes the room effect onto the stack.
+    /// Rooms (0-based next room to enter):
+    ///   0 → Undercity Entrance: gain 1 life
+    ///   1 → Archives: create a Treasure token
+    ///   2 → Lost Well: draw a card
+    ///   3 → Forge: create a 4/1 red Devil creature token
+    ///   4 (complete) → Inner Sanctum: draw 3 cards and put +1/+1 counters on up to two creatures
+    pub fn venture_into_undercity(&mut self, player_id: PlayerId) {
+        let room = self.undercity_room[player_id as usize];
+        let effect = match room {
+            0 => crate::stack::TriggeredEffect::UndercityRoom(UndercityRoom::Entrance),
+            1 => crate::stack::TriggeredEffect::UndercityRoom(UndercityRoom::Archives),
+            2 => crate::stack::TriggeredEffect::UndercityRoom(UndercityRoom::LostWell),
+            3 => crate::stack::TriggeredEffect::UndercityRoom(UndercityRoom::Forge),
+            _ => crate::stack::TriggeredEffect::UndercityRoom(UndercityRoom::InnerSanctum),
+        };
+        // Advance the room counter (cap at 4, meaning completed)
+        if room < 4 {
+            self.undercity_room[player_id as usize] = room + 1;
+        }
+        self.stack.push(
+            crate::stack::StackItemKind::TriggeredAbility {
+                source_id: 0,
+                source_name: crate::card::CardName::Plains, // placeholder source
+                effect,
+            },
+            player_id,
+            vec![],
+        );
     }
 
     /// Create an emblem for a player. Emblems can't be removed and persist for the rest of the game.

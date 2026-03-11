@@ -14,6 +14,8 @@ impl GameState {
 
         let mut damage_to_players: Vec<(PlayerId, i32)> = Vec::new();
         let mut damage_to_creatures: Vec<(ObjectId, i16)> = Vec::new();
+        // Collect initiative-steal events to apply after the loop (avoids borrow conflict).
+        let mut initiative_taken_by: Option<PlayerId> = None;
 
         for &(attacker_id, defending_player) in &self.attackers {
             let attacker = match self.find_permanent(attacker_id) {
@@ -90,6 +92,11 @@ impl GameState {
                 if self.monarch == Some(defending_player) {
                     self.monarch = Some(attacker_controller);
                 }
+                // Initiative: if the defending player has the initiative, the attacker's
+                // controller takes the initiative.
+                if self.initiative == Some(defending_player) {
+                    initiative_taken_by = Some(attacker_controller);
+                }
             } else {
                 // Blocked - assign damage to blockers
                 let mut remaining_damage = attacker_power;
@@ -142,6 +149,10 @@ impl GameState {
                     if self.monarch == Some(defending_player) {
                         self.monarch = Some(attacker_controller);
                     }
+                    // Initiative: trample damage reaching the initiative holder steals it
+                    if self.initiative == Some(defending_player) {
+                        initiative_taken_by = Some(attacker_controller);
+                    }
                 }
             }
 
@@ -174,6 +185,11 @@ impl GameState {
                 continue;
             }
             self.players[player_id as usize].life -= damage;
+        }
+
+        // Apply deferred initiative steal (from combat damage to the initiative holder).
+        if let Some(new_holder) = initiative_taken_by {
+            self.take_initiative(new_holder);
         }
 
         if !first_strike_only {

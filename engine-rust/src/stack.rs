@@ -142,6 +142,10 @@ pub enum TriggeredEffect {
     /// Saga sacrifice: after the last chapter resolves, sacrifice the saga.
     /// `saga_id` is the saga permanent's ObjectId.
     SagaSacrifice { saga_id: ObjectId },
+    /// Initiative upkeep trigger: the player with initiative ventures into the Undercity.
+    InitiativeUpkeep,
+    /// An Undercity dungeon room effect resolves.
+    UndercityRoom(crate::types::UndercityRoom),
 }
 
 /// Activated ability effects.

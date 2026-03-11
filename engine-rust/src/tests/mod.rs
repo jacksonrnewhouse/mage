@@ -40,6 +40,7 @@ mod hideaway;
 mod saga;
 mod adventure;
 mod transform;
+mod initiative;
 
 pub(crate) fn setup_simple_game() -> (GameState, Vec<CardDef>) {
     let db = build_card_db();

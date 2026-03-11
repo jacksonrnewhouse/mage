@@ -1755,6 +1755,16 @@ impl GameState {
                 });
             }
 
+            // White Plume Adventurer: take the initiative on ETB
+            CardName::WhitePlumeAdventurer => {
+                self.take_initiative(controller);
+            }
+
+            // Seasoned Dungeoneer: take the initiative on ETB
+            CardName::SeasonedDungeoneer => {
+                self.take_initiative(controller);
+            }
+
             _ => {}
         }
     }
@@ -2375,6 +2385,52 @@ impl GameState {
 
                     // Future chapters or unexpected values: no effect.
                     _ => {}
+                }
+            }
+
+            // Initiative upkeep trigger: venture into the Undercity.
+            TriggeredEffect::InitiativeUpkeep => {
+                self.venture_into_undercity(controller);
+            }
+
+            // Undercity room effects.
+            TriggeredEffect::UndercityRoom(room) => {
+                use crate::types::UndercityRoom;
+                match room {
+                    UndercityRoom::Entrance => {
+                        // Gain 1 life
+                        self.players[controller as usize].life += 1;
+                    }
+                    UndercityRoom::Archives => {
+                        // Create a Treasure token
+                        self.create_treasure_token(controller);
+                    }
+                    UndercityRoom::LostWell => {
+                        // Draw a card
+                        self.draw_cards(controller, 1);
+                    }
+                    UndercityRoom::Forge => {
+                        // Create a 4/1 red Devil creature token
+                        let token_id = self.new_object_id();
+                        let token_name = CardName::Plains; // placeholder
+                        let mut token = Permanent::new(
+                            token_id,
+                            token_name,
+                            controller,
+                            controller,
+                            Some(4),
+                            Some(1),
+                            None,
+                            Keywords::empty(),
+                            &[CardType::Creature],
+                        );
+                        token.is_token = true;
+                        self.battlefield.push(token);
+                    }
+                    UndercityRoom::InnerSanctum => {
+                        // Draw 3 cards (dungeon complete)
+                        self.draw_cards(controller, 3);
+                    }
                 }
             }
 
