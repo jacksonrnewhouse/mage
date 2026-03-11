@@ -603,6 +603,71 @@ impl GameState {
             .map(|(_, name)| *name)
     }
 
+    // --- Dynamic P/T ---
+
+    /// Count the number of distinct card types among all cards in all players' graveyards.
+    /// Used for Tarmogoyf and similar lhurgoyf-style creatures.
+    pub fn graveyard_card_type_count(&self, db: &[CardDef]) -> i16 {
+        let mut seen_types: u8 = 0; // bitfield for CardType variants (7 types)
+        for player in &self.players {
+            for &obj_id in &player.graveyard {
+                if let Some(card_name) = self.card_name_for_id(obj_id) {
+                    if let Some(def) = find_card(db, card_name) {
+                        for &ct in def.card_types {
+                            let bit = match ct {
+                                CardType::Land => 1 << 0,
+                                CardType::Creature => 1 << 1,
+                                CardType::Artifact => 1 << 2,
+                                CardType::Enchantment => 1 << 3,
+                                CardType::Instant => 1 << 4,
+                                CardType::Sorcery => 1 << 5,
+                                CardType::Planeswalker => 1 << 6,
+                            };
+                            seen_types |= bit;
+                        }
+                    }
+                }
+            }
+        }
+        seen_types.count_ones() as i16
+    }
+
+    /// Effective power of a permanent, accounting for dynamic P/T (e.g. Tarmogoyf).
+    /// For most creatures this equals `perm.power()`. For lhurgoyf-style creatures,
+    /// it is calculated from game state.
+    pub fn effective_power(&self, perm_id: ObjectId, db: &[CardDef]) -> i16 {
+        let perm = match self.find_permanent(perm_id) {
+            Some(p) => p,
+            None => return 0,
+        };
+        match perm.card_name {
+            CardName::Tarmogoyf => {
+                let count = self.graveyard_card_type_count(db);
+                count + perm.power_mod
+                    + perm.counters.get(CounterType::PlusOnePlusOne)
+                    - perm.counters.get(CounterType::MinusOneMinusOne)
+            }
+            _ => perm.power(),
+        }
+    }
+
+    /// Effective toughness of a permanent, accounting for dynamic P/T (e.g. Tarmogoyf).
+    pub fn effective_toughness(&self, perm_id: ObjectId, db: &[CardDef]) -> i16 {
+        let perm = match self.find_permanent(perm_id) {
+            Some(p) => p,
+            None => return 0,
+        };
+        match perm.card_name {
+            CardName::Tarmogoyf => {
+                let count = self.graveyard_card_type_count(db);
+                count + 1 + perm.toughness_mod
+                    + perm.counters.get(CounterType::PlusOnePlusOne)
+                    - perm.counters.get(CounterType::MinusOneMinusOne)
+            }
+            _ => perm.toughness(),
+        }
+    }
+
     /// Create a Treasure token controlled by the given player and place it on the battlefield.
     /// Returns the ObjectId of the newly created token.
     pub fn create_treasure_token(&mut self, controller: PlayerId) -> ObjectId {

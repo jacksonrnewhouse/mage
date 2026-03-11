@@ -18,7 +18,7 @@ impl GameState {
 
             Action::Concede => {
                 self.players[self.priority_player as usize].has_lost = true;
-                self.check_state_based_actions();
+                self.check_state_based_actions(db);
             }
 
             Action::PlayLand(card_id) => {

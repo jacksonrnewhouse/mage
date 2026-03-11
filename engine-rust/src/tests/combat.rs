@@ -46,7 +46,7 @@ fn test_creature_combat() {
     state.apply_action(&Action::ConfirmBlockers, &db);
 
     // Resolve combat damage
-    state.resolve_combat_damage(false);
+    state.resolve_combat_damage(&db, false);
 
     // Opponent should have taken 2 damage (Goblin Guide is 2/2 with haste)
     assert_eq!(state.players[1].life, 18);

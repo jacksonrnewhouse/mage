@@ -22,7 +22,7 @@ impl GameState {
                     self.resolve_activated(effect, item.controller, &item.targets);
                 }
             }
-            self.check_state_based_actions();
+            self.check_state_based_actions(db);
         }
     }
 

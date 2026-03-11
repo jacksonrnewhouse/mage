@@ -184,12 +184,12 @@ fn test_vintage_power() {
 
 #[test]
 fn test_game_result() {
-    let (mut state, _db) = setup_simple_game();
+    let (mut state, db) = setup_simple_game();
     assert_eq!(state.result, GameResult::InProgress);
     assert!(!state.is_terminal());
 
     state.players[1].life = 0;
-    state.check_state_based_actions();
+    state.check_state_based_actions(&db);
 
     assert!(state.is_terminal());
     assert_eq!(state.result, GameResult::Win(0));

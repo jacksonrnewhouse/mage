@@ -1,13 +1,13 @@
 /// Combat system: damage assignment and resolution.
 
-use crate::card::CardName;
+use crate::card::{CardDef, CardName};
 use crate::game::GameState;
 use crate::stack::{StackItemKind, TriggeredEffect};
 use crate::types::*;
 
 impl GameState {
     /// Resolve combat damage for the current combat step.
-    pub fn resolve_combat_damage(&mut self, first_strike_only: bool) {
+    pub fn resolve_combat_damage(&mut self, db: &[CardDef], first_strike_only: bool) {
         if self.combat_damage_dealt && !first_strike_only {
             return;
         }
@@ -36,7 +36,11 @@ impl GameState {
                 continue;
             }
 
-            let attacker_power = attacker.power();
+            let attacker_power = self.effective_power(attacker_id, db);
+            let attacker = match self.find_permanent(attacker_id) {
+                Some(p) => p,
+                None => continue,
+            };
             let attacker_has_trample = attacker.keywords.has(Keyword::Trample);
             let attacker_has_deathtouch = attacker.keywords.has(Keyword::Deathtouch);
             let attacker_has_lifelink = attacker.keywords.has(Keyword::Lifelink);
@@ -84,18 +88,19 @@ impl GameState {
                     if remaining_damage <= 0 {
                         break;
                     }
+                    let blocker_toughness = self.effective_toughness(blocker_id, db);
+                    let blocker_power = self.effective_power(blocker_id, db);
                     if let Some(blocker) = self.find_permanent(blocker_id) {
                         let lethal = if attacker_has_deathtouch {
                             1
                         } else {
-                            (blocker.toughness() - blocker.damage).max(0)
+                            (blocker_toughness - blocker.damage).max(0)
                         };
                         let assigned = remaining_damage.min(lethal);
                         damage_to_creatures.push((blocker_id, assigned));
                         remaining_damage -= assigned;
 
                         // Blocker deals damage back to attacker
-                        let blocker_power = blocker.power();
                         if blocker_power > 0 {
                             damage_to_creatures.push((attacker_id, blocker_power));
                             if blocker.keywords.has(Keyword::Lifelink) {
@@ -132,6 +137,6 @@ impl GameState {
             self.combat_damage_dealt = true;
         }
 
-        self.check_state_based_actions();
+        self.check_state_based_actions(db);
     }
 }

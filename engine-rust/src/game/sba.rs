@@ -6,7 +6,7 @@ use crate::permanent::*;
 use crate::types::*;
 
 impl GameState {
-    pub fn check_state_based_actions(&mut self) {
+    pub fn check_state_based_actions(&mut self, db: &[CardDef]) {
         let mut changes = true;
         while changes {
             changes = false;
@@ -25,8 +25,12 @@ impl GameState {
             // Creatures with 0 or less toughness die
             let mut to_die = Vec::new();
             for perm in &self.battlefield {
-                if perm.is_creature() && (perm.toughness() <= 0 || perm.has_lethal_damage()) {
-                    to_die.push(perm.id);
+                if perm.is_creature() {
+                    let toughness = self.effective_toughness(perm.id, db);
+                    let has_lethal = perm.damage >= toughness && !perm.keywords.has(Keyword::Indestructible);
+                    if toughness <= 0 || has_lethal {
+                        to_die.push(perm.id);
+                    }
                 }
             }
             for id in to_die {

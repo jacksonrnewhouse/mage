@@ -96,7 +96,7 @@ fn test_destroy_permanent_fires_dies_trigger_from_sba() {
     state.players[0].graveyard.push(ring_id);
 
     // Run state-based actions - should kill Myr Retriever and trigger
-    state.check_state_based_actions();
+    state.check_state_based_actions(&db);
 
     // Myr Retriever should be in graveyard
     assert!(
