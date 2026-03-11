@@ -60,6 +60,9 @@ pub struct GameState {
 
     // --- Card registry: maps ObjectId -> CardName ---
     pub card_registry: Vec<(ObjectId, CardName)>,
+
+    // --- Temporary until-end-of-turn effects ---
+    pub temporary_effects: Vec<TemporaryEffect>,
 }
 
 /// When the game needs a player to make a choice (tutor, discard, etc.)
@@ -132,6 +135,7 @@ impl GameState {
             next_object_id: 1000, // Reserve 0-999 for card IDs
             pending_choice: None,
             card_registry: Vec::with_capacity(120),
+            temporary_effects: Vec::new(),
         }
     }
 
@@ -289,15 +293,66 @@ impl GameState {
                 self.players[active].graveyard.push(id);
             }
         }
-        // Clear damage from all creatures
+        // Clear damage and per-turn flags from all permanents
         for perm in &mut self.battlefield {
             perm.end_of_turn_cleanup();
         }
-        // Clear temporary power/toughness modifications
-        for perm in &mut self.battlefield {
-            perm.power_mod = 0;
-            perm.toughness_mod = 0;
+        // Reverse and clear all temporary until-end-of-turn effects
+        self.end_of_turn_cleanup();
+    }
+
+    /// Apply a temporary effect immediately to the target permanent,
+    /// and record it so it can be reversed at end of turn.
+    pub fn add_temporary_effect(&mut self, effect: TemporaryEffect) {
+        match &effect {
+            TemporaryEffect::ModifyPT { target, power, toughness } => {
+                let (target, power, toughness) = (*target, *power, *toughness);
+                if let Some(perm) = self.find_permanent_mut(target) {
+                    perm.power_mod += power;
+                    perm.toughness_mod += toughness;
+                }
+            }
+            TemporaryEffect::GrantKeyword { target, keyword } => {
+                let (target, keyword) = (*target, *keyword);
+                if let Some(perm) = self.find_permanent_mut(target) {
+                    perm.keywords.add(keyword);
+                }
+            }
+            TemporaryEffect::RemoveAllAbilities { target, .. } => {
+                let target = *target;
+                if let Some(perm) = self.find_permanent_mut(target) {
+                    perm.keywords = Keywords::empty();
+                }
+            }
         }
+        self.temporary_effects.push(effect);
+    }
+
+    /// Reverse all temporary until-end-of-turn effects and clear the list.
+    /// Called during the cleanup step.
+    pub fn end_of_turn_cleanup(&mut self) {
+        let effects = std::mem::take(&mut self.temporary_effects);
+        for effect in &effects {
+            match effect {
+                TemporaryEffect::ModifyPT { target, power, toughness } => {
+                    if let Some(perm) = self.find_permanent_mut(*target) {
+                        perm.power_mod -= power;
+                        perm.toughness_mod -= toughness;
+                    }
+                }
+                TemporaryEffect::GrantKeyword { target, keyword } => {
+                    if let Some(perm) = self.find_permanent_mut(*target) {
+                        perm.keywords.remove(*keyword);
+                    }
+                }
+                TemporaryEffect::RemoveAllAbilities { target, saved_keywords } => {
+                    if let Some(perm) = self.find_permanent_mut(*target) {
+                        perm.keywords = *saved_keywords;
+                    }
+                }
+            }
+        }
+        // temporary_effects already cleared by mem::take
     }
 
     fn next_turn(&mut self) {

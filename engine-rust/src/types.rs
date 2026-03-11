@@ -159,3 +159,26 @@ pub enum GameResult {
     Draw,
     InProgress,
 }
+
+/// A temporary effect that lasts until end of turn.
+/// These are applied immediately and automatically reversed during cleanup.
+#[derive(Debug, Clone)]
+pub enum TemporaryEffect {
+    /// Modify a permanent's power and toughness (e.g. Giant Growth, combat tricks).
+    ModifyPT {
+        target: ObjectId,
+        power: i16,
+        toughness: i16,
+    },
+    /// Grant a keyword ability to a permanent until end of turn.
+    GrantKeyword {
+        target: ObjectId,
+        keyword: Keyword,
+    },
+    /// Remove all abilities from a permanent until end of turn.
+    RemoveAllAbilities {
+        target: ObjectId,
+        /// Snapshot of keywords before removal, for cleanup.
+        saved_keywords: Keywords,
+    },
+}
