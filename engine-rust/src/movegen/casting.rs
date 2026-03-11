@@ -529,6 +529,19 @@ impl GameState {
                 }
             }
 
+            // The One Ring: {T}: Put a burden counter, then draw cards equal to burden counters.
+            CardName::TheOneRing if ability_index == 0 => {
+                self.stack.push(
+                    StackItemKind::ActivatedAbility {
+                        source_id: permanent_id,
+                        source_name: card_name,
+                        effect: ActivatedEffect::TheOneRingDraw { ring_id: permanent_id },
+                    },
+                    controller,
+                    vec![],
+                );
+            }
+
             // Planeswalker abilities
             CardName::JaceTheMindSculptor => {
                 if let Some(perm) = self.find_permanent_mut(permanent_id) {

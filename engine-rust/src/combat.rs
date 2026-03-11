@@ -159,6 +159,20 @@ impl GameState {
         }
 
         for (player_id, damage) in damage_to_players {
+            // Prevent all damage to a player with protection from everything
+            // (e.g. The One Ring ETB effect until their next turn).
+            // Note: lifelink entries for the lifelink-granting player are also stored here;
+            // we only prevent damage entries (positive damage targeting defending players).
+            // To avoid breaking lifelink, we only skip entries where the player has protection
+            // AND the damage is a positive damage-to-player scenario.
+            // Lifelink entries use the attacker's controller as the target — they gain life.
+            // Check if this entry corresponds to an attack against the protected player.
+            let player_has_protection = self.players[player_id as usize].protection_from_everything;
+            if player_has_protection {
+                // Skip damage to this player entirely; lifelink will still be handled
+                // since the lifelink player is the attacker_controller, not the defender.
+                continue;
+            }
             self.players[player_id as usize].life -= damage;
         }
 

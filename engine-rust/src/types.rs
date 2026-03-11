@@ -285,6 +285,8 @@ pub enum CounterType {
     Time,
     Fade,
     Poison,
+    /// Burden counters placed on The One Ring by its tap ability.
+    Burden,
 }
 
 /// Represents a target for a spell or ability.

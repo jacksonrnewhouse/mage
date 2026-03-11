@@ -1353,6 +1353,11 @@ impl GameState {
             abilities.push((0, vec![]));
         }
 
+        // The One Ring: {T}: Put a burden counter on The One Ring, then draw a card for each burden counter.
+        if perm.card_name == CardName::TheOneRing && !perm.tapped {
+            abilities.push((0, vec![]));
+        }
+
         // Sensei's Divining Top: {T} draw + put on top
         if perm.card_name == CardName::SenseisDiviningTop && !perm.tapped {
             abilities.push((0, vec![])); // Look at top 3

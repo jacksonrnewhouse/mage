@@ -29,6 +29,7 @@ mod statics;
 mod surveil;
 mod triggers;
 mod tribal;
+mod one_ring;
 
 pub(crate) fn setup_simple_game() -> (GameState, Vec<CardDef>) {
     let db = build_card_db();

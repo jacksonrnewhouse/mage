@@ -115,6 +115,10 @@ pub enum TriggeredEffect {
     TezzeretEmblemArtifact,
     /// Delayed sacrifice: sacrifice a specific permanent (used by Sneak Attack and similar).
     SacrificeTarget { permanent_id: ObjectId },
+    /// The One Ring ETB: controller gains protection from everything until their next turn.
+    TheOneRingETB { ring_id: ObjectId },
+    /// The One Ring upkeep trigger: lose 1 life per burden counter, then add a burden counter.
+    TheOneRingUpkeep { ring_id: ObjectId },
 }
 
 /// Activated ability effects.
@@ -196,6 +200,8 @@ pub enum ActivatedEffect {
     TezzeretThopter,
     /// Tezzeret, Cruel Captain -7: create the Tezzeret emblem.
     TezzeretUltimate,
+    /// The One Ring {T}: put a burden counter on The One Ring, draw cards equal to burden counters.
+    TheOneRingDraw { ring_id: ObjectId },
 }
 
 /// The game stack.

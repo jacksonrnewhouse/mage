@@ -1049,6 +1049,11 @@ impl GameState {
     fn deal_damage_to_target(&mut self, target: Target, amount: u16, _source_controller: PlayerId) {
         match target {
             Target::Player(p) => {
+                // Prevent all damage to a player with protection from everything
+                // (e.g. The One Ring ETB effect until their next turn).
+                if self.players[p as usize].protection_from_everything {
+                    return;
+                }
                 self.players[p as usize].life -= amount as i32;
             }
             Target::Object(id) => {

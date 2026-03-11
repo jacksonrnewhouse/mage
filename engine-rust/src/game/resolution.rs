@@ -1518,6 +1518,31 @@ impl GameState {
                 }
             }
 
+            // The One Ring: ETB triggers protection from everything until next turn,
+            // and registers a recurring upkeep trigger (lose life per burden counter,
+            // then add a burden counter).
+            CardName::TheOneRing => {
+                // Push the ETB protection trigger onto the stack.
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: _card_id,
+                        source_name: CardName::TheOneRing,
+                        effect: TriggeredEffect::TheOneRingETB { ring_id: _card_id },
+                    },
+                    controller,
+                    vec![],
+                );
+                // Register a recurring upkeep trigger for the controller.
+                self.add_delayed_trigger(crate::types::DelayedTrigger {
+                    condition: crate::types::DelayedTriggerCondition::AtBeginningOfUpkeep {
+                        player: controller,
+                    },
+                    effect: TriggeredEffect::TheOneRingUpkeep { ring_id: _card_id },
+                    controller,
+                    fires_once: false,
+                });
+            }
+
             _ => {}
         }
     }
@@ -1874,6 +1899,34 @@ impl GameState {
                     .unwrap_or(false);
                 if still_on_field {
                     self.remove_permanent_to_zone(permanent_id, DestinationZone::Graveyard);
+                }
+            }
+            TriggeredEffect::TheOneRingETB { ring_id: _ } => {
+                // Grant the controller protection from everything until their next turn.
+                // The protection_from_everything flag on the player is cleared in reset_for_turn,
+                // which is called at the start of each new turn for the active player.
+                self.players[controller as usize].protection_from_everything = true;
+            }
+            TriggeredEffect::TheOneRingUpkeep { ring_id } => {
+                // At the beginning of your upkeep:
+                // 1. Lose 1 life for each burden counter on The One Ring.
+                // 2. Put a burden counter on The One Ring.
+                // If the ring is no longer on the battlefield, do nothing.
+                let ring_info = self.find_permanent(ring_id)
+                    .map(|p| (p.controller, p.counters.get(CounterType::Burden)));
+                if let Some((ring_controller, burden_count)) = ring_info {
+                    // Only trigger if the ring is still controlled by its original controller.
+                    if ring_controller != controller {
+                        return;
+                    }
+                    let life_loss = burden_count as i32;
+                    if life_loss > 0 {
+                        self.players[controller as usize].life -= life_loss;
+                    }
+                    // Add a burden counter.
+                    if let Some(perm_mut) = self.find_permanent_mut(ring_id) {
+                        perm_mut.counters.add(CounterType::Burden, 1);
+                    }
                 }
             }
             _ => {}
@@ -2242,6 +2295,23 @@ impl GameState {
                 // +0: You get an emblem with "As long as you control a Gideon planeswalker,
                 // you can't lose the game and your opponents can't win the game."
                 self.create_emblem(controller, Emblem::GideonOfTheTrials);
+            }
+
+            // The One Ring {T}: Put a burden counter on The One Ring, then draw a card for each
+            // burden counter on it.
+            ActivatedEffect::TheOneRingDraw { ring_id } => {
+                // Tap the ring and add a burden counter.
+                if let Some(perm) = self.find_permanent_mut(ring_id) {
+                    perm.tapped = true;
+                    perm.counters.add(CounterType::Burden, 1);
+                }
+                // Draw cards equal to burden counters after adding one.
+                let burden = self.find_permanent(ring_id)
+                    .map(|p| p.counters.get(CounterType::Burden))
+                    .unwrap_or(0);
+                if burden > 0 {
+                    self.draw_cards(controller, burden as usize);
+                }
             }
         }
     }
