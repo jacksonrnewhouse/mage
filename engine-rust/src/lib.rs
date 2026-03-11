@@ -511,4 +511,79 @@ mod tests {
             "Should have searched for a land (Gaea's Cradle on battlefield) or have pending choice"
         );
     }
+
+    #[test]
+    fn test_abrupt_decay_cant_be_countered() {
+        let db = build_card_db();
+        let mut state = GameState::new_two_player();
+
+        let decay_id = state.new_object_id();
+        let counter_id = state.new_object_id();
+        state.card_registry.push((decay_id, CardName::AbruptDecay));
+        state.card_registry.push((counter_id, CardName::Counterspell));
+        state.players[0].hand.push(decay_id);
+        state.players[1].hand.push(counter_id);
+
+        // Put Sol Ring on the battlefield as the target for Abrupt Decay
+        let target_id = state.new_object_id();
+        state.card_registry.push((target_id, CardName::SolRing));
+        let def = find_card(&db, CardName::SolRing).unwrap();
+        let perm = crate::permanent::Permanent::new(
+            target_id, CardName::SolRing, 1, 1,
+            def.power, def.toughness, None, def.keywords, def.card_types,
+        );
+        state.battlefield.push(perm);
+
+        state.turn_number = 1;
+        state.phase = Phase::PreCombatMain;
+        state.step = None;
+        state.active_player = 0;
+        state.priority_player = 0;
+        state.players[0].mana_pool.black = 1;
+        state.players[0].mana_pool.green = 1;
+
+        // Cast Abrupt Decay targeting Sol Ring
+        state.apply_action(
+            &Action::CastSpell {
+                card_id: decay_id,
+                targets: vec![Target::Object(target_id)],
+            },
+            &db,
+        );
+        assert_eq!(state.stack.len(), 1, "Abrupt Decay should be on the stack");
+
+        // Verify the stack item has cant_be_countered set
+        let stack_item = state.stack.top().unwrap();
+        assert!(stack_item.cant_be_countered, "Abrupt Decay should have cant_be_countered=true");
+
+        // P0 passes priority, P1 tries to counter with Counterspell
+        state.pass_priority(&db); // gives priority to P1
+
+        // P1 casts Counterspell targeting Abrupt Decay
+        let decay_stack_id = state.stack.items()[0].id;
+        state.players[1].mana_pool.blue = 2;
+        state.apply_action(
+            &Action::CastSpell {
+                card_id: counter_id,
+                targets: vec![Target::Object(decay_stack_id)],
+            },
+            &db,
+        );
+        assert_eq!(state.stack.len(), 2, "Counterspell should be on the stack");
+
+        // Both players pass priority - Counterspell resolves first (LIFO)
+        state.pass_priority(&db); // P1 passes
+        state.pass_priority(&db); // P0 passes -> Counterspell resolves
+
+        // Counterspell should have resolved and fizzled (Abrupt Decay still on stack)
+        assert_eq!(state.stack.len(), 1, "Abrupt Decay should still be on the stack (can't be countered)");
+
+        // Both players pass priority again - Abrupt Decay resolves
+        state.pass_priority(&db); // active player passes
+        state.pass_priority(&db); // other player passes -> Abrupt Decay resolves
+
+        // Sol Ring should be destroyed
+        let has_sol_ring = state.battlefield.iter().any(|p| p.card_name == CardName::SolRing);
+        assert!(!has_sol_ring, "Sol Ring should have been destroyed by Abrupt Decay");
+    }
 }

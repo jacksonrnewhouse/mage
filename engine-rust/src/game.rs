@@ -616,7 +616,15 @@ impl GameState {
             CardName::Counterspell | CardName::ForceOfWill | CardName::ManaDrain
             | CardName::ForceOfNegation | CardName::MindbreakTrap => {
                 if let Some(Target::Object(spell_id)) = targets.first() {
-                    self.stack.remove(*spell_id);
+                    // Check if the targeted spell can't be countered
+                    let is_uncounterable = self.stack.items()
+                        .iter()
+                        .find(|item| item.id == *spell_id)
+                        .map(|item| item.cant_be_countered)
+                        .unwrap_or(false);
+                    if !is_uncounterable {
+                        self.stack.remove(*spell_id);
+                    }
                 }
             }
             CardName::MentalMisstep | CardName::Flusterstorm | CardName::Daze
@@ -624,8 +632,16 @@ impl GameState {
             | CardName::SpellPierce | CardName::MysticalDispute | CardName::ConsignToMemory
             | CardName::SinkIntoStupor => {
                 // Counter unless controller pays - simplified: just counter
+                // Also respects can't-be-countered flag
                 if let Some(Target::Object(spell_id)) = targets.first() {
-                    self.stack.remove(*spell_id);
+                    let is_uncounterable = self.stack.items()
+                        .iter()
+                        .find(|item| item.id == *spell_id)
+                        .map(|item| item.cant_be_countered)
+                        .unwrap_or(false);
+                    if !is_uncounterable {
+                        self.stack.remove(*spell_id);
+                    }
                 }
             }
             CardName::Stifle => {

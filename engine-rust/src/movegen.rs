@@ -1157,13 +1157,15 @@ impl GameState {
                         let cost = self.effective_cost(def, player_id);
                         if self.players[player_id as usize].mana_pool.pay(&cost) {
                             self.players[player_id as usize].remove_from_hand(*card_id);
-                            self.stack.push(
+                            let uncounterable = is_uncounterable(cn);
+                            self.stack.push_with_flags(
                                 StackItemKind::Spell {
                                     card_name: cn,
                                     card_id: *card_id,
                                 },
                                 player_id,
                                 targets.clone(),
+                                uncounterable,
                             );
                             self.players[player_id as usize].spells_cast_this_turn += 1;
                             self.storm_count += 1;
@@ -1683,3 +1685,11 @@ impl GameState {
 }
 
 use crate::permanent::Permanent;
+
+/// Returns true if the spell with the given card name can't be countered.
+pub fn is_uncounterable(name: CardName) -> bool {
+    matches!(
+        name,
+        CardName::AbruptDecay
+    )
+}
