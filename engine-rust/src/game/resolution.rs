@@ -13,7 +13,7 @@ impl GameState {
         if let Some(item) = self.stack.pop() {
             match item.kind {
                 StackItemKind::Spell { card_name, card_id, cast_via_evoke } => {
-                    self.resolve_spell(card_name, card_id, item.controller, &item.targets, item.x_value, item.cast_from_graveyard, cast_via_evoke, db);
+                    self.resolve_spell(card_name, card_id, item.controller, &item.targets, item.x_value, item.cast_from_graveyard, cast_via_evoke, &item.modes, db);
                 }
                 StackItemKind::TriggeredAbility { effect, .. } => {
                     self.resolve_triggered(effect, item.controller, &item.targets, db);
@@ -35,6 +35,7 @@ impl GameState {
         x_value: u8,
         cast_from_graveyard: bool,
         cast_via_evoke: bool,
+        modes: &[u8],
         db: &[CardDef],
     ) {
         let card_def = find_card(db, card_name);
@@ -91,7 +92,7 @@ impl GameState {
         } else {
             // Instant/sorcery: resolve effect, then place in appropriate zone.
             // If cast via flashback (or via Yawgmoth's Will), exile instead of going to graveyard.
-            self.resolve_card_effect_with_x(card_name, controller, targets, x_value, db);
+            self.resolve_card_effect_with_x(card_name, controller, targets, x_value, modes, db);
             if cast_from_graveyard {
                 // Exile the card (flashback / Yawgmoth's Will rule: if it would go to graveyard, exile it)
                 // The card was already removed from graveyard when cast; just push to exile.
@@ -109,9 +110,10 @@ impl GameState {
         controller: PlayerId,
         targets: &[Target],
         _x_value: u8,
+        modes: &[u8],
         db: &[CardDef],
     ) {
-        self.resolve_card_effect(card_name, controller, targets, db);
+        self.resolve_card_effect(card_name, controller, targets, modes, db);
     }
 
     fn resolve_card_effect(
@@ -119,6 +121,7 @@ impl GameState {
         card_name: CardName,
         controller: PlayerId,
         targets: &[Target],
+        modes: &[u8],
         db: &[CardDef],
     ) {
         match card_name {
@@ -1046,6 +1049,119 @@ impl GameState {
                     if let Some(pos) = gy.iter().position(|&id| id == *target_id) {
                         let card = gy.remove(pos);
                         self.players[controller as usize].hand.push(card);
+                    }
+                }
+            }
+
+            // === Modal spells ===
+            CardName::KolaghanCommand => {
+                // Choose two — modes:
+                //   0: Return target creature card from your graveyard to your hand
+                //   1: Target player discards a card
+                //   2: Destroy target artifact
+                //   3: Kolaghan's Command deals 2 damage to any target
+                // targets layout (ordered by mode):
+                //   mode 0 -> Target::Object(graveyard_creature_id)
+                //   mode 1 -> Target::Player(discard_player)
+                //   mode 2 -> Target::Object(artifact_id)
+                //   mode 3 -> Target::Object(creature_or_player) or Target::Player(...)
+                let mut target_idx = 0usize;
+                for &mode in modes {
+                    match mode {
+                        0 => {
+                            // Return creature from graveyard to hand
+                            if let Some(Target::Object(card_id)) = targets.get(target_idx) {
+                                let pid = controller as usize;
+                                if let Some(pos) = self.players[pid].graveyard.iter().position(|&id| id == *card_id) {
+                                    self.players[pid].graveyard.remove(pos);
+                                    self.players[pid].hand.push(*card_id);
+                                }
+                            }
+                            target_idx += 1;
+                        }
+                        1 => {
+                            // Target player discards a card (simplified: discard last)
+                            if let Some(Target::Player(p)) = targets.get(target_idx) {
+                                let pid = *p as usize;
+                                if let Some(id) = self.players[pid].hand.pop() {
+                                    let cn = self.card_name_for_id(id).unwrap_or(CardName::Plains);
+                                    self.send_to_graveyard(id, cn, *p);
+                                }
+                            }
+                            target_idx += 1;
+                        }
+                        2 => {
+                            // Destroy target artifact
+                            if let Some(Target::Object(artifact_id)) = targets.get(target_idx) {
+                                self.destroy_permanent(*artifact_id);
+                            }
+                            target_idx += 1;
+                        }
+                        3 => {
+                            // Deal 2 damage to any target
+                            if let Some(tgt) = targets.get(target_idx) {
+                                self.deal_damage_to_target(*tgt, 2, controller);
+                            }
+                            target_idx += 1;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            CardName::KozileksCommand => {
+                // Choose two — modes:
+                //   0: Target player draws two cards and loses 2 life
+                //   1: Create a 0/1 Eldrazi Spawn token with "Sacrifice: Add {C}"
+                //   2: Destroy target artifact or enchantment with mana value 3 or less
+                //   3: Target creature gets -3/-3 until end of turn
+                let mut target_idx = 0usize;
+                for &mode in modes {
+                    match mode {
+                        0 => {
+                            if let Some(Target::Player(p)) = targets.get(target_idx) {
+                                self.draw_cards(*p, 2);
+                                self.players[*p as usize].life -= 2;
+                            }
+                            target_idx += 1;
+                        }
+                        1 => {
+                            // Create a 0/1 Eldrazi Spawn token (no target needed)
+                            let token_id = self.new_object_id();
+                            let mut token = crate::permanent::Permanent::new(
+                                token_id,
+                                CardName::EldraziSpawnToken,
+                                controller,
+                                controller,
+                                Some(0),
+                                Some(1),
+                                None,
+                                Keywords::empty(),
+                                &[CardType::Creature],
+                            );
+                            token.is_token = true;
+                            self.battlefield.push(token);
+                            // no target consumed
+                        }
+                        2 => {
+                            // Destroy target artifact or enchantment
+                            if let Some(Target::Object(id)) = targets.get(target_idx) {
+                                self.destroy_permanent(*id);
+                            }
+                            target_idx += 1;
+                        }
+                        3 => {
+                            // Target creature gets -3/-3 until end of turn
+                            if let Some(Target::Object(id)) = targets.get(target_idx) {
+                                self.add_temporary_effect(crate::types::TemporaryEffect::ModifyPT {
+                                    target: *id,
+                                    power: -3,
+                                    toughness: -3,
+                                });
+                            }
+                            target_idx += 1;
+                        }
+                        _ => {}
                     }
                 }
             }

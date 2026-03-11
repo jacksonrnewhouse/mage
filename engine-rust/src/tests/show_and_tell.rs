@@ -26,6 +26,7 @@ fn cast_show_and_tell(
             from_graveyard: false,
             from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         db,
     );

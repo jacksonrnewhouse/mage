@@ -107,6 +107,7 @@ fn test_rest_in_peace_instant_goes_to_exile_after_resolution() {
             from_graveyard: false,
                 from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );
@@ -195,6 +196,7 @@ fn test_grafdiggers_cage_blocks_reanimate() {
             from_graveyard: false,
                 from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );
@@ -241,6 +243,7 @@ fn test_containment_priest_blocks_reanimate() {
             from_graveyard: false,
                 from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );

@@ -115,6 +115,7 @@ fn test_ethersworn_canonist_limits_nonartifact_spells() {
             from_graveyard: false,
                 from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );
@@ -166,6 +167,7 @@ fn test_deafening_silence_limits_noncreature_spells() {
             from_graveyard: false,
                 from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );
@@ -218,6 +220,7 @@ fn test_archon_of_emeria_limits_one_spell_per_turn() {
             from_graveyard: false,
                 from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );

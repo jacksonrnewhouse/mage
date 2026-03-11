@@ -205,6 +205,7 @@ fn test_tezzeret_emblem_triggers_on_artifact_cast() {
             from_graveyard: false,
             from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );
@@ -251,6 +252,7 @@ fn test_dack_emblem_triggers_on_permanent_targeting_spell() {
             from_graveyard: false,
             from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );

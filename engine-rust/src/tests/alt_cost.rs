@@ -42,6 +42,7 @@ fn push_spell_on_stack(state: &mut GameState, card_name: CardName, controller: u
         false,
         0,
         false,
+        vec![],
     );
     // Return the stack item ID (the stack generates its own ID for items)
     state.stack.items().last().map(|i| i.id).unwrap_or(spell_id)
@@ -160,6 +161,7 @@ fn test_fow_alt_cost_exiles_blue_card_and_pays_life() {
             from_graveyard: false,
                 from_library_top: false,
             alt_cost: Some(AltCost::ForceOfWill { exile_id: blue_id }),
+        modes: vec![],
         },
         &db,
     );
@@ -207,6 +209,7 @@ fn test_fow_alt_cost_counters_spell() {
             from_graveyard: false,
                 from_library_top: false,
             alt_cost: Some(AltCost::ForceOfWill { exile_id: blue_id }),
+        modes: vec![],
         },
         &db,
     );
@@ -297,6 +300,7 @@ fn test_fon_alt_cost_exiles_blue_card_without_life_payment() {
             from_graveyard: false,
                 from_library_top: false,
             alt_cost: Some(AltCost::ForceOfNegation { exile_id: blue_id }),
+        modes: vec![],
         },
         &db,
     );
@@ -412,6 +416,7 @@ fn test_solitude_evoke_exiles_white_card_and_enters_battlefield() {
             from_graveyard: false,
                 from_library_top: false,
             alt_cost: Some(AltCost::Evoke { exile_id: white_id }),
+        modes: vec![],
         },
         &db,
     );
@@ -463,6 +468,7 @@ fn test_solitude_evoke_enters_then_is_sacrificed() {
             from_graveyard: false,
                 from_library_top: false,
             alt_cost: Some(AltCost::Evoke { exile_id: white_id }),
+        modes: vec![],
         },
         &db,
     );
@@ -720,6 +726,7 @@ fn test_gitaxian_probe_phyrexian_deducts_2_life_and_draws() {
                 life_paid: 2,
                 normal_cost: crate::mana::ManaCost::ZERO,
             }),
+        modes: vec![],
         },
         &db,
     );
@@ -828,6 +835,7 @@ fn test_mental_misstep_phyrexian_deducts_2_life() {
                 life_paid: 2,
                 normal_cost: crate::mana::ManaCost::ZERO,
             }),
+        modes: vec![],
         },
         &db,
     );
@@ -960,6 +968,7 @@ fn test_dismember_phyrexian_deducts_life_and_mana() {
                 life_paid: 4,
                 normal_cost: crate::mana::ManaCost { generic: 1, ..crate::mana::ManaCost::ZERO },
             }),
+        modes: vec![],
         },
         &db,
     );
@@ -1092,6 +1101,7 @@ fn test_surgical_extraction_phyrexian_deducts_2_life() {
                 life_paid: 2,
                 normal_cost: crate::mana::ManaCost::ZERO,
             }),
+        modes: vec![],
         },
         &db,
     );

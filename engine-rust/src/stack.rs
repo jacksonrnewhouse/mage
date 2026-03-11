@@ -18,6 +18,9 @@ pub struct StackItem {
     /// True if this spell was cast from the graveyard (flashback or Yawgmoth's Will).
     /// When true and the spell is an instant/sorcery, it is exiled instead of going to graveyard.
     pub cast_from_graveyard: bool,
+    /// Chosen mode indices for modal spells (e.g., Kolaghan's Command choose 2 of 4).
+    /// Empty for non-modal spells.
+    pub modes: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
@@ -211,7 +214,7 @@ impl GameStack {
     }
 
     pub fn push(&mut self, kind: StackItemKind, controller: PlayerId, targets: Vec<Target>) -> ObjectId {
-        self.push_with_flags(kind, controller, targets, false, 0, false)
+        self.push_with_flags(kind, controller, targets, false, 0, false, vec![])
     }
 
     pub fn push_with_flags(
@@ -222,6 +225,7 @@ impl GameStack {
         cant_be_countered: bool,
         x_value: u8,
         cast_from_graveyard: bool,
+        modes: Vec<u8>,
     ) -> ObjectId {
         let id = self.next_id;
         self.next_id += 1;
@@ -233,6 +237,7 @@ impl GameStack {
             cant_be_countered,
             x_value,
             cast_from_graveyard,
+            modes,
         });
         id
     }

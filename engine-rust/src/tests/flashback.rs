@@ -149,6 +149,7 @@ fn test_flashback_spell_is_exiled_after_resolving() {
             from_graveyard: true,
                 from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );
@@ -212,6 +213,7 @@ fn test_snapcaster_mage_grants_flashback() {
             from_graveyard: false,
                 from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );
@@ -310,6 +312,7 @@ fn test_yawgmoths_will_cast_exiles_on_resolution() {
             from_graveyard: true,
                 from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );

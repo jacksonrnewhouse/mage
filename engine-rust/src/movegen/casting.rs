@@ -80,7 +80,7 @@ impl GameState {
                 }
             }
 
-            Action::CastSpell { card_id, targets, x_value, from_graveyard, from_library_top, alt_cost } => {
+            Action::CastSpell { card_id, targets, x_value, from_graveyard, from_library_top, alt_cost, modes } => {
                 let player_id = self.priority_player;
                 let card_name = self.card_name_for_id(*card_id);
                 if let Some(cn) = card_name {
@@ -175,6 +175,7 @@ impl GameState {
                                 uncounterable,
                                 *x_value,
                                 *from_graveyard,
+                                modes.clone(),
                             );
                             self.players[player_id as usize].spells_cast_this_turn += 1;
                             if !def.card_types.contains(&CardType::Artifact) {

@@ -182,6 +182,7 @@ fn test_time_walk_grants_extra_turn() {
             from_graveyard: false,
             from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );
@@ -219,6 +220,7 @@ fn test_temporal_mastery_grants_extra_turn() {
             from_graveyard: false,
             from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );
@@ -254,6 +256,7 @@ fn test_extra_turn_is_taken_by_same_player() {
             from_graveyard: false,
             from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );
@@ -312,6 +315,7 @@ fn test_emrakul_cast_trigger_grants_extra_turn() {
             from_graveyard: false,
             from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );

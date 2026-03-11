@@ -524,6 +524,8 @@ pub enum CardName {
     TreasureToken,
     /// Represents a Thopter token (1/1 colorless Thopter artifact creature with flying).
     ThopterToken,
+    /// Represents an Eldrazi Spawn token (0/1 colorless creature: "Sacrifice: Add {C}.")
+    EldraziSpawnToken,
 
     // Sentinel value for array sizing
     _Count,

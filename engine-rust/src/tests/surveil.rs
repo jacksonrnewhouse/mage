@@ -129,6 +129,7 @@ fn test_consider_keep_on_top_then_draw() {
             from_graveyard: false,
             from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );
@@ -185,6 +186,7 @@ fn test_consider_send_to_graveyard_then_draw_next() {
             from_graveyard: false,
             from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );

@@ -80,6 +80,7 @@ fn test_citadel_pays_life_equal_to_mana_value() {
             from_graveyard: false,
             from_library_top: true,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );
@@ -193,6 +194,7 @@ fn test_future_sight_cast_removes_card_from_library() {
             from_graveyard: false,
             from_library_top: true,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );

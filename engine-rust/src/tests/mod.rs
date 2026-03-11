@@ -6,6 +6,7 @@ mod alt_cost;
 mod annihilator_extra_turn;
 mod delayed_triggers;
 mod basic;
+mod modal_spells;
 mod dredge;
 mod emblem;
 mod clone;

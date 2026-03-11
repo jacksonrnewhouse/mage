@@ -173,6 +173,7 @@ fn test_crop_rotation_searches_for_land() {
             from_graveyard: false,
                 from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );
@@ -233,6 +234,7 @@ fn test_abrupt_decay_cant_be_countered() {
             from_graveyard: false,
                 from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );
@@ -256,6 +258,7 @@ fn test_abrupt_decay_cant_be_countered() {
             from_graveyard: false,
                 from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );
@@ -348,7 +351,7 @@ fn test_mana_vault_etb_sets_doesnt_untap() {
     state.action_context = ActionContext::Priority;
 
     // Cast Mana Vault
-    state.apply_action(&crate::action::Action::CastSpell { card_id: vault_id, targets: vec![], x_value: 0, from_graveyard: false, from_library_top: false, alt_cost: None }, &db);
+    state.apply_action(&crate::action::Action::CastSpell { card_id: vault_id, targets: vec![], x_value: 0, from_graveyard: false, from_library_top: false, alt_cost: None, modes: vec![] }, &db);
 
     // Resolve it (pass priority twice)
     state.pass_priority(&db);
@@ -476,6 +479,7 @@ fn test_memory_lapse_puts_on_top() {
             from_graveyard: false,
                 from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );
@@ -492,6 +496,7 @@ fn test_memory_lapse_puts_on_top() {
             from_graveyard: false,
                 from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );
@@ -550,6 +555,7 @@ fn test_remand_returns_to_hand_and_draws() {
             from_graveyard: false,
                 from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );
@@ -565,6 +571,7 @@ fn test_remand_returns_to_hand_and_draws() {
             from_graveyard: false,
                 from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );
@@ -614,6 +621,7 @@ fn test_sheoldreds_edict_forces_opponent_to_sacrifice_creature() {
             from_graveyard: false,
                 from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );
@@ -681,6 +689,7 @@ fn test_sheoldreds_edict_no_effect_when_opponent_has_no_creatures() {
             from_graveyard: false,
                 from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );
@@ -817,6 +826,7 @@ fn test_generous_plunderer_etb_creates_treasures_for_both() {
             from_graveyard: false,
                 from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );
@@ -1186,6 +1196,7 @@ fn test_walking_ballista_x0_dies_immediately() {
             from_graveyard: false,
                 from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );
@@ -1235,6 +1246,7 @@ fn test_walking_ballista_x3_enters_with_counters() {
             from_graveyard: false,
                 from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );
@@ -1286,6 +1298,7 @@ fn test_stonecoil_serpent_x4_enters_with_counters() {
             from_graveyard: false,
                 from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );
@@ -1336,6 +1349,7 @@ fn test_chalice_of_the_void_x1_enters_with_charge_counter() {
             from_graveyard: false,
                 from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );

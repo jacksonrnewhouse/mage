@@ -130,6 +130,7 @@ fn test_cast_lightning_bolt() {
             from_graveyard: false,
                 from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );

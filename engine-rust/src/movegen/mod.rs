@@ -176,6 +176,13 @@ impl GameState {
                         vec![0u8]
                     };
 
+                    // Modal spells: generate actions per valid mode combination
+                    if is_modal_spell(card_name) {
+                        let modal_actions = self.generate_modal_actions(card_id, card_name, player_id, db);
+                        actions.extend(modal_actions);
+                        continue;
+                    }
+
                     // Generate target permutations
                     let target_sets = self.generate_targets(card_name, player_id, db);
                     for x_value in x_values {
@@ -192,6 +199,7 @@ impl GameState {
                                 from_graveyard: false,
                 from_library_top: false,
                                 alt_cost: None,
+                                modes: vec![],
                             });
                         } else {
                             for targets in &target_sets {
@@ -202,6 +210,7 @@ impl GameState {
                                     from_graveyard: false,
                 from_library_top: false,
                                     alt_cost: None,
+                                modes: vec![],
                                 });
                             }
                         }
@@ -322,6 +331,7 @@ impl GameState {
                                 from_graveyard: true,
                 from_library_top: false,
                                 alt_cost: None,
+                                modes: vec![],
                             });
                         } else {
                             for targets in &target_sets {
@@ -332,6 +342,7 @@ impl GameState {
                                     from_graveyard: true,
                 from_library_top: false,
                                     alt_cost: None,
+                                modes: vec![],
                                 });
                             }
                         }
@@ -432,6 +443,7 @@ impl GameState {
                                                         from_graveyard: false,
                                                         from_library_top: true,
                                                         alt_cost: None,
+                                modes: vec![],
                                                     });
                                                 }
                                             } else {
@@ -443,6 +455,7 @@ impl GameState {
                                                         from_graveyard: false,
                                                         from_library_top: true,
                                                         alt_cost: None,
+                                modes: vec![],
                                                     });
                                                 }
                                             }
@@ -1892,6 +1905,7 @@ impl GameState {
                                     from_graveyard: false,
                 from_library_top: false,
                                     alt_cost: Some(AltCost::ForceOfWill { exile_id }),
+                                modes: vec![],
                                 });
                             }
                         } else {
@@ -1903,6 +1917,7 @@ impl GameState {
                                     from_graveyard: false,
                 from_library_top: false,
                                     alt_cost: Some(AltCost::ForceOfWill { exile_id }),
+                                modes: vec![],
                                 });
                             }
                         }
@@ -1935,6 +1950,7 @@ impl GameState {
                                     from_graveyard: false,
                 from_library_top: false,
                                     alt_cost: Some(AltCost::ForceOfNegation { exile_id }),
+                                modes: vec![],
                                 });
                             }
                         } else {
@@ -1946,6 +1962,7 @@ impl GameState {
                                     from_graveyard: false,
                 from_library_top: false,
                                     alt_cost: Some(AltCost::ForceOfNegation { exile_id }),
+                                modes: vec![],
                                 });
                             }
                         }
@@ -1979,6 +1996,7 @@ impl GameState {
                                     from_graveyard: false,
                 from_library_top: false,
                                     alt_cost: Some(AltCost::Misdirection { exile_id }),
+                                modes: vec![],
                                 });
                             }
                         } else {
@@ -1990,6 +2008,7 @@ impl GameState {
                                     from_graveyard: false,
                 from_library_top: false,
                                     alt_cost: Some(AltCost::Misdirection { exile_id }),
+                                modes: vec![],
                                 });
                             }
                         }
@@ -2029,6 +2048,7 @@ impl GameState {
                                 from_graveyard: false,
                 from_library_top: false,
                                 alt_cost: Some(AltCost::Commandeer { exile_id1, exile_id2 }),
+                                modes: vec![],
                             });
                         }
                     } else {
@@ -2040,6 +2060,7 @@ impl GameState {
                                 from_graveyard: false,
                 from_library_top: false,
                                 alt_cost: Some(AltCost::Commandeer { exile_id1, exile_id2 }),
+                                modes: vec![],
                             });
                         }
                     }
@@ -2083,6 +2104,7 @@ impl GameState {
                                 from_graveyard: false,
                 from_library_top: false,
                                 alt_cost: Some(alt),
+                                modes: vec![],
                             });
                         } else {
                             for targets in &target_sets {
@@ -2093,6 +2115,7 @@ impl GameState {
                                     from_graveyard: false,
                 from_library_top: false,
                                     alt_cost: Some(alt.clone()),
+                                    modes: vec![],
                                 });
                             }
                         }
@@ -2118,6 +2141,7 @@ impl GameState {
                                 from_graveyard: false,
                 from_library_top: false,
                                 alt_cost: Some(alt.clone()),
+                                modes: vec![],
                             });
                         }
                     }
@@ -2142,6 +2166,7 @@ impl GameState {
                                 from_graveyard: false,
                 from_library_top: false,
                                 alt_cost: Some(alt.clone()),
+                                modes: vec![],
                             });
                         }
                     }
@@ -2172,6 +2197,7 @@ impl GameState {
                                     from_graveyard: false,
                 from_library_top: false,
                                     alt_cost: Some(alt.clone()),
+                                    modes: vec![],
                                 });
                             }
                         }
@@ -2190,6 +2216,7 @@ impl GameState {
                                     from_graveyard: false,
                 from_library_top: false,
                                     alt_cost: Some(alt.clone()),
+                                    modes: vec![],
                                 });
                             }
                         }
@@ -2248,6 +2275,7 @@ impl GameState {
                     from_graveyard: false,
                 from_library_top: false,
                     alt_cost: Some(AltCost::Evoke { exile_id }),
+                    modes: vec![],
                 });
             } else {
                 for targets in &target_sets {
@@ -2258,9 +2286,191 @@ impl GameState {
                         from_graveyard: false,
                 from_library_top: false,
                         alt_cost: Some(AltCost::Evoke { exile_id }),
+                        modes: vec![],
                     });
                 }
             }
+        }
+    }
+
+    /// Generate all valid CastSpell actions for a modal spell, covering every valid
+    /// combination of modes and the required targets for each combination.
+    fn generate_modal_actions(
+        &self,
+        card_id: ObjectId,
+        card_name: CardName,
+        player_id: PlayerId,
+        db: &[CardDef],
+    ) -> Vec<Action> {
+        match card_name {
+            CardName::KolaghanCommand => {
+                // Choose exactly 2 of 4 modes.
+                // Mode targets:
+                //   0: graveyard creature card owned by controller
+                //   1: any player (discard)
+                //   2: any artifact on battlefield
+                //   3: any creature or player (deal 2 damage)
+                let spell_colors = find_card(db, card_name)
+                    .map(|d| d.color_identity.to_vec())
+                    .unwrap_or_default();
+                let gyd_creatures: Vec<ObjectId> = self.players[player_id as usize]
+                    .graveyard
+                    .iter()
+                    .filter(|&&id| {
+                        self.card_name_for_id(id)
+                            .and_then(|cn| find_card(db, cn))
+                            .map(|def| def.card_types.contains(&CardType::Creature))
+                            .unwrap_or(false)
+                    })
+                    .copied()
+                    .collect();
+                let players: Vec<PlayerId> = (0..self.num_players).collect();
+                let artifacts: Vec<ObjectId> = self.battlefield.iter()
+                    .filter(|p| p.is_artifact() && self.can_be_targeted(p, player_id, &spell_colors))
+                    .map(|p| p.id)
+                    .collect();
+                // Damage targets: any player or creature
+                let damage_targets: Vec<Target> = {
+                    let mut v: Vec<Target> = players.iter().map(|&p| Target::Player(p)).collect();
+                    for perm in &self.battlefield {
+                        if perm.is_creature() && self.can_be_targeted(perm, player_id, &spell_colors) {
+                            v.push(Target::Object(perm.id));
+                        }
+                    }
+                    v
+                };
+
+                // Generate targets for each mode
+                let mode_targets: [Vec<Target>; 4] = [
+                    gyd_creatures.iter().map(|&id| Target::Object(id)).collect(),
+                    players.iter().map(|&p| Target::Player(p)).collect(),
+                    artifacts.iter().map(|&id| Target::Object(id)).collect(),
+                    damage_targets.clone(),
+                ];
+
+                let mut result = Vec::new();
+                // All C(4,2) = 6 combinations
+                for mode_a in 0u8..4 {
+                    for mode_b in (mode_a + 1)..4 {
+                        let modes = vec![mode_a, mode_b];
+                        // Mode 1 (discard) has no explicit target constraint check needed
+                        // (targets a player, always valid)
+                        // Some modes may have no valid targets
+                        let targets_a = &mode_targets[mode_a as usize];
+                        let targets_b = &mode_targets[mode_b as usize];
+                        // modes 0 and 2 require a valid target; modes 1 and 3 always have valid targets
+                        let a_needs_target = mode_a == 0 || mode_a == 2;
+                        let b_needs_target = mode_b == 0 || mode_b == 2;
+                        if a_needs_target && targets_a.is_empty() {
+                            continue;
+                        }
+                        if b_needs_target && targets_b.is_empty() {
+                            continue;
+                        }
+                        // Generate Cartesian product of valid targets for the two modes
+                        let effective_a: Vec<Target> = if targets_a.is_empty() {
+                            // Default target when mode doesn't require one (e.g., mode 1 player)
+                            vec![Target::Player(self.opponent(player_id))]
+                        } else {
+                            targets_a.clone()
+                        };
+                        let effective_b: Vec<Target> = if targets_b.is_empty() {
+                            vec![Target::Player(self.opponent(player_id))]
+                        } else {
+                            targets_b.clone()
+                        };
+                        for &ta in &effective_a {
+                            for &tb in &effective_b {
+                                result.push(Action::CastSpell {
+                                    card_id,
+                                    targets: vec![ta, tb],
+                                    x_value: 0,
+                                    from_graveyard: false,
+                                    from_library_top: false,
+                                    alt_cost: None,
+                                    modes: modes.clone(),
+                                });
+                            }
+                        }
+                    }
+                }
+                result
+            }
+
+            CardName::KozileksCommand => {
+                // Choose exactly 2 of 4 modes.
+                // Mode targets:
+                //   0: any player (draws 2, loses 2 life)
+                //   1: no target (creates Eldrazi Spawn token)
+                //   2: any artifact or enchantment
+                //   3: any creature (-3/-3)
+                let spell_colors = find_card(db, card_name)
+                    .map(|d| d.color_identity.to_vec())
+                    .unwrap_or_default();
+                let players: Vec<PlayerId> = (0..self.num_players).collect();
+                let art_ench: Vec<ObjectId> = self.battlefield.iter()
+                    .filter(|p| (p.is_artifact() || p.is_enchantment()) && self.can_be_targeted(p, player_id, &spell_colors))
+                    .map(|p| p.id)
+                    .collect();
+                let creatures: Vec<ObjectId> = self.battlefield.iter()
+                    .filter(|p| p.is_creature() && self.can_be_targeted(p, player_id, &spell_colors))
+                    .map(|p| p.id)
+                    .collect();
+
+                let mode_targets: [Vec<Target>; 4] = [
+                    players.iter().map(|&p| Target::Player(p)).collect(),
+                    vec![], // mode 1 has no target
+                    art_ench.iter().map(|&id| Target::Object(id)).collect(),
+                    creatures.iter().map(|&id| Target::Object(id)).collect(),
+                ];
+                // modes that need a valid target: 0 (always has players), 2, 3
+                let needs_target = [false, false, true, true];
+
+                let mut result = Vec::new();
+                for mode_a in 0u8..4 {
+                    for mode_b in (mode_a + 1)..4 {
+                        let modes = vec![mode_a, mode_b];
+                        let targets_a = &mode_targets[mode_a as usize];
+                        let targets_b = &mode_targets[mode_b as usize];
+                        if needs_target[mode_a as usize] && targets_a.is_empty() {
+                            continue;
+                        }
+                        if needs_target[mode_b as usize] && targets_b.is_empty() {
+                            continue;
+                        }
+                        // Enumerate targets
+                        let effective_a: Vec<Option<Target>> = if targets_a.is_empty() {
+                            vec![None] // mode 1: no target
+                        } else {
+                            targets_a.iter().map(|&t| Some(t)).collect()
+                        };
+                        let effective_b: Vec<Option<Target>> = if targets_b.is_empty() {
+                            vec![None]
+                        } else {
+                            targets_b.iter().map(|&t| Some(t)).collect()
+                        };
+                        for ta_opt in &effective_a {
+                            for tb_opt in &effective_b {
+                                let mut targets = Vec::new();
+                                if let Some(ta) = ta_opt { targets.push(*ta); }
+                                if let Some(tb) = tb_opt { targets.push(*tb); }
+                                result.push(Action::CastSpell {
+                                    card_id,
+                                    targets,
+                                    x_value: 0,
+                                    from_graveyard: false,
+                                    from_library_top: false,
+                                    alt_cost: None,
+                                    modes: modes.clone(),
+                                });
+                            }
+                        }
+                    }
+                }
+                result
+            }
+
+            _ => vec![],
         }
     }
 }
@@ -2306,4 +2516,9 @@ pub fn requires_sacrifice_cost(name: CardName) -> bool {
             | CardName::NaturalOrder
             | CardName::CropRotation
     )
+}
+
+/// Returns true if this card is a modal spell (choose N of M modes).
+pub fn is_modal_spell(name: CardName) -> bool {
+    matches!(name, CardName::KolaghanCommand | CardName::KozileksCommand)
 }

@@ -492,6 +492,7 @@ fn test_young_pyromancer_triggers_on_noncreature_spell() {
             from_graveyard: false,
                 from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );
@@ -556,6 +557,7 @@ fn test_young_pyromancer_does_not_trigger_on_creature_spell() {
             from_graveyard: false,
                 from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );
@@ -608,6 +610,7 @@ fn test_monastery_mentor_triggers_on_noncreature_spell() {
             from_graveyard: false,
                 from_library_top: false,
             alt_cost: None,
+        modes: vec![],
         },
         &db,
     );

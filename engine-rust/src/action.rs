@@ -41,6 +41,8 @@ pub enum Action {
     /// `from_graveyard` is true when casting via flashback or Yawgmoth's Will.
     /// `from_library_top` is true when casting via Bolas's Citadel, Future Sight, Mystic Forge, etc.
     /// `alt_cost` is Some when paying an alternative cost instead of the normal mana cost.
+    /// `modes` is the list of chosen mode indices for modal spells (e.g., Kolaghan's Command).
+    /// Empty for non-modal spells.
     CastSpell {
         card_id: ObjectId,
         targets: Vec<Target>,
@@ -48,6 +50,7 @@ pub enum Action {
         from_graveyard: bool,
         from_library_top: bool,
         alt_cost: Option<AltCost>,
+        modes: Vec<u8>,
     },
     /// Activate an ability on a permanent.
     ActivateAbility {
