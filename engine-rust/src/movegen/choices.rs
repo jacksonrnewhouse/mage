@@ -91,6 +91,14 @@ impl GameState {
                         // The chosen player sacrifices the chosen creature
                         self.destroy_permanent(card_id);
                     }
+                    ChoiceReason::AnnihilatorSacrifice { remaining } => {
+                        // The chosen player sacrifices the chosen permanent
+                        self.destroy_permanent(card_id);
+                        // If more sacrifices are required, queue the next one
+                        if remaining > 0 {
+                            self.trigger_annihilator(choice.player, remaining);
+                        }
+                    }
                     ChoiceReason::CloneTarget { clone_id, is_metamorph } => {
                         // Copy the chosen permanent's characteristics onto the clone.
                         // Collect the data we need from the target before mutating.

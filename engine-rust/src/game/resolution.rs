@@ -291,7 +291,7 @@ impl GameState {
             }
 
             // === Extra turns ===
-            CardName::TimeWalk => {
+            CardName::TimeWalk | CardName::TemporalMastery => {
                 self.players[controller as usize].extra_turns += 1;
             }
 
@@ -1686,6 +1686,10 @@ impl GameState {
             TriggeredEffect::MonarchEndStep => {
                 // The monarch draws a card at the beginning of their end step.
                 self.draw_cards(controller, 1);
+            }
+            TriggeredEffect::EmrakulCast => {
+                // When you cast Emrakul, take an extra turn after this one.
+                self.players[controller as usize].extra_turns += 1;
             }
             _ => {}
         }

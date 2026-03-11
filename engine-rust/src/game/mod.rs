@@ -134,6 +134,9 @@ pub enum ChoiceReason {
     MyrRetrieverReturn,
     /// Edict effect: the affected player must sacrifice a creature they control
     EdictSacrifice,
+    /// Annihilator N: the defending player must sacrifice a permanent.
+    /// `remaining` is the number of additional sacrifices still required after this one resolves.
+    AnnihilatorSacrifice { remaining: u8 },
     /// Treasure token sacrifice: choose a color to add 1 mana of
     TreasureSacrificeColor,
     /// Cavern of Souls ETB: choose a creature type (encoded as index into CreatureType::ALL)
@@ -706,6 +709,28 @@ impl GameState {
             }
         }
         dest
+    }
+
+    /// Trigger annihilator N for the given defending player: they must sacrifice N permanents.
+    /// Sets up N pending edict-style sacrifice choices, chained via AnnihilatorSacrifice { remaining }.
+    pub fn trigger_annihilator(&mut self, defending_player: PlayerId, n: u8) {
+        if n == 0 {
+            return;
+        }
+        let permanents: Vec<ObjectId> = self.battlefield.iter()
+            .filter(|p| p.controller == defending_player)
+            .map(|p| p.id)
+            .collect();
+        if permanents.is_empty() {
+            return;
+        }
+        self.pending_choice = Some(PendingChoice {
+            player: defending_player,
+            kind: ChoiceKind::ChooseFromList {
+                options: permanents,
+                reason: ChoiceReason::AnnihilatorSacrifice { remaining: n - 1 },
+            },
+        });
     }
 
     /// Make a player the monarch. The monarch draws a card at the beginning of their

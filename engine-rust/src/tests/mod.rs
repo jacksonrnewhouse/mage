@@ -3,6 +3,7 @@ use crate::game::*;
 use crate::types::*;
 
 mod alt_cost;
+mod annihilator_extra_turn;
 mod basic;
 mod clone;
 mod protection;

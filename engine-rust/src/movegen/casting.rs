@@ -188,6 +188,18 @@ impl GameState {
                             if is_noncreature {
                                 self.check_noncreature_cast_triggers(player_id);
                             }
+                            // Emrakul, the Aeons Torn: when cast, take an extra turn after this one.
+                            if cn == CardName::EmrakulTheAeonsTorn {
+                                self.stack.push(
+                                    crate::stack::StackItemKind::TriggeredAbility {
+                                        source_id: *card_id,
+                                        source_name: cn,
+                                        effect: crate::stack::TriggeredEffect::EmrakulCast,
+                                    },
+                                    player_id,
+                                    vec![],
+                                );
+                            }
                             self.reset_priority_passes();
                         }
                     }
@@ -212,11 +224,19 @@ impl GameState {
             Action::DeclareAttacker { creature_id } => {
                 let defending_player = self.opponent(self.active_player);
                 self.attackers.push((*creature_id, defending_player));
+                let card_name = self.find_permanent(*creature_id).map(|p| p.card_name);
                 if let Some(perm) = self.find_permanent_mut(*creature_id) {
                     if !perm.keywords.has(Keyword::Vigilance) {
                         perm.tapped = true;
                     }
                     perm.attacked_this_turn = true;
+                }
+                // Annihilator N: when this creature attacks, the defending player sacrifices N permanents.
+                if let Some(cn) = card_name {
+                    let n = crate::card::annihilator_value(cn);
+                    if n > 0 {
+                        self.trigger_annihilator(defending_player, n);
+                    }
                 }
             }
 

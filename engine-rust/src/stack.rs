@@ -104,6 +104,8 @@ pub enum TriggeredEffect {
     ExileLinkedReturn { card_id: ObjectId, card_owner: PlayerId },
     /// Monarch end-step trigger: the monarch draws a card
     MonarchEndStep,
+    /// Emrakul, the Aeons Torn cast trigger: take an extra turn after this one
+    EmrakulCast,
 }
 
 /// Activated ability effects.

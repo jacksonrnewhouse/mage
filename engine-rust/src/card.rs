@@ -91,6 +91,7 @@ pub enum CardName {
     AncestralRecall,
     TimeWalk,
     Timetwister,
+    TemporalMastery,
     MoxPearl,
     MoxSapphire,
     MoxJet,
@@ -608,6 +609,15 @@ pub fn equipment_bonus(card_name: CardName) -> Option<EquipmentBonus> {
     }
 }
 
+/// Returns the annihilator N value for a creature, or 0 if it has no annihilator.
+/// Annihilator N means: when this creature attacks, the defending player sacrifices N permanents.
+pub fn annihilator_value(card_name: CardName) -> u8 {
+    match card_name {
+        CardName::EmrakulTheAeonsTorn => 6,
+        _ => 0,
+    }
+}
+
 /// Cycling ability info: cost and whether it's a basic cycling (draw a card) or special.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CyclingKind {
@@ -945,6 +955,8 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Target player draws three cards.");
     card!(TimeWalk, "Time Walk", ManaCost { blue: 1, generic: 1, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Blue],
         "Take an extra turn after this one.");
+    card!(TemporalMastery, "Temporal Mastery", ManaCost { blue: 2, generic: 5, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Blue],
+        "Take an extra turn after this one. Miracle {1}{U}.");
     card!(Timetwister, "Timetwister", ManaCost { blue: 1, generic: 2, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Blue],
         "Each player shuffles their hand and graveyard into their library, then draws seven cards.");
     card!(MoxPearl, "Mox Pearl", c, &[Artifact], &[], None, None, None, kw(), &[White],
