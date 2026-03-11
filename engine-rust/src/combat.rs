@@ -45,6 +45,7 @@ impl GameState {
             let attacker_has_deathtouch = attacker.keywords.has(Keyword::Deathtouch);
             let attacker_has_lifelink = attacker.keywords.has(Keyword::Lifelink);
             let attacker_controller = attacker.controller;
+            let attacker_colors = attacker.colors.clone();
 
             if attacker_power <= 0 {
                 continue;
@@ -100,17 +101,32 @@ impl GameState {
                     let blocker_toughness = self.effective_toughness(blocker_id, db);
                     let blocker_power = self.effective_power(blocker_id, db);
                     if let Some(blocker) = self.find_permanent(blocker_id) {
-                        let lethal = if attacker_has_deathtouch {
-                            1
-                        } else {
-                            (blocker_toughness - blocker.damage).max(0)
-                        };
-                        let assigned = remaining_damage.min(lethal);
-                        damage_to_creatures.push((blocker_id, assigned));
-                        remaining_damage -= assigned;
+                        // Check if blocker has protection from the attacker
+                        // (attacker's damage is prevented if blocker has protection from attacker's quality)
+                        let blocker_protected = blocker.is_protected_from(&attacker_colors, attacker_controller);
+
+                        if !blocker_protected {
+                            let lethal = if attacker_has_deathtouch {
+                                1
+                            } else {
+                                (blocker_toughness - blocker.damage).max(0)
+                            };
+                            let assigned = remaining_damage.min(lethal);
+                            damage_to_creatures.push((blocker_id, assigned));
+                            remaining_damage -= assigned;
+                        }
 
                         // Blocker deals damage back to attacker
-                        if blocker_power > 0 {
+                        // Check if attacker has protection from the blocker
+                        let blocker_colors = blocker.colors.clone();
+                        let blocker_controller = blocker.controller;
+                        let attacker_protected = {
+                            // We need attacker's protections; re-fetch attacker
+                            self.find_permanent(attacker_id)
+                                .map(|a| a.is_protected_from(&blocker_colors, blocker_controller))
+                                .unwrap_or(false)
+                        };
+                        if blocker_power > 0 && !attacker_protected {
                             damage_to_creatures.push((attacker_id, blocker_power));
                             if blocker.keywords.has(Keyword::Lifelink) {
                                 damage_to_players.push((blocker.controller, blocker_power as i32));

@@ -588,13 +588,16 @@ impl GameState {
             // Can block each attacker
             for &(attacker_id, _) in &self.attackers {
                 if let Some(attacker) = self.find_permanent(attacker_id) {
-                    let can_block = if attacker.keywords.has(Keyword::Flying) {
+                    let can_block_flight = if attacker.keywords.has(Keyword::Flying) {
                         perm.can_block_flyer()
                     } else {
                         true
                     };
+                    // Protection: the attacker can't be blocked by creatures with a protected quality.
+                    // Check if the attacker has protection from the blocker's colors or from the blocking player.
+                    let blocked_by_protection = attacker.is_protected_from(&perm.colors, perm.controller);
                     // Menace: must be blocked by 2+ creatures (simplified: allow single block)
-                    if can_block {
+                    if can_block_flight && !blocked_by_protection {
                         actions.push(Action::DeclareBlocker {
                             blocker_id: perm.id,
                             attacker_id,
@@ -1517,13 +1520,41 @@ impl GameState {
         )
     }
 
+    /// Check whether a permanent can be targeted by a spell/ability with the given
+    /// source colors cast by `caster`. Returns false if the permanent has hexproof,
+    /// shroud, or protection from the source's color or from the caster.
+    fn can_be_targeted(
+        &self,
+        target: &crate::permanent::Permanent,
+        caster: PlayerId,
+        source_colors: &[Color],
+    ) -> bool {
+        // Hexproof: can't be targeted by opponents' spells/abilities.
+        if target.keywords.has(Keyword::Hexproof) && target.controller != caster {
+            return false;
+        }
+        // Shroud: can't be targeted by any spells/abilities.
+        if target.keywords.has(Keyword::Shroud) {
+            return false;
+        }
+        // Protection: can't be targeted by sources with a protected quality.
+        if target.is_protected_from(source_colors, caster) {
+            return false;
+        }
+        true
+    }
+
     /// Generate valid target sets for a spell.
     fn generate_targets(
         &self,
         card_name: CardName,
         controller: PlayerId,
-        _db: &[CardDef],
+        db: &[CardDef],
     ) -> Vec<Vec<Target>> {
+        // Look up the spell's color identity for protection checks.
+        let spell_colors: Vec<Color> = find_card(db, card_name)
+            .map(|def| def.color_identity.to_vec())
+            .unwrap_or_default();
         match card_name {
             // Target any player or creature (damage spells)
             CardName::LightningBolt | CardName::ChainLightning => {
@@ -1532,7 +1563,7 @@ impl GameState {
                     targets.push(vec![Target::Player(pid)]);
                 }
                 for perm in &self.battlefield {
-                    if perm.is_creature() {
+                    if perm.is_creature() && self.can_be_targeted(perm, controller, &spell_colors) {
                         targets.push(vec![Target::Object(perm.id)]);
                     }
                 }
@@ -1604,7 +1635,9 @@ impl GameState {
             CardName::Abrade | CardName::RedirectLightning => {
                 let mut targets = Vec::new();
                 for perm in &self.battlefield {
-                    if perm.is_creature() || perm.is_planeswalker() || perm.is_artifact() {
+                    if (perm.is_creature() || perm.is_planeswalker() || perm.is_artifact())
+                        && self.can_be_targeted(perm, controller, &spell_colors)
+                    {
                         targets.push(vec![Target::Object(perm.id)]);
                     }
                 }
@@ -1616,7 +1649,7 @@ impl GameState {
             | CardName::FatalPush | CardName::SnuffOut => {
                 self.battlefield
                     .iter()
-                    .filter(|p| p.is_creature())
+                    .filter(|p| p.is_creature() && self.can_be_targeted(p, controller, &spell_colors))
                     .map(|p| vec![Target::Object(p.id)])
                     .collect()
             }
@@ -1625,7 +1658,7 @@ impl GameState {
             CardName::BitterTriumph | CardName::MoltenCollapse | CardName::PrismaticEnding => {
                 self.battlefield
                     .iter()
-                    .filter(|p| p.is_creature() || p.is_planeswalker())
+                    .filter(|p| (p.is_creature() || p.is_planeswalker()) && self.can_be_targeted(p, controller, &spell_colors))
                     .map(|p| vec![Target::Object(p.id)])
                     .collect()
             }
@@ -1635,7 +1668,7 @@ impl GameState {
             | CardName::ChainOfVapor | CardName::IntoTheFloodMaw => {
                 self.battlefield
                     .iter()
-                    .filter(|p| !p.is_land())
+                    .filter(|p| !p.is_land() && self.can_be_targeted(p, controller, &spell_colors))
                     .map(|p| vec![Target::Object(p.id)])
                     .collect()
             }
@@ -1730,7 +1763,7 @@ impl GameState {
                     .iter()
                     .filter(|&&id| {
                         self.card_name_for_id(id)
-                            .and_then(|cn| find_card(_db, cn))
+                            .and_then(|cn| find_card(db, cn))
                             .map(|def| {
                                 def.card_types.contains(&CardType::Instant)
                                     || def.card_types.contains(&CardType::Sorcery)

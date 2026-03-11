@@ -67,6 +67,8 @@ impl GameState {
                 } else {
                     perm.creature_types = def.creature_types.to_vec();
                 }
+                // Store color identity for protection checks
+                perm.colors = def.color_identity.to_vec();
                 self.battlefield.push(perm);
                 // ETB triggers
                 self.handle_etb_with_x(card_name, card_id, controller, x_value);
@@ -1149,6 +1151,31 @@ impl GameState {
             CardName::SnapcasterMage => {}
             // Stoneforge Mystic: search for equipment
             CardName::StoneforgeMystic => {}
+            // Auriok Champion: protection from black and from red (set on ETB)
+            CardName::AuriokChampion => {
+                if let Some(perm) = self.find_permanent_mut(_card_id) {
+                    perm.protections.push(Protection::FromColor(Color::Black));
+                    perm.protections.push(Protection::FromColor(Color::Red));
+                }
+            }
+            // Kor Firewalker: protection from red (set on ETB)
+            CardName::KorFirewalker => {
+                if let Some(perm) = self.find_permanent_mut(_card_id) {
+                    perm.protections.push(Protection::FromColor(Color::Red));
+                }
+            }
+            // True-Name Nemesis: choose a player on ETB, gain protection from that player
+            CardName::TrueNameNemesis => {
+                // The controller chooses a player (0 or 1 in a 2-player game).
+                self.pending_choice = Some(PendingChoice {
+                    player: controller,
+                    kind: ChoiceKind::ChooseNumber {
+                        min: 0,
+                        max: (self.num_players - 1) as u32,
+                        reason: ChoiceReason::TrueNameNemesisETB { permanent_id: _card_id },
+                    },
+                });
+            }
             // Palace Jailer: become monarch, exile target opponent's creature
             CardName::PalaceJailer => {
                 self.become_monarch(controller);
@@ -1755,6 +1782,8 @@ impl GameState {
                     card_types: vec![CardType::Artifact],
                     creature_types: Vec::new(),
                     cavern_creature_type: None,
+                    protections: Vec::new(),
+                    colors: Vec::new(),
                     is_token: true,
                     attached_to: None,
                     attachments: Vec::new(),
@@ -1889,6 +1918,8 @@ impl GameState {
                     card_types: vec![CardType::Creature],
                     creature_types: vec![CreatureType::Shark],
                     cavern_creature_type: None,
+                    protections: Vec::new(),
+                    colors: Vec::new(),
                     is_token: true,
                     attached_to: None,
                     attachments: Vec::new(),

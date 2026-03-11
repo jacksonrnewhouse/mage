@@ -81,6 +81,17 @@ pub enum SuperType {
     Snow,
 }
 
+/// Protection from a specific quality.
+/// Protection means can't be damaged, enchanted/equipped, blocked, or targeted
+/// by sources with that quality.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Protection {
+    /// Protection from a specific color (e.g., Auriok Champion: pro black/red).
+    FromColor(Color),
+    /// Protection from a specific player (e.g., True-Name Nemesis).
+    FromPlayer(PlayerId),
+}
+
 /// Keyword abilities that affect game rules directly.
 /// Using a bitfield representation for fast checking.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

@@ -42,6 +42,10 @@ pub struct Permanent {
     pub creature_types: Vec<CreatureType>,
     /// For Cavern of Souls: the creature type chosen when it entered.
     pub cavern_creature_type: Option<CreatureType>,
+    /// Protection abilities (from color, from player, etc.)
+    pub protections: Vec<Protection>,
+    /// Color identity of this permanent (from card definition).
+    pub colors: Vec<Color>,
     /// For tokens
     pub is_token: bool,
     /// For equipment/auras: the ObjectId of the permanent this is attached to (None = unattached).
@@ -114,6 +118,8 @@ impl Permanent {
             card_types: card_types.to_vec(),
             creature_types: Vec::new(),
             cavern_creature_type: None,
+            protections: Vec::new(),
+            colors: Vec::new(),
             is_token: false,
             attached_to: None,
             attachments: Vec::new(),
@@ -130,6 +136,36 @@ impl Permanent {
     /// Changelings (has all creature types via Keywords::Changeling) always return true.
     pub fn has_creature_type(&self, ct: CreatureType) -> bool {
         self.creature_types.contains(&ct)
+    }
+
+    /// Returns true if this permanent has protection from the given color.
+    pub fn has_protection_from_color(&self, color: Color) -> bool {
+        self.protections.contains(&Protection::FromColor(color))
+    }
+
+    /// Returns true if this permanent has protection from the given player.
+    pub fn has_protection_from_player(&self, player: PlayerId) -> bool {
+        self.protections.contains(&Protection::FromPlayer(player))
+    }
+
+    /// Returns true if this permanent is protected from a source with the given colors,
+    /// controlled by the given player.
+    pub fn is_protected_from(&self, source_colors: &[Color], source_controller: PlayerId) -> bool {
+        for &prot in &self.protections {
+            match prot {
+                Protection::FromColor(c) => {
+                    if source_colors.contains(&c) {
+                        return true;
+                    }
+                }
+                Protection::FromPlayer(p) => {
+                    if source_controller == p {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
     }
 
     /// Current power after all modifications.

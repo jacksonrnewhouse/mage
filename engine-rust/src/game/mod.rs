@@ -145,6 +145,9 @@ pub enum ChoiceReason {
     /// The player first chooses 0 (enter tapped) or 1 (pay 2 life, enter untapped),
     /// then surveil 1 is triggered for the same player.
     SurveilLandShock { card_id: ObjectId },
+    /// True-Name Nemesis ETB: choose a player (by player id).
+    /// The permanent_id is the True-Name Nemesis's ObjectId so we can grant protection.
+    TrueNameNemesisETB { permanent_id: ObjectId },
 }
 impl GameState {
     /// Create a new two-player game.

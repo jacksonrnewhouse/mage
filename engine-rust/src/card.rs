@@ -137,6 +137,8 @@ pub enum CardName {
     SkyclaveApparition,
     StoneforgeMystic,
     PalaceJailer,
+    AuriokChampion,
+    KorFirewalker,
 
     // === White Spells ===
     SwordsToPlowshares,
@@ -1116,6 +1118,12 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(PalaceJailer, "Palace Jailer", ManaCost { white: 2, generic: 2, ..c }, &[Creature], &[],
         Some(2), Some(2), None, kw(), &[White],
         "When Palace Jailer enters, you become the monarch. When Palace Jailer enters, exile target creature an opponent controls until an opponent becomes the monarch.");
+    card!(CT(&[CreatureType::Human, CreatureType::Cleric]) AuriokChampion, "Auriok Champion", ManaCost { white: 2, ..c }, &[Creature], &[],
+        Some(1), Some(1), None, kw(), &[White],
+        "Protection from black and from red. Whenever another creature enters the battlefield, you may gain 1 life.");
+    card!(CT(&[CreatureType::Kor, CreatureType::Soldier]) KorFirewalker, "Kor Firewalker", ManaCost { white: 2, ..c }, &[Creature], &[],
+        Some(2), Some(2), None, kw(), &[White],
+        "Protection from red. Whenever a player casts a red spell, you may gain 1 life.");
 
     // === Green Spells ===
     card!(Channel, "Channel", ManaCost { green: 1, generic: 1, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Green],

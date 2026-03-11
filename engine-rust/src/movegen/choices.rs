@@ -71,6 +71,7 @@ impl GameState {
                                         } else {
                                             perm.creature_types = def.creature_types.to_vec();
                                         }
+                                        perm.colors = def.color_identity.to_vec();
                                         self.battlefield.push(perm);
                                         self.handle_etb(cn, card_id, choice.player);
                                     }
@@ -120,6 +121,13 @@ impl GameState {
                             if let Some(perm) = self.find_permanent_mut(cavern_id) {
                                 perm.cavern_creature_type = Some(chosen_type);
                             }
+                        }
+                    }
+                    ChoiceReason::TrueNameNemesisETB { permanent_id } => {
+                        // n is the chosen player id; grant protection from that player.
+                        let chosen_player = n as PlayerId;
+                        if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                            perm.protections.push(Protection::FromPlayer(chosen_player));
                         }
                     }
                     ChoiceReason::SurveilLandShock { card_id } => {

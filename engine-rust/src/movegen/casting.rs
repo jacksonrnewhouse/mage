@@ -28,7 +28,7 @@ impl GameState {
                     self.players[player_id as usize].land_plays_remaining -= 1;
                     if let Some(cn) = card_name {
                         if let Some(def) = find_card(db, cn) {
-                            let perm = Permanent::new(
+                            let mut perm = Permanent::new(
                                 *card_id,
                                 cn,
                                 player_id,
@@ -39,6 +39,7 @@ impl GameState {
                                 def.keywords,
                                 def.card_types,
                             );
+                            perm.colors = def.color_identity.to_vec();
                             self.battlefield.push(perm);
                             self.handle_etb(cn, *card_id, player_id);
                         }
@@ -60,7 +61,7 @@ impl GameState {
                             // Remove from top of library
                             self.players[player_id as usize].library.pop();
                             self.players[player_id as usize].land_plays_remaining -= 1;
-                            let perm = Permanent::new(
+                            let mut perm = Permanent::new(
                                 *card_id,
                                 cn,
                                 player_id,
@@ -71,6 +72,7 @@ impl GameState {
                                 def.keywords,
                                 def.card_types,
                             );
+                            perm.colors = def.color_identity.to_vec();
                             self.battlefield.push(perm);
                             self.handle_etb(cn, *card_id, player_id);
                         }
