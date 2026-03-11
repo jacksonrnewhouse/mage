@@ -46,6 +46,9 @@ pub struct Permanent {
     pub protections: Vec<Protection>,
     /// Color identity of this permanent (from card definition).
     pub colors: Vec<Color>,
+    /// Whether this permanent is currently showing its back face (transformed).
+    /// Only relevant for double-faced cards (DFCs).
+    pub transformed: bool,
     /// For tokens
     pub is_token: bool,
     /// For equipment/auras: the ObjectId of the permanent this is attached to (None = unattached).
@@ -120,6 +123,7 @@ impl Permanent {
             cavern_creature_type: None,
             protections: Vec::new(),
             colors: Vec::new(),
+            transformed: false,
             is_token: false,
             attached_to: None,
             attachments: Vec::new(),

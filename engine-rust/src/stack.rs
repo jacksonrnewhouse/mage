@@ -59,6 +59,8 @@ pub enum StackItemKind {
 #[derive(Debug, Clone)]
 pub enum TriggeredEffect {
     ManaCryptUpkeep,
+    /// Delver of Secrets upkeep trigger: reveal top card, transform if instant/sorcery
+    DelverUpkeep { delver_id: ObjectId },
     GoblinGuideAttack,
     YoungPyromancerCast,
     MonasteryMentorCast,

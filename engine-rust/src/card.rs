@@ -168,6 +168,12 @@ pub enum CardName {
     // === White Planeswalkers ===
     GideonOfTheTrials,
 
+    // === Double-Faced Cards (DFCs) ===
+    /// Delver of Secrets — front face (1/1 Human Wizard, {U})
+    DelverOfSecrets,
+    /// Insectile Aberration — back face of Delver of Secrets (3/2 Insect with flying)
+    InsectileAberration,
+
     // === Blue Creatures ===
     TamiyoInquisitiveStudent,
     AphettoAlchemist,
@@ -572,6 +578,9 @@ pub struct CardDef {
     /// The adventure is an instant or sorcery spell with its own cost, types, and name.
     /// When you cast the adventure, it goes to exile; then you may cast the creature from exile.
     pub adventure: Option<AdventureDef>,
+    /// Double-faced card: if Some, this is the front face and the value is the back-face CardName.
+    /// Transform flips the permanent to show its back face.
+    pub back_face: Option<CardName>,
 }
 
 /// The adventure half of an adventure card (e.g., "Stomp" on Bonecrusher Giant).
@@ -727,6 +736,7 @@ pub fn build_card_db() -> Vec<CardDef> {
                 creature_types: &[],
                 is_changeling: false,
                 adventure: None,
+                back_face: None,
             });
         };
         // Variant with creature types
@@ -751,6 +761,7 @@ pub fn build_card_db() -> Vec<CardDef> {
                 creature_types: $ct,
                 is_changeling: false,
                 adventure: None,
+                back_face: None,
             });
         };
         // Variant with changeling (all creature types)
@@ -775,6 +786,7 @@ pub fn build_card_db() -> Vec<CardDef> {
                 creature_types: &[],
                 is_changeling: true,
                 adventure: None,
+                back_face: None,
             });
         };
         // Variant with X cost: x_mult is how many times X appears (1 or 2)
@@ -799,6 +811,7 @@ pub fn build_card_db() -> Vec<CardDef> {
                 creature_types: &[],
                 is_changeling: false,
                 adventure: None,
+                back_face: None,
             });
         };
         // Variant with flashback cost
@@ -823,6 +836,7 @@ pub fn build_card_db() -> Vec<CardDef> {
                 creature_types: &[],
                 is_changeling: false,
                 adventure: None,
+                back_face: None,
             });
         };
         // Variant with madness cost
@@ -847,6 +861,7 @@ pub fn build_card_db() -> Vec<CardDef> {
                 creature_types: &[],
                 is_changeling: false,
                 adventure: None,
+                back_face: None,
             });
         };
         // Variant with adventure half
@@ -871,6 +886,7 @@ pub fn build_card_db() -> Vec<CardDef> {
                 creature_types: &[],
                 is_changeling: false,
                 adventure: Some($adv),
+                back_face: None,
             });
         };
     }
@@ -1485,6 +1501,53 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(GideonOfTheTrials, "Gideon of the Trials", ManaCost { white: 2, generic: 1, ..c }, &[Planeswalker], &[Legendary],
         None, None, Some(3), kw(), &[White],
         "+1: Until your next turn, prevent all damage target permanent would deal. 0: Until end of turn, Gideon becomes a 4/4 Human Soldier creature with indestructible. +0: You get an emblem with \"As long as you control a Gideon planeswalker, you can't lose the game and your opponents can't win the game.\"");
+
+    // === Double-Faced Cards (DFCs) ===
+    // Front face: Delver of Secrets — {U} 1/1 Human Wizard
+    // Back face: Insectile Aberration — 3/2 Insect with Flying (no mana cost)
+    db.push(CardDef {
+        name: CardName::DelverOfSecrets,
+        display_name: "Delver of Secrets",
+        mana_cost: ManaCost::u(1),
+        has_x_cost: false,
+        x_multiplier: 0,
+        card_types: &[CardType::Creature],
+        supertypes: &[],
+        power: Some(1),
+        toughness: Some(1),
+        loyalty: None,
+        keywords: kw(),
+        color_identity: &[Color::Blue],
+        oracle_text: "At the beginning of your upkeep, look at the top card of your library. You may reveal it. If it's an instant or sorcery card, transform Delver of Secrets.",
+        flashback_cost: None,
+        madness_cost: None,
+        creature_types: &[CreatureType::Human, CreatureType::Wizard],
+        is_changeling: false,
+        adventure: None,
+        back_face: Some(CardName::InsectileAberration),
+    });
+    // Back face of Delver of Secrets — 3/2 Insect with Flying (can't be cast directly)
+    db.push(CardDef {
+        name: CardName::InsectileAberration,
+        display_name: "Insectile Aberration",
+        mana_cost: ManaCost::ZERO,
+        has_x_cost: false,
+        x_multiplier: 0,
+        card_types: &[CardType::Creature],
+        supertypes: &[],
+        power: Some(3),
+        toughness: Some(2),
+        loyalty: None,
+        keywords: flying(),
+        color_identity: &[Color::Blue],
+        oracle_text: "Flying",
+        flashback_cost: None,
+        madness_cost: None,
+        creature_types: &[CreatureType::Human, CreatureType::Insect],
+        is_changeling: false,
+        adventure: None,
+        back_face: None,
+    });
 
     // === Blue Creatures ===
     card!(TamiyoInquisitiveStudent, "Tamiyo, Inquisitive Student", ManaCost::u(1), &[Creature], &[Legendary],

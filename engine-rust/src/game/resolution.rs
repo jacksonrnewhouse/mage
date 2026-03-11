@@ -1741,6 +1741,20 @@ impl GameState {
                 });
             }
 
+            // Delver of Secrets: register a recurring upkeep trigger to check the top card.
+            // At the beginning of your upkeep, reveal the top card of your library.
+            // If it's an instant or sorcery, transform Delver of Secrets.
+            CardName::DelverOfSecrets => {
+                self.add_delayed_trigger(crate::types::DelayedTrigger {
+                    condition: crate::types::DelayedTriggerCondition::AtBeginningOfUpkeep {
+                        player: controller,
+                    },
+                    effect: TriggeredEffect::DelverUpkeep { delver_id: _card_id },
+                    controller,
+                    fires_once: false,
+                });
+            }
+
             _ => {}
         }
     }
@@ -1759,6 +1773,24 @@ impl GameState {
                         reason: ChoiceReason::CoinFlip,
                     },
                 });
+            }
+            TriggeredEffect::DelverUpkeep { delver_id } => {
+                // Look at the top card of controller's library.
+                // If it is an instant or sorcery card, transform Delver of Secrets.
+                // Only transform if the permanent is still on the battlefield and not already transformed.
+                let still_on_field = self.battlefield.iter().any(|p| p.id == delver_id && !p.transformed);
+                if still_on_field {
+                    let is_instant_or_sorcery = self.players[controller as usize]
+                        .library
+                        .last()
+                        .and_then(|&top_id| self.card_name_for_id(top_id))
+                        .and_then(|cn| find_card(db, cn))
+                        .map(|def| def.card_types.iter().any(|&t| matches!(t, CardType::Instant | CardType::Sorcery)))
+                        .unwrap_or(false);
+                    if is_instant_or_sorcery {
+                        self.transform_permanent(delver_id, db);
+                    }
+                }
             }
             TriggeredEffect::DealDamage(amount) => {
                 if let Some(target) = targets.first() {
@@ -2480,6 +2512,7 @@ impl GameState {
                     cavern_creature_type: None,
                     protections: Vec::new(),
                     colors: Vec::new(),
+                    transformed: false,
                     is_token: true,
                     attached_to: None,
                     attachments: Vec::new(),
@@ -2616,6 +2649,7 @@ impl GameState {
                     cavern_creature_type: None,
                     protections: Vec::new(),
                     colors: Vec::new(),
+                    transformed: false,
                     is_token: true,
                     attached_to: None,
                     attachments: Vec::new(),
@@ -2711,6 +2745,7 @@ impl GameState {
                     cavern_creature_type: None,
                     protections: Vec::new(),
                     colors: Vec::new(),
+                    transformed: false,
                     is_token: true,
                     attached_to: None,
                     attachments: Vec::new(),
@@ -2922,5 +2957,51 @@ impl GameState {
             }
         }
         self.remove_permanent_to_zone(equip_id, zone);
+    }
+
+    /// Transform a double-faced permanent to its back face (or front face if already transformed).
+    /// Updates card_name, base_power, base_toughness, keywords, creature_types, and the
+    /// `transformed` flag. The permanent's ObjectId, counters, and controller are preserved.
+    pub fn transform_permanent(&mut self, perm_id: ObjectId, db: &[CardDef]) {
+        let (current_name, is_transformed) = match self.find_permanent(perm_id) {
+            Some(p) => (p.card_name, p.transformed),
+            None => return,
+        };
+
+        // Determine the target face: if already transformed, flip back to front face;
+        // otherwise flip to the back face listed in the card definition.
+        let target_name = if is_transformed {
+            // Find the front face: look for a card whose back_face == current_name
+            db.iter()
+                .find(|def| def.back_face == Some(current_name))
+                .map(|def| def.name)
+        } else {
+            find_card(db, current_name).and_then(|def| def.back_face)
+        };
+
+        let target_name = match target_name {
+            Some(n) => n,
+            None => return, // Not a DFC or no matching face found
+        };
+
+        if let Some(target_def) = find_card(db, target_name) {
+            let power = target_def.power;
+            let toughness = target_def.toughness;
+            let keywords = target_def.keywords;
+            let creature_types = target_def.creature_types.to_vec();
+            let card_types = target_def.card_types.to_vec();
+            let colors = target_def.color_identity.to_vec();
+
+            if let Some(perm) = self.find_permanent_mut(perm_id) {
+                perm.card_name = target_name;
+                perm.base_power = power.unwrap_or(0);
+                perm.base_toughness = toughness.unwrap_or(0);
+                perm.keywords = keywords;
+                perm.creature_types = creature_types;
+                perm.card_types = card_types;
+                perm.colors = colors;
+                perm.transformed = !is_transformed;
+            }
+        }
     }
 }
