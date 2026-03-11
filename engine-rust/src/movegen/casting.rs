@@ -177,6 +177,97 @@ impl GameState {
                     self.resolve_number_choice(choice, *n);
                 }
             }
+
+            Action::ActivateFromHand { card_id, ability_index, targets, x_value } => {
+                self.apply_activate_from_hand(*card_id, *ability_index, targets, *x_value, db);
+            }
+        }
+    }
+
+    fn apply_activate_from_hand(
+        &mut self,
+        card_id: ObjectId,
+        ability_index: u8,
+        targets: &[Target],
+        x_value: u8,
+        _db: &[CardDef],
+    ) {
+        let player_id = self.priority_player;
+        let card_name = match self.card_name_for_id(card_id) {
+            Some(cn) => cn,
+            None => return,
+        };
+
+        match ability_index {
+            // 0 = Cycling
+            0 => {
+                if let Some((cycling_cost, cycling_kind)) = crate::card::cycling_ability(card_name) {
+                    // Street Wraith: pay 2 life instead of mana
+                    if card_name == CardName::StreetWraith {
+                        self.players[player_id as usize].life -= 2;
+                    } else {
+                        // Pay X mana for Shark Typhoon, or flat mana for normal cycling
+                        let mut cost = cycling_cost;
+                        if matches!(cycling_kind, CyclingKind::SharkTyphoon) {
+                            cost.generic = cost.generic.saturating_add(x_value);
+                        }
+                        if !self.players[player_id as usize].mana_pool.pay(&cost) {
+                            return;
+                        }
+                    }
+                    // Discard the card
+                    if !self.players[player_id as usize].remove_from_hand(card_id) {
+                        return; // Card not in hand
+                    }
+                    self.players[player_id as usize].graveyard.push(card_id);
+
+                    // Push cycling effect to stack
+                    let effect = match cycling_kind {
+                        CyclingKind::Basic => ActivatedEffect::CyclingDraw,
+                        CyclingKind::SharkTyphoon => ActivatedEffect::SharkTyphoonCycling { x_value },
+                    };
+                    self.stack.push(
+                        StackItemKind::ActivatedAbility {
+                            source_id: card_id,
+                            source_name: card_name,
+                            effect,
+                        },
+                        player_id,
+                        vec![],
+                    );
+                    self.reset_priority_passes();
+                }
+            }
+            // 1 = Channel
+            1 => {
+                if let Some((channel_cost, channel_kind)) = crate::card::channel_ability(card_name) {
+                    if !self.players[player_id as usize].mana_pool.pay(&channel_cost) {
+                        return;
+                    }
+                    // Discard the card
+                    if !self.players[player_id as usize].remove_from_hand(card_id) {
+                        return;
+                    }
+                    self.players[player_id as usize].graveyard.push(card_id);
+
+                    // Push channel effect to stack
+                    let effect = match channel_kind {
+                        ChannelKind::Boseiju => ActivatedEffect::BoseijuChannel,
+                        ChannelKind::Otawara => ActivatedEffect::OtawaraChannel,
+                    };
+                    self.stack.push(
+                        StackItemKind::ActivatedAbility {
+                            source_id: card_id,
+                            source_name: card_name,
+                            effect,
+                        },
+                        player_id,
+                        targets.to_vec(),
+                    );
+                    self.reset_priority_passes();
+                }
+            }
+            _ => {}
         }
     }
 

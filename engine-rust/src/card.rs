@@ -230,6 +230,8 @@ pub enum CardName {
     DressDown,
     EnergyFlux,
     SinkIntoStupor,
+    SharkTyphoon,
+    SharkToken,
 
     // === Black Creatures ===
     Nethergoyf,
@@ -587,6 +589,53 @@ pub fn equipment_bonus(card_name: CardName) -> Option<EquipmentBonus> {
             toughness_mod: 0,
             keywords: kw,
         }),
+        _ => None,
+    }
+}
+
+/// Cycling ability info: cost and whether it's a basic cycling (draw a card) or special.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CyclingKind {
+    /// Pay cost, discard this card, draw a card.
+    Basic,
+    /// Shark Typhoon: pay {X}{U}, discard, create an X/X Shark with flying.
+    SharkTyphoon,
+}
+
+/// Returns the cycling cost and kind for a card in hand, or None if it can't cycle.
+/// Returns (cost, kind). Cost is the colored/generic part (before X for SharkTyphoon).
+pub fn cycling_ability(card_name: CardName) -> Option<(ManaCost, CyclingKind)> {
+    use crate::mana::ManaCost;
+    match card_name {
+        // Street Wraith: cycling costs 2 life (life payment handled separately; cost is zero mana)
+        CardName::StreetWraith => Some((ManaCost::ZERO, CyclingKind::Basic)),
+        // Troll of Khazad-dum: Swamp cycling {1}
+        CardName::TrollOfKhazadDum => Some((ManaCost::generic(1), CyclingKind::Basic)),
+        // Lorien Revealed: Island cycling {1}
+        CardName::LorienRevealed => Some((ManaCost::generic(1), CyclingKind::Basic)),
+        // Step Through: Wizardcycling {2}
+        CardName::StepThrough => Some((ManaCost::generic(2), CyclingKind::Basic)),
+        // Shark Typhoon: cycling {X}{U}
+        CardName::SharkTyphoon => Some((ManaCost::u(1), CyclingKind::SharkTyphoon)),
+        _ => None,
+    }
+}
+
+/// Channel ability info: whether a card has a channel ability and what its cost is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChannelKind {
+    /// Boseiju: {1}{G}, discard → destroy target artifact, enchantment, or nonbasic land.
+    Boseiju,
+    /// Otawara: {3}{U}, discard → bounce target artifact, creature, or planeswalker.
+    Otawara,
+}
+
+/// Returns the channel cost and kind for a card in hand, or None if it has no channel.
+pub fn channel_ability(card_name: CardName) -> Option<(ManaCost, ChannelKind)> {
+    use crate::mana::ManaCost;
+    match card_name {
+        CardName::BoseijuWhoEndures => Some((ManaCost { green: 1, generic: 1, ..ManaCost::ZERO }, ChannelKind::Boseiju)),
+        CardName::OtawaraSoaringCity => Some((ManaCost { blue: 1, generic: 3, ..ManaCost::ZERO }, ChannelKind::Otawara)),
         _ => None,
     }
 }
@@ -1374,6 +1423,10 @@ pub fn build_card_db() -> Vec<CardDef> {
         "All artifacts have \"At the beginning of your upkeep, sacrifice this artifact unless you pay {2}.\"");
     card!(SinkIntoStupor, "Sink into Stupor", ManaCost { blue: 1, generic: 2, ..c }, &[Instant], &[], None, None, None, kw(), &[Blue],
         "Choose one: Counter target spell unless its controller pays {4}. Return target nonland permanent to its owner's hand.");
+    card!(SharkTyphoon, "Shark Typhoon", ManaCost { blue: 1, generic: 5, ..c }, &[Enchantment], &[], None, None, None, kw(), &[Blue],
+        "Whenever you cast a noncreature spell, create an X/X blue Shark creature token with flying, where X is that spell's mana value. Cycling {X}{U}.");
+    card!(SharkToken, "Shark Token", ManaCost::ZERO, &[Creature], &[], Some(0), Some(0), None, flying(), &[Blue],
+        "Flying. (This is a token created by Shark Typhoon.)");
 
     // === Black Creatures ===
     card!(Nethergoyf, "Nethergoyf", ManaCost::b(1), &[Creature], &[],

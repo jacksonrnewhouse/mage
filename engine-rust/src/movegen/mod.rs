@@ -374,6 +374,66 @@ impl GameState {
             }
         }
 
+        // --- Cycling abilities (from hand, instant speed) ---
+        // ability_index 0 = cycling, 1 = channel
+        for &card_id in &player.hand {
+            if let Some(card_name) = self.card_name_for_id(card_id) {
+                // --- Cycling ---
+                if let Some((cycling_cost, cycling_kind)) = crate::card::cycling_ability(card_name) {
+                    match cycling_kind {
+                        CyclingKind::Basic => {
+                            // Street Wraith cycling costs 2 life (zero mana), check life total
+                            let life_cost = if card_name == CardName::StreetWraith { 2i32 } else { 0 };
+                            let can_pay_mana = player.mana_pool.can_pay(&cycling_cost);
+                            let can_pay_life = player.life > life_cost;
+                            if can_pay_mana && can_pay_life {
+                                actions.push(Action::ActivateFromHand {
+                                    card_id,
+                                    ability_index: 0,
+                                    targets: vec![],
+                                    x_value: 0,
+                                });
+                            }
+                        }
+                        CyclingKind::SharkTyphoon => {
+                            // Cycling cost {X}{U}: check if we can pay at least the {U} part
+                            if player.mana_pool.can_pay(&cycling_cost) {
+                                // Compute remaining mana after paying {U}
+                                let mut temp_pool = player.mana_pool;
+                                temp_pool.pay(&cycling_cost);
+                                let max_x = temp_pool.total() as u8;
+                                // Generate X=0 through max_x
+                                let cap = max_x.min(10);
+                                for x in 0..=cap {
+                                    actions.push(Action::ActivateFromHand {
+                                        card_id,
+                                        ability_index: 0,
+                                        targets: vec![],
+                                        x_value: x,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // --- Channel ---
+                if let Some((channel_cost, channel_kind)) = crate::card::channel_ability(card_name) {
+                    if player.mana_pool.can_pay(&channel_cost) {
+                        let targets = self.generate_channel_targets(channel_kind, player_id);
+                        for target in targets {
+                            actions.push(Action::ActivateFromHand {
+                                card_id,
+                                ability_index: 1,
+                                targets: vec![target],
+                                x_value: 0,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
         actions
     }
 
@@ -438,6 +498,30 @@ impl GameState {
         }
 
         actions
+    }
+
+    /// Generate valid targets for a channel ability.
+    fn generate_channel_targets(&self, channel_kind: ChannelKind, player_id: PlayerId) -> Vec<Target> {
+        match channel_kind {
+            ChannelKind::Boseiju => {
+                // Destroy target artifact, enchantment, or nonbasic land controlled by an opponent
+                let opponent = self.opponent(player_id);
+                self.battlefield.iter()
+                    .filter(|p| {
+                        p.controller == opponent
+                            && (p.is_artifact() || p.is_enchantment() || (p.is_land() && !self.is_basic_land(p)))
+                    })
+                    .map(|p| Target::Object(p.id))
+                    .collect()
+            }
+            ChannelKind::Otawara => {
+                // Return target artifact, creature, or planeswalker to owner's hand
+                self.battlefield.iter()
+                    .filter(|p| p.is_artifact() || p.is_creature() || p.is_planeswalker())
+                    .map(|p| Target::Object(p.id))
+                    .collect()
+            }
+        }
     }
 
     /// Get the effective mana cost of a card after tax effects (Thalia, Trinisphere, etc.)

@@ -1627,6 +1627,53 @@ impl GameState {
                     self.detach_and_remove(id, DestinationZone::Hand);
                 }
             }
+            ActivatedEffect::CyclingDraw => {
+                // Discard already happened at activation; just draw a card.
+                self.draw_cards(controller, 1);
+            }
+            ActivatedEffect::SharkTyphoonCycling { x_value } => {
+                // Discard already happened at activation; create an X/X Shark with flying, then draw.
+                let token_id = self.new_object_id();
+                let mut kw = Keywords::empty();
+                kw.add(Keyword::Flying);
+                let token = Permanent {
+                    id: token_id,
+                    card_name: CardName::SharkToken,
+                    controller,
+                    owner: controller,
+                    tapped: false,
+                    base_power: x_value as i16,
+                    base_toughness: x_value as i16,
+                    power_mod: 0,
+                    toughness_mod: 0,
+                    damage: 0,
+                    keywords: kw,
+                    counters: Counters::default(),
+                    entered_this_turn: true,
+                    attacked_this_turn: false,
+                    doesnt_untap: false,
+                    loyalty: 0,
+                    loyalty_activated_this_turn: false,
+                    card_types: vec![CardType::Creature],
+                    is_token: true,
+                    attached_to: None,
+                    attachments: Vec::new(),
+                };
+                self.battlefield.push(token);
+                self.draw_cards(controller, 1);
+            }
+            ActivatedEffect::BoseijuChannel => {
+                // Destroy target artifact, enchantment, or nonbasic land (opponent controls).
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    self.destroy_permanent(*target_id);
+                }
+            }
+            ActivatedEffect::OtawaraChannel => {
+                // Return target artifact, creature, or planeswalker to owner's hand.
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    self.remove_permanent_to_zone(*target_id, DestinationZone::Hand);
+                }
+            }
         }
     }
 

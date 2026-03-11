@@ -52,6 +52,15 @@ pub enum Action {
     ChooseColor(Color),
     /// Concede the game.
     Concede,
+    /// Activate an ability from a card in hand (cycling, channel, etc.).
+    /// `card_id` is the card in hand, `ability_index` identifies which ability.
+    ActivateFromHand {
+        card_id: ObjectId,
+        ability_index: u8,
+        targets: Vec<Target>,
+        /// For X-based cycling (Shark Typhoon): the chosen value of X.
+        x_value: u8,
+    },
 }
 
 /// Categories of game situations where different action types are available.

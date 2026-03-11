@@ -145,6 +145,14 @@ pub enum ActivatedEffect {
     EquipCreature { equipment_id: ObjectId },
     /// Batterskull bounce: return Batterskull to owner's hand
     BatterskullBounce,
+    /// Basic cycling: discard a card, draw a card (already discarded at activation).
+    CyclingDraw,
+    /// Shark Typhoon cycling: discard, create an X/X Shark token with flying (X chosen at activation).
+    SharkTyphoonCycling { x_value: u8 },
+    /// Boseiju channel: destroy target artifact, enchantment, or nonbasic land.
+    BoseijuChannel,
+    /// Otawara channel: return target artifact, creature, or planeswalker to owner's hand.
+    OtawaraChannel,
 }
 
 /// The game stack.
