@@ -733,8 +733,68 @@ impl GameState {
         cost
     }
 
+    /// Check if Blood Moon is on the battlefield (makes nonbasic lands into Mountains).
+    fn blood_moon_active(&self) -> bool {
+        self.battlefield.iter().any(|p| p.card_name == CardName::BloodMoon)
+    }
+
+    /// Check if Urborg, Tomb of Yawgmoth is on the battlefield (all lands also tap for B).
+    fn urborg_active(&self) -> bool {
+        self.battlefield.iter().any(|p| p.card_name == CardName::UrborgTombOfYawgmoth)
+    }
+
+    /// Check if Yavimaya, Cradle of Growth is on the battlefield (all lands also tap for G).
+    fn yavimaya_active(&self) -> bool {
+        self.battlefield.iter().any(|p| p.card_name == CardName::YavimayaCradleOfGrowth)
+    }
+
+    /// Apply land-type static effects (Blood Moon, Urborg, Yavimaya) to a land's mana options.
+    /// - Blood Moon: nonbasic lands lose all abilities and become Mountains (only tap for R).
+    /// - Urborg: all lands gain {T}: Add {B}.
+    /// - Yavimaya: all lands gain {T}: Add {G}.
+    fn apply_land_type_effects(
+        &self,
+        perm: &crate::permanent::Permanent,
+        mut options: Vec<Option<Color>>,
+    ) -> Vec<Option<Color>> {
+        if !perm.is_land() {
+            return options;
+        }
+        let is_basic = self.is_basic_land(perm);
+
+        // Blood Moon: nonbasic lands lose their abilities and become Mountains (only tap for R).
+        // This overrides all other effects for nonbasic lands.
+        if !is_basic && self.blood_moon_active() {
+            return vec![Some(Color::Red)];
+        }
+
+        // Urborg: all lands also tap for B (deduplicate if already present).
+        if self.urborg_active() && !options.contains(&Some(Color::Black)) {
+            options.push(Some(Color::Black));
+        }
+
+        // Yavimaya: all lands also tap for G (deduplicate if already present).
+        if self.yavimaya_active() && !options.contains(&Some(Color::Green)) {
+            options.push(Some(Color::Green));
+        }
+
+        options
+    }
+
     /// What mana can a permanent produce?
     fn mana_ability_options(&self, perm: &crate::permanent::Permanent) -> Vec<Option<Color>> {
+        let base = self.mana_ability_options_base(perm);
+        self.apply_land_type_effects(perm, base)
+    }
+
+    /// Public version of mana_ability_options for testing.
+    #[cfg(test)]
+    pub fn mana_ability_options_pub(&self, perm: &crate::permanent::Permanent) -> Vec<Option<Color>> {
+        self.mana_ability_options(perm)
+    }
+
+    /// Base mana options before land-type static effects.
+    fn mana_ability_options_base(&self, perm: &crate::permanent::Permanent) -> Vec<Option<Color>> {
         match perm.card_name {
             // Basic lands
             CardName::Plains => vec![Some(Color::White)],
@@ -947,6 +1007,18 @@ impl GameState {
             if artifact_lockdown {
                 return false;
             }
+        }
+
+        // Blood Moon: nonbasic lands lose all abilities and become Mountains (tap for R only).
+        // This must be checked before the per-card match so that hardcoded colorless producers
+        // (AncientTomb, StripMine, etc.) are overridden.
+        let is_basic = self.is_basic_land(self.find_permanent(permanent_id).unwrap());
+        if !is_basic && self.find_permanent(permanent_id).unwrap().is_land() && self.blood_moon_active() {
+            if let Some(perm_mut) = self.find_permanent_mut(permanent_id) {
+                perm_mut.tapped = true;
+            }
+            self.players[controller as usize].mana_pool.add(Some(Color::Red), 1);
+            return true;
         }
 
         match card_name {

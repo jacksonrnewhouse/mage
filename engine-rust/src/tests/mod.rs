@@ -11,6 +11,7 @@ mod dynamic_pt;
 mod equipment;
 mod exile_linked;
 mod flashback;
+mod land_type_modification;
 mod library_top;
 mod replacement_effects;
 mod spells;
