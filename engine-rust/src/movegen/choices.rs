@@ -122,6 +122,38 @@ impl GameState {
                             }
                         }
                     }
+                    ChoiceReason::SurveilLandShock { card_id } => {
+                        if n == 0 {
+                            // Enter tapped
+                            if let Some(perm) = self.find_permanent_mut(card_id) {
+                                perm.tapped = true;
+                            }
+                        } else {
+                            // Pay 2 life, enter untapped
+                            self.players[choice.player as usize].life -= 2;
+                        }
+                        // After the tapped/life choice, surveil 1 (no draw after).
+                        self.surveil(choice.player, 1, false);
+                    }
+                    ChoiceReason::SurveilCard { draw_after } => {
+                        // n == 0: keep the top card on top (do nothing)
+                        // n == 1: put the top card into the graveyard
+                        let pid = choice.player as usize;
+                        if let Some(card_id) = self.players[pid].library.pop() {
+                            if n == 1 {
+                                // Send to graveyard (respecting Rest in Peace etc.)
+                                let card_name = self.card_name_for_id(card_id)
+                                    .unwrap_or(crate::card::CardName::Plains);
+                                self.send_to_graveyard(card_id, card_name, choice.player);
+                            } else {
+                                // Put back on top
+                                self.players[pid].library.push(card_id);
+                            }
+                        }
+                        if draw_after {
+                            self.draw_cards(choice.player, 1);
+                        }
+                    }
                     _ => {}
                 }
             }

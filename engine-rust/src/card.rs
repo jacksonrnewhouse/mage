@@ -216,6 +216,7 @@ pub enum CardName {
     Misdirection,
     Commandeer,
     CarefulStudy,
+    Consider,
     MerchantScroll,
     TransmuteArtifact,
     ShowAndTell,
@@ -1455,6 +1456,8 @@ pub fn build_card_db() -> Vec<CardDef> {
     // === Blue Sorceries ===
     card!(CarefulStudy, "Careful Study", ManaCost::u(1), &[Sorcery], &[], None, None, None, kw(), &[Blue],
         "Draw two cards, then discard two cards.");
+    card!(Consider, "Consider", ManaCost::u(1), &[Instant], &[], None, None, None, kw(), &[Blue],
+        "Surveil 1, then draw a card.");
     card!(MerchantScroll, "Merchant Scroll", ManaCost { blue: 1, generic: 1, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Blue],
         "Search your library for a blue instant card, reveal it, put it into your hand, then shuffle.");
     card!(TransmuteArtifact, "Transmute Artifact", ManaCost { blue: 2, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Blue],

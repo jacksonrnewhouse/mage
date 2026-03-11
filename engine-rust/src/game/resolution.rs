@@ -590,6 +590,11 @@ impl GameState {
                 // Simplified: draw a card
                 self.draw_cards(controller, 1);
             }
+            // Consider: surveil 1, then draw 1.
+            // The surveil sets a pending binary choice; once resolved, the draw fires.
+            CardName::Consider => {
+                self.surveil(controller, 1, true);
+            }
 
             // === Board wipes ===
             CardName::Balance => {
@@ -1190,6 +1195,20 @@ impl GameState {
                         min: 0,
                         max: 1,
                         reason: ChoiceReason::ShockLandETB { card_id: _card_id },
+                    },
+                });
+            }
+            // Surveil lands: shock-land life/tapped choice, then surveil 1.
+            CardName::MeticulousArchive
+            | CardName::UndercitySewers
+            | CardName::ThunderingFalls
+            | CardName::HedgeMaze => {
+                self.pending_choice = Some(PendingChoice {
+                    player: controller,
+                    kind: ChoiceKind::ChooseNumber {
+                        min: 0,
+                        max: 1,
+                        reason: ChoiceReason::SurveilLandShock { card_id: _card_id },
                     },
                 });
             }

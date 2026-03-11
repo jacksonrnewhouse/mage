@@ -17,6 +17,7 @@ mod library_top;
 mod replacement_effects;
 mod spells;
 mod statics;
+mod surveil;
 mod triggers;
 mod tribal;
 

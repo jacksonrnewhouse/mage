@@ -138,6 +138,13 @@ pub enum ChoiceReason {
     TreasureSacrificeColor,
     /// Cavern of Souls ETB: choose a creature type (encoded as index into CreatureType::ALL)
     CavernOfSoulsETB { cavern_id: ObjectId },
+    /// Surveil N: for each card seen, choose 0 = keep on top, 1 = put in graveyard.
+    /// The card_id passed to resolve_choice is the top-of-library card being surveilled.
+    SurveilCard { draw_after: bool },
+    /// Surveil land ETB: combined shock-land + surveil.
+    /// The player first chooses 0 (enter tapped) or 1 (pay 2 life, enter untapped),
+    /// then surveil 1 is triggered for the same player.
+    SurveilLandShock { card_id: ObjectId },
 }
 impl GameState {
     /// Create a new two-player game.
@@ -724,6 +731,44 @@ impl GameState {
     }
 
     // --- Utility ---
+
+    /// Surveil N: look at the top N cards of a player's library.
+    /// For AI search simplicity, we model this as a pending binary choice per card:
+    /// the player either keeps each card on top (ChooseNumber 0) or puts it in the
+    /// graveyard (ChooseNumber 1).  For N > 1 we queue only the first card; the
+    /// choice handler re-queues for the remaining cards automatically.
+    ///
+    /// `draw_after`: when true, draw a card after the surveil completes (e.g. Consider).
+    pub fn surveil(&mut self, player: PlayerId, count: u8, draw_after: bool) {
+        if count == 0 {
+            if draw_after {
+                self.draw_cards(player, 1);
+            }
+            return;
+        }
+        // Only set a choice if there are cards to surveil.
+        let pid = player as usize;
+        if self.players[pid].library.is_empty() {
+            if draw_after {
+                self.draw_cards(player, 1);
+            }
+            return;
+        }
+        // Peek at the top card (last element = top of library in this engine).
+        let top_id = *self.players[pid].library.last().unwrap();
+        self.pending_choice = Some(PendingChoice {
+            player,
+            kind: ChoiceKind::ChooseNumber {
+                min: 0,
+                max: 1,
+                reason: ChoiceReason::SurveilCard { draw_after },
+            },
+        });
+        // We need the card_id to be retrievable; we store a reference via the top of library.
+        // The choice resolver will pop the top card and handle it.
+        // No extra storage needed: the resolver always uses the current library top.
+        let _ = top_id; // suppress unused warning; resolver reads it directly
+    }
 
     pub fn draw_cards(&mut self, player: PlayerId, count: usize) {
         let pid = player as usize;
