@@ -109,6 +109,8 @@ pub enum ChoiceReason {
     ShockLandETB { card_id: ObjectId },
     /// Myr Retriever: return an artifact from graveyard to hand
     MyrRetrieverReturn,
+    /// Edict effect: the affected player must sacrifice a creature they control
+    EdictSacrifice,
 }
 
 impl GameState {
@@ -1361,7 +1363,7 @@ impl GameState {
             | CardName::AbruptDecay | CardName::AncientGrudge | CardName::ShatteringSpree
             | CardName::Vandalblast | CardName::Suplex
             | CardName::MoltenCollapse | CardName::PrismaticEnding | CardName::FatalPush
-            | CardName::BitterTriumph | CardName::SheoldredsEdict | CardName::SnuffOut
+            | CardName::BitterTriumph | CardName::SnuffOut
             | CardName::UntimellyMalfunction | CardName::Crash | CardName::CouncilsJudgment
             | CardName::MarchOfOtherworldlyLight | CardName::SunderingEruption
             | CardName::PestControl => {
@@ -1371,6 +1373,29 @@ impl GameState {
                 // Nature's Claim: controller gains 4 life
                 if card_name == CardName::NaturesClaim {
                     // target's controller already handled
+                }
+            }
+
+            // === Edict effects: target player sacrifices a creature ===
+            CardName::SheoldredsEdict => {
+                // Sheoldred's Edict: choose one — each opponent sacrifices a nontoken creature,
+                // or a creature token, or a planeswalker.
+                // Simplified: force opponent to sacrifice a creature (player chooses which).
+                if let Some(Target::Player(target_player)) = targets.first() {
+                    let opp = *target_player;
+                    let creatures: Vec<ObjectId> = self.battlefield.iter()
+                        .filter(|p| p.controller == opp && p.is_creature())
+                        .map(|p| p.id)
+                        .collect();
+                    if !creatures.is_empty() {
+                        self.pending_choice = Some(PendingChoice {
+                            player: opp,
+                            kind: ChoiceKind::ChooseFromList {
+                                options: creatures,
+                                reason: ChoiceReason::EdictSacrifice,
+                            },
+                        });
+                    }
                 }
             }
 

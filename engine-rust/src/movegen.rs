@@ -1694,6 +1694,10 @@ impl GameState {
                             self.players[pid].hand.push(card_id);
                         }
                     }
+                    ChoiceReason::EdictSacrifice => {
+                        // The chosen player sacrifices the chosen creature
+                        self.destroy_permanent(card_id);
+                    }
                     _ => {}
                 }
             }

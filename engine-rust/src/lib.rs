@@ -1447,4 +1447,122 @@ mod tests {
         assert_eq!(creature.power(), 2, "Both effects should be reversed");
         assert_eq!(creature.toughness(), 2, "Both effects should be reversed");
     }
+
+    #[test]
+    fn test_sheoldreds_edict_forces_opponent_to_sacrifice_creature() {
+        let db = build_card_db();
+        let mut state = GameState::new_two_player();
+
+        // P0 casts Sheoldred's Edict, P1 has a Goblin Guide on the battlefield
+        let edict_id = state.new_object_id();
+        let goblin_id = state.new_object_id();
+        state.card_registry.push((edict_id, CardName::SheoldredsEdict));
+        state.card_registry.push((goblin_id, CardName::GoblinGuide));
+        state.players[0].hand.push(edict_id);
+
+        let def = find_card(&db, CardName::GoblinGuide).unwrap();
+        let mut perm = crate::permanent::Permanent::new(
+            goblin_id, CardName::GoblinGuide, 1, 1,
+            def.power, def.toughness, None, def.keywords, def.card_types,
+        );
+        perm.entered_this_turn = false;
+        state.battlefield.push(perm);
+
+        state.turn_number = 1;
+        state.phase = Phase::PreCombatMain;
+        state.step = None;
+        state.active_player = 0;
+        state.priority_player = 0;
+        // Give P0 enough mana (BB = 2 black)
+        state.players[0].mana_pool.black = 2;
+
+        // Cast Sheoldred's Edict targeting P1
+        state.apply_action(
+            &Action::CastSpell {
+                card_id: edict_id,
+                targets: vec![Target::Player(1)],
+            },
+            &db,
+        );
+        assert_eq!(state.stack.len(), 1, "Edict should be on the stack");
+
+        // Both players pass priority to resolve
+        state.pass_priority(&db); // P0 passes
+        state.pass_priority(&db); // P1 passes -> resolves
+
+        // Should now have a pending choice for P1 to pick which creature to sacrifice
+        assert!(
+            state.pending_choice.is_some(),
+            "Edict should create a pending choice for the opponent"
+        );
+
+        // Verify the choice is for P1 and contains the Goblin Guide
+        if let Some(ref choice) = state.pending_choice {
+            assert_eq!(choice.player, 1, "P1 should be the one making the sacrifice choice");
+            if let crate::game::ChoiceKind::ChooseFromList { options, .. } = &choice.kind {
+                assert!(
+                    options.contains(&goblin_id),
+                    "Goblin Guide should be in the options to sacrifice"
+                );
+            } else {
+                panic!("Expected ChooseFromList choice kind");
+            }
+        }
+
+        // P1 chooses to sacrifice the Goblin Guide
+        state.apply_action(&Action::ChooseCard(goblin_id), &db);
+
+        // Goblin Guide should now be in P1's graveyard, not on the battlefield
+        let goblin_on_bf = state.battlefield.iter().any(|p| p.id == goblin_id);
+        assert!(!goblin_on_bf, "Goblin Guide should have been sacrificed");
+
+        let goblin_in_gy = state.players[1].graveyard.contains(&goblin_id);
+        assert!(goblin_in_gy, "Goblin Guide should be in P1's graveyard after sacrifice");
+    }
+
+    #[test]
+    fn test_sheoldreds_edict_no_effect_when_opponent_has_no_creatures() {
+        let db = build_card_db();
+        let mut state = GameState::new_two_player();
+
+        // P0 casts Sheoldred's Edict, P1 has NO creatures
+        let edict_id = state.new_object_id();
+        state.card_registry.push((edict_id, CardName::SheoldredsEdict));
+        state.players[0].hand.push(edict_id);
+
+        state.turn_number = 1;
+        state.phase = Phase::PreCombatMain;
+        state.step = None;
+        state.active_player = 0;
+        state.priority_player = 0;
+        state.players[0].mana_pool.black = 2;
+
+        let p1_bf_before = state.battlefield.iter().filter(|p| p.controller == 1).count();
+
+        // Cast Sheoldred's Edict targeting P1
+        state.apply_action(
+            &Action::CastSpell {
+                card_id: edict_id,
+                targets: vec![Target::Player(1)],
+            },
+            &db,
+        );
+
+        // Both players pass priority to resolve
+        state.pass_priority(&db);
+        state.pass_priority(&db);
+
+        // No pending choice should exist (no creatures to sacrifice)
+        assert!(
+            state.pending_choice.is_none(),
+            "No pending choice when opponent has no creatures"
+        );
+
+        // P1's battlefield should be unchanged
+        let p1_bf_after = state.battlefield.iter().filter(|p| p.controller == 1).count();
+        assert_eq!(
+            p1_bf_before, p1_bf_after,
+            "P1's battlefield should be unchanged when they have no creatures"
+        );
+    }
 }
