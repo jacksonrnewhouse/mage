@@ -93,6 +93,8 @@ pub enum ChoiceReason {
     TimeTwisterShuffle,
     GenericDiscard,
     GenericSearch,
+    /// Shock land entering the battlefield: 0 = enter tapped, 1 = pay 2 life (enter untapped)
+    ShockLandETB { card_id: ObjectId },
 }
 
 impl GameState {
@@ -1384,7 +1386,7 @@ impl GameState {
         }
     }
 
-    fn handle_etb(&mut self, card_name: CardName, _card_id: ObjectId, controller: PlayerId) {
+    pub(crate) fn handle_etb(&mut self, card_name: CardName, _card_id: ObjectId, controller: PlayerId) {
         match card_name {
             // Orcish Bowmasters: amass 1 and deal 1
             CardName::OrcishBowmasters => {
@@ -1478,6 +1480,26 @@ impl GameState {
                 if let Some(perm) = self.find_permanent_mut(_card_id) {
                     perm.doesnt_untap = true;
                 }
+            }
+            // Shock lands: player chooses to pay 2 life (enter untapped) or enter tapped
+            CardName::HallowedFountain
+            | CardName::WateryGrave
+            | CardName::BloodCrypt
+            | CardName::StompingGround
+            | CardName::TempleGarden
+            | CardName::GodlessShrine
+            | CardName::SteamVents
+            | CardName::OvergrownTomb
+            | CardName::SacredFoundry
+            | CardName::BreedingPool => {
+                self.pending_choice = Some(PendingChoice {
+                    player: controller,
+                    kind: ChoiceKind::ChooseNumber {
+                        min: 0,
+                        max: 1,
+                        reason: ChoiceReason::ShockLandETB { card_id: _card_id },
+                    },
+                });
             }
             // Loran of the Third Path: destroy artifact or enchantment
             CardName::LoranOfTheThirdPath => {

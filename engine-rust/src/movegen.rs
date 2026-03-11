@@ -1144,6 +1144,7 @@ impl GameState {
                                 def.card_types,
                             );
                             self.battlefield.push(perm);
+                            self.handle_etb(cn, *card_id, player_id);
                         }
                     }
                 }
@@ -1231,9 +1232,8 @@ impl GameState {
             }
 
             Action::ChooseNumber(n) => {
-                if let Some(_choice) = self.pending_choice.take() {
-                    // Handle number choice (e.g., Toxic Deluge X value)
-                    let _ = n;
+                if let Some(choice) = self.pending_choice.take() {
+                    self.resolve_number_choice(choice, *n);
                 }
             }
         }
@@ -1653,6 +1653,28 @@ impl GameState {
                                     self.battlefield.push(perm);
                                 }
                             }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn resolve_number_choice(&mut self, choice: PendingChoice, n: u32) {
+        match choice.kind {
+            ChoiceKind::ChooseNumber { reason, .. } => {
+                match reason {
+                    ChoiceReason::ShockLandETB { card_id } => {
+                        if n == 0 {
+                            // Enter tapped
+                            if let Some(perm) = self.find_permanent_mut(card_id) {
+                                perm.tapped = true;
+                            }
+                        } else {
+                            // Pay 2 life, enter untapped
+                            self.players[choice.player as usize].life -= 2;
                         }
                     }
                     _ => {}

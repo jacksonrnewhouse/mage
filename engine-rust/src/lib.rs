@@ -668,4 +668,92 @@ mod tests {
         let vault = state.find_permanent(vault_id).unwrap();
         assert!(vault.doesnt_untap, "Mana Vault should have doesnt_untap set after ETB");
     }
+
+    #[test]
+    fn test_shock_land_enters_tapped_if_no_life_paid() {
+        let db = build_card_db();
+        let mut state = GameState::new_two_player();
+
+        let fountain_id = state.new_object_id();
+        state.card_registry.push((fountain_id, CardName::HallowedFountain));
+        state.players[0].hand.push(fountain_id);
+
+        state.turn_number = 1;
+        state.phase = Phase::PreCombatMain;
+        state.step = None;
+        state.active_player = 0;
+        state.priority_player = 0;
+
+        state.apply_action(&Action::PlayLand(fountain_id), &db);
+
+        assert!(state.pending_choice.is_some(), "Should have pending choice for shock land");
+
+        // Choose 0 = enter tapped (no life paid)
+        state.apply_action(&Action::ChooseNumber(0), &db);
+
+        let fountain = state.find_permanent(fountain_id).expect("Hallowed Fountain should be on battlefield");
+        assert!(fountain.tapped, "Hallowed Fountain should enter tapped when player chooses not to pay 2 life");
+    }
+
+    #[test]
+    fn test_shock_land_enters_untapped_if_life_paid() {
+        let db = build_card_db();
+        let mut state = GameState::new_two_player();
+
+        let fountain_id = state.new_object_id();
+        state.card_registry.push((fountain_id, CardName::HallowedFountain));
+        state.players[0].hand.push(fountain_id);
+
+        state.turn_number = 1;
+        state.phase = Phase::PreCombatMain;
+        state.step = None;
+        state.active_player = 0;
+        state.priority_player = 0;
+
+        let life_before = state.players[0].life;
+
+        state.apply_action(&Action::PlayLand(fountain_id), &db);
+        assert!(state.pending_choice.is_some(), "Should have pending choice for shock land");
+
+        // Choose 1 = pay 2 life, enter untapped
+        state.apply_action(&Action::ChooseNumber(1), &db);
+
+        let fountain = state.find_permanent(fountain_id).expect("Hallowed Fountain should be on battlefield");
+        assert!(!fountain.tapped, "Hallowed Fountain should enter untapped when player pays 2 life");
+        assert_eq!(state.players[0].life, life_before - 2, "Player should have paid 2 life");
+    }
+
+    #[test]
+    fn test_shock_land_choice_covers_all_ten() {
+        let db = build_card_db();
+        let shock_lands = [
+            CardName::HallowedFountain,
+            CardName::WateryGrave,
+            CardName::BloodCrypt,
+            CardName::StompingGround,
+            CardName::TempleGarden,
+            CardName::GodlessShrine,
+            CardName::SteamVents,
+            CardName::OvergrownTomb,
+            CardName::SacredFoundry,
+            CardName::BreedingPool,
+        ];
+        for card_name in shock_lands {
+            let mut state = GameState::new_two_player();
+            let card_id = state.new_object_id();
+            state.card_registry.push((card_id, card_name));
+            state.players[0].hand.push(card_id);
+            state.turn_number = 1;
+            state.phase = Phase::PreCombatMain;
+            state.step = None;
+            state.active_player = 0;
+            state.priority_player = 0;
+            state.apply_action(&Action::PlayLand(card_id), &db);
+            assert!(
+                state.pending_choice.is_some(),
+                "{:?} should trigger a pending choice on ETB",
+                card_name
+            );
+        }
+    }
 }
