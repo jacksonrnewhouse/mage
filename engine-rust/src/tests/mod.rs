@@ -14,6 +14,7 @@ mod replacement_effects;
 mod spells;
 mod statics;
 mod triggers;
+mod tribal;
 
 pub(crate) fn setup_simple_game() -> (GameState, Vec<CardDef>) {
     let db = build_card_db();

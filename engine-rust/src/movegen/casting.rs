@@ -84,7 +84,12 @@ impl GameState {
                             } else {
                                 self.players[player_id as usize].remove_from_hand(*card_id);
                             }
-                            let uncounterable = is_uncounterable(cn);
+                            // Check static can't-be-countered (e.g., Abrupt Decay)
+                            let mut uncounterable = is_uncounterable(cn);
+                            // Cavern of Souls: creature spells of the named type can't be countered.
+                            if !uncounterable && def.card_types.contains(&CardType::Creature) {
+                                uncounterable = self.cavern_makes_uncounterable(player_id, def, cn);
+                            }
                             // Mark evoke-cast spells so resolution can apply the sacrifice trigger.
                             let is_evoke = matches!(alt_cost, Some(AltCost::Evoke { .. }));
                             self.stack.push_with_flags(

@@ -62,10 +62,15 @@ impl GameState {
                                         // Card is exiled instead of entering
                                         self.exile.push((card_id, cn, choice.player));
                                     } else {
-                                        let perm = Permanent::new(
+                                        let mut perm = Permanent::new(
                                             card_id, cn, choice.player, choice.player,
                                             def.power, def.toughness, def.loyalty, def.keywords, def.card_types,
                                         );
+                                        if def.is_changeling {
+                                            perm.creature_types = crate::types::CreatureType::ALL.to_vec();
+                                        } else {
+                                            perm.creature_types = def.creature_types.to_vec();
+                                        }
                                         self.battlefield.push(perm);
                                         self.handle_etb(cn, card_id, choice.player);
                                     }
@@ -105,6 +110,16 @@ impl GameState {
                         } else {
                             // Pay 2 life, enter untapped
                             self.players[choice.player as usize].life -= 2;
+                        }
+                    }
+                    ChoiceReason::CavernOfSoulsETB { cavern_id } => {
+                        // n is an index into CreatureType::ALL
+                        let all_types = crate::types::CreatureType::ALL;
+                        if (n as usize) < all_types.len() {
+                            let chosen_type = all_types[n as usize];
+                            if let Some(perm) = self.find_permanent_mut(cavern_id) {
+                                perm.cavern_creature_type = Some(chosen_type);
+                            }
                         }
                     }
                     _ => {}

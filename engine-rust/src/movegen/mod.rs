@@ -723,6 +723,18 @@ impl GameState {
             CardName::UrborgTombOfYawgmoth => vec![Some(Color::Black)],
             CardName::YavimayaCradleOfGrowth => vec![Some(Color::Green)],
 
+            // Cavern of Souls: produces colorless, or any color for spells of the named type.
+            // Both abilities are always available; the colored-mana-only-for-named-type
+            // restriction is enforced at spell casting, not here.
+            CardName::CavernOfSouls => vec![
+                None, // Colorless {C}
+                Some(Color::White),
+                Some(Color::Blue),
+                Some(Color::Black),
+                Some(Color::Red),
+                Some(Color::Green),
+            ],
+
             // Bazaar of Baghdad: doesn't produce mana, only draw/discard (activated ability)
             // Dryad Arbor: it's a forest, taps for green
             CardName::DryadArbor => vec![Some(Color::Green)],
@@ -873,6 +885,19 @@ impl GameState {
             | CardName::ChromaticStar
             | CardName::DelightedHalfling
             | CardName::UndermountainAdventurer => {
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.tapped = true;
+                }
+                self.players[controller as usize]
+                    .mana_pool
+                    .add(color_choice, 1);
+                true
+            }
+
+            // Cavern of Souls: tap for colorless {C} or any color (for named creature type).
+            // Colored mana from Cavern is tracked as "cavern mana" for uncounterable purposes,
+            // but since we simplify mana tracking we just add it to the pool.
+            CardName::CavernOfSouls => {
                 if let Some(perm) = self.find_permanent_mut(permanent_id) {
                     perm.tapped = true;
                 }
@@ -1932,6 +1957,29 @@ impl GameState {
                 }
             }
         }
+    }
+}
+
+impl GameState {
+    /// Check if a Cavern of Souls controlled by `player_id` makes a creature spell uncounterable.
+    /// Returns true if the player controls a Cavern whose named creature type matches
+    /// any creature type of the spell's card definition, or if the card is a changeling.
+    /// Check if a Cavern of Souls controlled by `player_id` makes a creature spell uncounterable.
+    /// Simplified: if the player controls a Cavern with the matching named type, and the spell
+    /// has that creature type (or is a changeling), the spell is uncounterable.
+    /// Note: In actual MTG rules, Cavern's colored mana must be spent on the spell; here we
+    /// approximate this for the game tree search.
+    pub fn cavern_makes_uncounterable(&self, player_id: PlayerId, def: &crate::card::CardDef, _card_name: CardName) -> bool {
+        for perm in &self.battlefield {
+            if perm.card_name == CardName::CavernOfSouls && perm.controller == player_id {
+                if let Some(cavern_type) = perm.cavern_creature_type {
+                    if def.is_changeling || def.creature_types.contains(&cavern_type) {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
     }
 }
 

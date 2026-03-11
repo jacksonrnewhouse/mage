@@ -38,6 +38,10 @@ pub struct Permanent {
     pub loyalty_activated_this_turn: bool,
     /// Types (can be modified by effects)
     pub card_types: Vec<CardType>,
+    /// Creature subtypes (e.g., Human, Wizard, Goblin). Set from card definition.
+    pub creature_types: Vec<CreatureType>,
+    /// For Cavern of Souls: the creature type chosen when it entered.
+    pub cavern_creature_type: Option<CreatureType>,
     /// For tokens
     pub is_token: bool,
     /// For equipment/auras: the ObjectId of the permanent this is attached to (None = unattached).
@@ -108,10 +112,24 @@ impl Permanent {
             loyalty: loyalty.unwrap_or(0),
             loyalty_activated_this_turn: false,
             card_types: card_types.to_vec(),
+            creature_types: Vec::new(),
+            cavern_creature_type: None,
             is_token: false,
             attached_to: None,
             attachments: Vec::new(),
         }
+    }
+
+    /// Set creature types from a card definition slice.
+    pub fn with_creature_types(mut self, types: &[CreatureType]) -> Self {
+        self.creature_types = types.to_vec();
+        self
+    }
+
+    /// Check if this permanent has a given creature type.
+    /// Changelings (has all creature types via Keywords::Changeling) always return true.
+    pub fn has_creature_type(&self, ct: CreatureType) -> bool {
+        self.creature_types.contains(&ct)
     }
 
     /// Current power after all modifications.

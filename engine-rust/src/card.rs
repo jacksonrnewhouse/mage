@@ -4,6 +4,9 @@
 use crate::mana::ManaCost;
 use crate::types::*;
 
+/// Creature type data for a card. Static slices for zero-overhead lookup.
+pub type CreatureTypes = &'static [CreatureType];
+
 /// Every card known to the engine. Using an enum for fast dispatch.
 /// Compiler can optimize match statements into jump tables.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -81,6 +84,7 @@ pub enum CardName {
     UrzasSaga,
     BazaarOfBaghdad,
     DryadArbor,
+    CavernOfSouls,
 
     // === Power 9 ===
     BlackLotus,
@@ -537,6 +541,10 @@ pub struct CardDef {
     /// Flashback cost: if Some, this card can be cast from the graveyard for this alternate cost.
     /// When cast via flashback (or countered), the card is exiled instead of going to graveyard.
     pub flashback_cost: Option<ManaCost>,
+    /// Creature subtypes for tribal interactions. Empty for non-creatures.
+    pub creature_types: &'static [CreatureType],
+    /// True if this card is a changeling (has all creature types).
+    pub is_changeling: bool,
 }
 
 /// Equipment bonus: P/T modification and keyword grants applied when equipped.
@@ -668,6 +676,52 @@ pub fn build_card_db() -> Vec<CardDef> {
                 color_identity: $colors,
                 oracle_text: $text,
                 flashback_cost: None,
+                creature_types: &[],
+                is_changeling: false,
+            });
+        };
+        // Variant with creature types
+        (CT($ct:expr) $name:expr, $display:expr, $cost:expr, $types:expr, $supers:expr,
+         $pow:expr, $tou:expr, $loy:expr, $kw:expr, $colors:expr, $text:expr) => {
+            db.push(CardDef {
+                name: $name,
+                display_name: $display,
+                mana_cost: $cost,
+                has_x_cost: false,
+                x_multiplier: 0,
+                card_types: $types,
+                supertypes: $supers,
+                power: $pow,
+                toughness: $tou,
+                loyalty: $loy,
+                keywords: $kw,
+                color_identity: $colors,
+                oracle_text: $text,
+                flashback_cost: None,
+                creature_types: $ct,
+                is_changeling: false,
+            });
+        };
+        // Variant with changeling (all creature types)
+        (CHANGELING $name:expr, $display:expr, $cost:expr, $types:expr, $supers:expr,
+         $pow:expr, $tou:expr, $loy:expr, $kw:expr, $colors:expr, $text:expr) => {
+            db.push(CardDef {
+                name: $name,
+                display_name: $display,
+                mana_cost: $cost,
+                has_x_cost: false,
+                x_multiplier: 0,
+                card_types: $types,
+                supertypes: $supers,
+                power: $pow,
+                toughness: $tou,
+                loyalty: $loy,
+                keywords: $kw,
+                color_identity: $colors,
+                oracle_text: $text,
+                flashback_cost: None,
+                creature_types: &[],
+                is_changeling: true,
             });
         };
         // Variant with X cost: x_mult is how many times X appears (1 or 2)
@@ -688,6 +742,8 @@ pub fn build_card_db() -> Vec<CardDef> {
                 color_identity: $colors,
                 oracle_text: $text,
                 flashback_cost: None,
+                creature_types: &[],
+                is_changeling: false,
             });
         };
         // Variant with flashback cost
@@ -708,6 +764,8 @@ pub fn build_card_db() -> Vec<CardDef> {
                 color_identity: $colors,
                 oracle_text: $text,
                 flashback_cost: Some($fb),
+                creature_types: &[],
+                is_changeling: false,
             });
         };
     }
@@ -939,16 +997,16 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Counter target noncreature spell unless its controller pays {2}.");
 
     // === Blue Creatures ===
-    card!(SnapcasterMage, "Snapcaster Mage", ManaCost { blue: 1, generic: 1, ..c }, &[Creature], &[],
+    card!(CT(&[CreatureType::Human, CreatureType::Wizard]) SnapcasterMage, "Snapcaster Mage", ManaCost { blue: 1, generic: 1, ..c }, &[Creature], &[],
         Some(2), Some(1), None, flash(), &[Blue],
         "Flash. When Snapcaster Mage enters, target instant or sorcery card in your graveyard gains flashback until end of turn.");
-    card!(TrueNameNemesis, "True-Name Nemesis", ManaCost { blue: 1, generic: 2, ..c }, &[Creature], &[],
+    card!(CT(&[CreatureType::Merfolk, CreatureType::Rogue]) TrueNameNemesis, "True-Name Nemesis", ManaCost { blue: 1, generic: 2, ..c }, &[Creature], &[],
         Some(3), Some(1), None, kw(), &[Blue],
         "As True-Name Nemesis enters, choose a player. True-Name Nemesis has protection from the chosen player.");
-    card!(Hullbreacher, "Hullbreacher", ManaCost { blue: 1, generic: 2, ..c }, &[Creature], &[],
+    card!(CT(&[CreatureType::Merfolk, CreatureType::Pirate]) Hullbreacher, "Hullbreacher", ManaCost { blue: 1, generic: 2, ..c }, &[Creature], &[],
         Some(3), Some(2), None, flash(), &[Blue],
         "Flash. If an opponent would draw a card except the first one they draw in each of their draw steps, instead you create a Treasure token.");
-    card!(OppositionAgent, "Opposition Agent", ManaCost { black: 1, generic: 2, ..c }, &[Creature], &[],
+    card!(CT(&[CreatureType::Human, CreatureType::Rogue]) OppositionAgent, "Opposition Agent", ManaCost { black: 1, generic: 2, ..c }, &[Creature], &[],
         Some(3), Some(2), None, flash(), &[Black],
         "Flash. You control your opponents while they're searching their libraries.");
 
@@ -980,10 +1038,10 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Target player loses 2 life and you gain 2 life. Storm.");
 
     // === Black Creatures ===
-    card!(SheoldredTheApocalypse, "Sheoldred, the Apocalypse", ManaCost { black: 2, generic: 2, ..c }, &[Creature], &[Legendary],
+    card!(CT(&[CreatureType::Phyrexian, CreatureType::Praetor]) SheoldredTheApocalypse, "Sheoldred, the Apocalypse", ManaCost { black: 2, generic: 2, ..c }, &[Creature], &[Legendary],
         Some(4), Some(5), None, kw(), &[Black],
         "Deathtouch. Whenever you draw a card, you gain 2 life. Whenever an opponent draws a card, they lose 2 life.");
-    card!(DarkConfidant, "Dark Confidant", ManaCost { black: 1, generic: 1, ..c }, &[Creature], &[],
+    card!(CT(&[CreatureType::Human, CreatureType::Wizard]) DarkConfidant, "Dark Confidant", ManaCost { black: 1, generic: 1, ..c }, &[Creature], &[],
         Some(2), Some(1), None, kw(), &[Black],
         "At the beginning of your upkeep, reveal the top card of your library and put it into your hand. You lose life equal to its mana value.");
 
@@ -1000,16 +1058,16 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Chain Lightning deals 3 damage to any target.");
 
     // === Red Creatures ===
-    card!(GoblinGuide, "Goblin Guide", ManaCost::r(1), &[Creature], &[],
+    card!(CT(&[CreatureType::Goblin]) GoblinGuide, "Goblin Guide", ManaCost::r(1), &[Creature], &[],
         Some(2), Some(2), None, haste(), &[Red],
         "Haste. Whenever Goblin Guide attacks, defending player reveals the top card of their library. If it's a land card, that player puts it into their hand.");
-    card!(MonasterySwiftspear, "Monastery Swiftspear", ManaCost::r(1), &[Creature], &[],
+    card!(CT(&[CreatureType::Human, CreatureType::Monk]) MonasterySwiftspear, "Monastery Swiftspear", ManaCost::r(1), &[Creature], &[],
         Some(1), Some(2), None, prowess_haste(), &[Red],
         "Haste. Prowess.");
-    card!(RagavanNimblePilferer, "Ragavan, Nimble Pilferer", ManaCost::r(1), &[Creature], &[Legendary],
+    card!(CT(&[CreatureType::Monkey]) RagavanNimblePilferer, "Ragavan, Nimble Pilferer", ManaCost::r(1), &[Creature], &[Legendary],
         Some(2), Some(1), None, kw(), &[Red],
         "Whenever Ragavan deals combat damage to a player, create a Treasure token and exile the top card of that player's library. You may cast that card this turn.");
-    card!(YoungPyromancer, "Young Pyromancer", ManaCost { red: 1, generic: 1, ..c }, &[Creature], &[],
+    card!(CT(&[CreatureType::Human, CreatureType::Shaman]) YoungPyromancer, "Young Pyromancer", ManaCost { red: 1, generic: 1, ..c }, &[Creature], &[],
         Some(2), Some(1), None, kw(), &[Red],
         "Whenever you cast an instant or sorcery spell, create a 1/1 red Elemental creature token.");
 
@@ -1028,24 +1086,24 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Destroy target artifact or enchantment.");
 
     // === White Creatures ===
-    card!(ThaliaGuardianOfThraben, "Thalia, Guardian of Thraben", ManaCost { white: 1, generic: 1, ..c }, &[Creature], &[Legendary],
+    card!(CT(&[CreatureType::Human, CreatureType::Soldier]) ThaliaGuardianOfThraben, "Thalia, Guardian of Thraben", ManaCost { white: 1, generic: 1, ..c }, &[Creature], &[Legendary],
         Some(2), Some(1), None, {
             let mut k = Keywords::empty();
             k.add(Keyword::FirstStrike);
             k
         }, &[White],
         "First strike. Noncreature spells cost {1} more to cast.");
-    card!(MonasteryMentor, "Monastery Mentor", ManaCost { white: 1, generic: 2, ..c }, &[Creature], &[],
+    card!(CT(&[CreatureType::Human, CreatureType::Monk]) MonasteryMentor, "Monastery Mentor", ManaCost { white: 1, generic: 2, ..c }, &[Creature], &[],
         Some(2), Some(2), None, {
             let mut k = Keywords::empty();
             k.add(Keyword::Prowess);
             k
         }, &[White],
         "Prowess. Whenever you cast a noncreature spell, create a 1/1 white Monk creature token with prowess.");
-    card!(Solitude, "Solitude", ManaCost { white: 2, generic: 3, ..c }, &[Creature], &[],
+    card!(CT(&[CreatureType::Elemental]) Solitude, "Solitude", ManaCost { white: 2, generic: 3, ..c }, &[Creature], &[],
         Some(3), Some(2), None, flash_flying(), &[White],
         "Flash. Flying. Lifelink. When Solitude enters, exile up to one other target creature. That creature's controller gains life equal to its power. Evoke - Exile a white card from your hand.");
-    card!(StoneforgeMystic, "Stoneforge Mystic", ManaCost { white: 1, generic: 1, ..c }, &[Creature], &[],
+    card!(CT(&[CreatureType::Kor, CreatureType::Artificer]) StoneforgeMystic, "Stoneforge Mystic", ManaCost { white: 1, generic: 1, ..c }, &[Creature], &[],
         Some(1), Some(2), None, kw(), &[White],
         "When Stoneforge Mystic enters, you may search your library for an Equipment card, reveal it, put it into your hand, then shuffle. {1}{W}, {T}: You may put an Equipment card from your hand onto the battlefield.");
     card!(PalaceJailer, "Palace Jailer", ManaCost { white: 2, generic: 2, ..c }, &[Creature], &[],
@@ -1063,10 +1121,10 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Return target card from your graveyard to your hand.");
 
     // === Green Creatures ===
-    card!(BirdsOfParadise, "Birds of Paradise", ManaCost::g(1), &[Creature], &[],
+    card!(CT(&[CreatureType::Bird]) BirdsOfParadise, "Birds of Paradise", ManaCost::g(1), &[Creature], &[],
         Some(0), Some(1), None, flying(), &[Green],
         "Flying. {T}: Add one mana of any color.");
-    card!(CollectorOuphe, "Collector Ouphe", ManaCost { green: 1, generic: 1, ..c }, &[Creature], &[],
+    card!(CT(&[CreatureType::Ouphe]) CollectorOuphe, "Collector Ouphe", ManaCost { green: 1, generic: 1, ..c }, &[Creature], &[],
         Some(2), Some(2), None, kw(), &[Green],
         "Activated abilities of artifacts can't be activated.");
     card!(Endurance, "Endurance", ManaCost { green: 2, generic: 1, ..c }, &[Creature], &[],
@@ -1199,6 +1257,9 @@ pub fn build_card_db() -> Vec<CardDef> {
         "{T}: Draw two cards, then discard three cards.");
     card!(DryadArbor, "Dryad Arbor", c, &[Land, Creature], &[], Some(1), Some(1), None, kw(), &[Green],
         "Dryad Arbor is green.");
+    // Cavern of Souls: named creature type produces colored mana and makes spells uncounterable
+    card!(CavernOfSouls, "Cavern of Souls", c, &[Land], &[], None, None, None, kw(), &[],
+        "As Cavern of Souls enters, choose a creature type. {T}: Add {C}. {T}: Add one mana of any color. Spend this mana only to cast a creature spell of the chosen type. That spell can't be countered.");
 
     // === White Creatures ===
     card!(NomadsEnKor, "Nomads en-Kor", ManaCost::w(1), &[Creature], &[],
@@ -1538,7 +1599,7 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(ZhaoTheMoonSlayer, "Zhao, the Moon Slayer", ManaCost { red: 1, generic: 1, ..c }, &[Creature], &[Legendary],
         Some(2), Some(2), None, kw(), &[Red],
         "Whenever Zhao attacks, exile the top card of your library. You may play it this turn. Whenever you play a land or cast a spell from exile, put a +1/+1 counter on Zhao.");
-    card!(NameStickerGoblin, "Name Sticker Goblin", ManaCost { red: 1, generic: 1, ..c }, &[Creature], &[],
+    card!(CT(&[CreatureType::Goblin]) NameStickerGoblin, "Name Sticker Goblin", ManaCost { red: 1, generic: 1, ..c }, &[Creature], &[],
         Some(2), Some(1), None, haste(), &[Red],
         "Haste. When Name Sticker Goblin enters, you may add a name sticker to a nonland permanent you own.");
     card!(AvalancheOfSector7, "Avalanche of Sector 7", ManaCost { red: 1, generic: 2, ..c }, &[Creature], &[],
@@ -1619,12 +1680,12 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(BlazingRootwalla, "Blazing Rootwalla", ManaCost::r(1), &[Creature], &[],
         Some(1), Some(1), None, kw(), &[Red],
         "{R}{R}: Blazing Rootwalla gets +2/+0 until end of turn. Activate only once each turn. Madness {0}.");
-    card!(SqueeGoblinNabob, "Squee, Goblin Nabob", ManaCost { red: 1, generic: 2, ..c }, &[Creature], &[Legendary],
+    card!(CT(&[CreatureType::Goblin]) SqueeGoblinNabob, "Squee, Goblin Nabob", ManaCost { red: 1, generic: 2, ..c }, &[Creature], &[Legendary],
         Some(1), Some(1), None, kw(), &[Red],
         "At the beginning of your upkeep, you may return Squee, Goblin Nabob from your graveyard to your hand.");
 
     // === Green Creatures ===
-    card!(DelightedHalfling, "Delighted Halfling", ManaCost::g(1), &[Creature], &[Legendary],
+    card!(CT(&[CreatureType::Halfling]) DelightedHalfling, "Delighted Halfling", ManaCost::g(1), &[Creature], &[Legendary],
         Some(1), Some(2), None, kw(), &[Green],
         "{T}: Add {C}. {T}: Add one mana of any color. Spend this mana only to cast a legendary spell, and that spell can't be countered.");
     card!(HaywireMite, "Haywire Mite", ManaCost::generic(1), &[Artifact, Creature], &[],
@@ -1636,7 +1697,7 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(SylvanSafekeeper, "Sylvan Safekeeper", ManaCost::g(1), &[Creature], &[Legendary],
         Some(1), Some(1), None, kw(), &[Green],
         "Sacrifice a land: Target creature you control gains shroud until end of turn.");
-    card!(HermitDruid, "Hermit Druid", ManaCost { green: 1, generic: 1, ..c }, &[Creature], &[],
+    card!(CT(&[CreatureType::Human, CreatureType::Druid]) HermitDruid, "Hermit Druid", ManaCost { green: 1, generic: 1, ..c }, &[Creature], &[],
         Some(1), Some(1), None, kw(), &[Green],
         "{G}, {T}: Reveal cards from the top of your library until you reveal a basic land card. Put that card into your hand and all other cards revealed this way into your graveyard.");
     card!(OutlandLiberator, "Outland Liberator", ManaCost { green: 1, generic: 1, ..c }, &[Creature], &[],
@@ -1651,7 +1712,7 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(TownGreeter, "Town Greeter", ManaCost { green: 1, generic: 1, ..c }, &[Creature], &[],
         Some(2), Some(2), None, kw(), &[Green],
         "When Town Greeter enters, you take the initiative.");
-    card!(ElvishSpiritGuide, "Elvish Spirit Guide", ManaCost { green: 1, generic: 2, ..c }, &[Creature], &[],
+    card!(CT(&[CreatureType::Elf, CreatureType::Spirit]) ElvishSpiritGuide, "Elvish Spirit Guide", ManaCost { green: 1, generic: 2, ..c }, &[Creature], &[],
         Some(2), Some(2), None, kw(), &[Green],
         "Exile Elvish Spirit Guide from your hand: Add {G}.");
     card!(Manglehorn, "Manglehorn", ManaCost { green: 1, generic: 2, ..c }, &[Creature], &[],
@@ -1718,7 +1779,7 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(PhyrexianDreadnought, "Phyrexian Dreadnought", ManaCost::generic(1), &[Artifact, Creature], &[],
         Some(12), Some(12), None, trample(), &[],
         "Trample. When Phyrexian Dreadnought enters, unless you sacrifice any number of creatures with total power 12 or greater, sacrifice it.");
-    card!(MyrRetriever, "Myr Retriever", ManaCost::generic(2), &[Artifact, Creature], &[],
+    card!(CT(&[CreatureType::Myr]) MyrRetriever, "Myr Retriever", ManaCost::generic(2), &[Artifact, Creature], &[],
         Some(1), Some(1), None, kw(), &[],
         "When Myr Retriever dies, return another target artifact card from your graveyard to your hand.");
     card!(PatchworkAutomaton, "Patchwork Automaton", ManaCost::generic(2), &[Artifact, Creature], &[],
@@ -1742,7 +1803,7 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(ScrawlingCrawler, "Scrawling Crawler", ManaCost::generic(3), &[Artifact, Creature], &[],
         Some(3), Some(3), None, kw(), &[],
         "Scrawling Crawler can't be blocked. Whenever Scrawling Crawler deals combat damage to a player, draw a card.");
-    card!(LodestoneGolem, "Lodestone Golem", ManaCost::generic(4), &[Artifact, Creature], &[],
+    card!(CT(&[CreatureType::Golem]) LodestoneGolem, "Lodestone Golem", ManaCost::generic(4), &[Artifact, Creature], &[],
         Some(5), Some(3), None, kw(), &[],
         "Nonartifact spells cost {1} more to cast.");
     card!(ArgentumMasticore, "Argentum Masticore", ManaCost::generic(5), &[Artifact, Creature], &[],
@@ -1754,7 +1815,7 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(KarnSilverGolem, "Karn, Silver Golem", ManaCost::generic(5), &[Artifact, Creature], &[Legendary],
         Some(4), Some(4), None, kw(), &[],
         "Whenever Karn blocks or becomes blocked, it gets -4/+4 until end of turn. {1}: Target noncreature artifact becomes an artifact creature with power and toughness each equal to its mana value until end of turn.");
-    card!(WurmcoilEngine, "Wurmcoil Engine", ManaCost::generic(6), &[Artifact, Creature], &[],
+    card!(CT(&[CreatureType::Wurm]) WurmcoilEngine, "Wurmcoil Engine", ManaCost::generic(6), &[Artifact, Creature], &[],
         Some(6), Some(6), None, deathtouch_lifelink(), &[],
         "Deathtouch, lifelink. When Wurmcoil Engine dies, create a 3/3 colorless Wurm artifact creature token with deathtouch and a 3/3 colorless Wurm artifact creature token with lifelink.");
     card!(EmrakulTheAeonsTorn, "Emrakul, the Aeons Torn", ManaCost::generic(15), &[Creature], &[Legendary],

@@ -50,7 +50,7 @@ impl GameState {
         if is_permanent {
             // Put permanent onto battlefield
             if let Some(def) = card_def {
-                let perm = Permanent::new(
+                let mut perm = Permanent::new(
                     card_id,
                     card_name,
                     controller,
@@ -61,6 +61,12 @@ impl GameState {
                     def.keywords,
                     def.card_types,
                 );
+                // Set creature types from card definition (or all types if changeling)
+                if def.is_changeling {
+                    perm.creature_types = crate::types::CreatureType::ALL.to_vec();
+                } else {
+                    perm.creature_types = def.creature_types.to_vec();
+                }
                 self.battlefield.push(perm);
                 // ETB triggers
                 self.handle_etb_with_x(card_name, card_id, controller, x_value);
@@ -1239,6 +1245,19 @@ impl GameState {
                 }
             }
 
+            // Cavern of Souls: player chooses a creature type when it enters.
+            // The chosen type is stored on the permanent and used for mana abilities.
+            CardName::CavernOfSouls => {
+                self.pending_choice = Some(PendingChoice {
+                    player: controller,
+                    kind: ChoiceKind::ChooseNumber {
+                        min: 0,
+                        max: (crate::types::CreatureType::ALL.len() as u32).saturating_sub(1),
+                        reason: ChoiceReason::CavernOfSoulsETB { cavern_id: _card_id },
+                    },
+                });
+            }
+
             // Rest in Peace: exile all graveyards when it enters the battlefield.
             // Its static replacement effect (cards go to exile instead of graveyard) is
             // applied at the point of send_to_graveyard / remove_permanent_to_zone.
@@ -1587,6 +1606,8 @@ impl GameState {
                     loyalty: 0,
                     loyalty_activated_this_turn: false,
                     card_types: vec![CardType::Artifact],
+                    creature_types: Vec::new(),
+                    cavern_creature_type: None,
                     is_token: true,
                     attached_to: None,
                     attachments: Vec::new(),
@@ -1719,6 +1740,8 @@ impl GameState {
                     loyalty: 0,
                     loyalty_activated_this_turn: false,
                     card_types: vec![CardType::Creature],
+                    creature_types: vec![CreatureType::Shark],
+                    cavern_creature_type: None,
                     is_token: true,
                     attached_to: None,
                     attachments: Vec::new(),

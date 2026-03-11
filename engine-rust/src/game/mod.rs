@@ -121,6 +121,8 @@ pub enum ChoiceReason {
     EdictSacrifice,
     /// Treasure token sacrifice: choose a color to add 1 mana of
     TreasureSacrificeColor,
+    /// Cavern of Souls ETB: choose a creature type (encoded as index into CreatureType::ALL)
+    CavernOfSoulsETB { cavern_id: ObjectId },
 }
 impl GameState {
     /// Create a new two-player game.
