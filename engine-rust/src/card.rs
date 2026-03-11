@@ -499,6 +499,10 @@ pub enum CardName {
     AtraxaGrandUnifier,
     KolaghanCommand,
 
+    // === Tokens ===
+    /// Represents a Treasure token (artifact: "Sacrifice: Add one mana of any color.")
+    TreasureToken,
+
     // Sentinel value for array sizing
     _Count,
 }

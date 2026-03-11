@@ -69,6 +69,10 @@ pub enum TriggeredEffect {
     LoseLife(i32),
     /// Create N tokens
     CreateTokens { power: i16, toughness: i16, count: u8 },
+    /// Create N Treasure tokens for the given controller
+    CreateTreasures { count: u8 },
+    /// Ragavan deals combat damage: create a Treasure token
+    RagavanCombatDamage,
 }
 
 /// Activated ability effects.

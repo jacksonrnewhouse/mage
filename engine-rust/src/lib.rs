@@ -1565,4 +1565,176 @@ mod tests {
             "P1's battlefield should be unchanged when they have no creatures"
         );
     }
+
+    #[test]
+    fn test_create_treasure_token() {
+        let _db = build_card_db();
+        let mut state = GameState::new_two_player();
+
+        // Initially no permanents
+        assert_eq!(state.battlefield.len(), 0);
+
+        // Create a treasure token for player 0
+        let token_id = state.create_treasure_token(0);
+
+        // Token should be on the battlefield
+        assert_eq!(state.battlefield.len(), 1);
+        let token = state.find_permanent(token_id).unwrap();
+        assert_eq!(token.card_name, CardName::TreasureToken);
+        assert_eq!(token.controller, 0);
+        assert!(token.is_token, "Treasure should be a token");
+        assert!(token.is_artifact(), "Treasure should be an artifact");
+        assert!(!token.is_creature(), "Treasure should not be a creature");
+    }
+
+    #[test]
+    fn test_sacrifice_treasure_for_mana() {
+        let db = build_card_db();
+        let mut state = GameState::new_two_player();
+
+        state.turn_number = 1;
+        state.phase = Phase::PreCombatMain;
+        state.step = None;
+        state.active_player = 0;
+        state.priority_player = 0;
+
+        // Create a treasure token for player 0
+        let token_id = state.create_treasure_token(0);
+
+        // Verify it appears as an activatable ability
+        let actions = state.legal_actions(&db);
+        let has_activate = actions.iter().any(|a| {
+            matches!(a, Action::ActivateAbility { permanent_id, ability_index: 0, .. }
+                if *permanent_id == token_id)
+        });
+        assert!(has_activate, "Should be able to sacrifice treasure token");
+
+        // Sacrifice the treasure (ability_index 0)
+        state.apply_action(
+            &Action::ActivateAbility {
+                permanent_id: token_id,
+                ability_index: 0,
+                targets: vec![],
+            },
+            &db,
+        );
+
+        // Should now have a pending color choice
+        assert!(
+            state.pending_choice.is_some(),
+            "Should have a pending color choice after sacrificing Treasure"
+        );
+        if let Some(ref choice) = state.pending_choice {
+            assert!(matches!(
+                choice.kind,
+                crate::game::ChoiceKind::ChooseColor { .. }
+            ));
+        }
+
+        // Token should be gone from battlefield
+        assert!(
+            state.find_permanent(token_id).is_none(),
+            "Treasure token should be removed after sacrifice"
+        );
+
+        // Choose green mana
+        state.apply_action(&Action::ChooseColor(Color::Green), &db);
+
+        // Player 0 should now have 1 green mana
+        assert_eq!(
+            state.players[0].mana_pool.green, 1,
+            "Should have 1 green mana after sacrificing Treasure for green"
+        );
+
+        // Token should not be in any graveyard (tokens cease to exist)
+        let in_gy = state.players[0].graveyard.iter().any(|&id| id == token_id)
+            || state.players[1].graveyard.iter().any(|&id| id == token_id);
+        assert!(!in_gy, "Treasure token should not end up in any graveyard");
+    }
+
+    #[test]
+    fn test_generous_plunderer_etb_creates_treasures_for_both() {
+        let db = build_card_db();
+        let mut state = GameState::new_two_player();
+
+        state.turn_number = 1;
+        state.phase = Phase::PreCombatMain;
+        state.step = None;
+        state.active_player = 0;
+        state.priority_player = 0;
+
+        // Give P0 enough mana and put GenerousPlunderer in hand
+        let plunderer_id = state.new_object_id();
+        state.card_registry.push((plunderer_id, CardName::GenerousPlunderer));
+        state.players[0].hand.push(plunderer_id);
+        state.players[0].mana_pool.red = 2;
+
+        let bf_before = state.battlefield.len();
+
+        // Cast GenerousPlunderer
+        state.apply_action(
+            &Action::CastSpell {
+                card_id: plunderer_id,
+                targets: vec![],
+            },
+            &db,
+        );
+        // Both players pass priority to resolve the spell
+        state.pass_priority(&db);
+        state.pass_priority(&db);
+
+        // The permanent itself plus 2 treasure tokens (one per player)
+        let bf_after = state.battlefield.len();
+        assert_eq!(
+            bf_after,
+            bf_before + 3,
+            "GenerousPlunderer + 2 Treasure tokens should be on battlefield"
+        );
+
+        // Verify there are exactly 2 treasure tokens (one for each player)
+        let p0_treasures = state.battlefield.iter()
+            .filter(|p| p.card_name == CardName::TreasureToken && p.controller == 0)
+            .count();
+        let p1_treasures = state.battlefield.iter()
+            .filter(|p| p.card_name == CardName::TreasureToken && p.controller == 1)
+            .count();
+        assert_eq!(p0_treasures, 1, "P0 should have 1 Treasure token");
+        assert_eq!(p1_treasures, 1, "P1 should have 1 Treasure token");
+    }
+
+    #[test]
+    fn test_treasure_lockdown_under_null_rod() {
+        let db = build_card_db();
+        let mut state = GameState::new_two_player();
+
+        state.turn_number = 1;
+        state.phase = Phase::PreCombatMain;
+        state.step = None;
+        state.active_player = 0;
+        state.priority_player = 0;
+
+        // Create a Treasure token for player 0
+        let token_id = state.create_treasure_token(0);
+
+        // Put a Null Rod on the battlefield (belonging to player 1)
+        let rod_id = state.new_object_id();
+        state.card_registry.push((rod_id, CardName::NullRod));
+        let def = find_card(&db, CardName::NullRod).unwrap();
+        let rod_perm = crate::permanent::Permanent::new(
+            rod_id, CardName::NullRod, 1, 1,
+            def.power, def.toughness, None, def.keywords, def.card_types,
+        );
+        state.battlefield.push(rod_perm);
+
+        // Should NOT be able to sacrifice the treasure under Null Rod
+        let actions = state.legal_actions(&db);
+        let has_activate = actions.iter().any(|a| {
+            matches!(a, Action::ActivateAbility { permanent_id, .. }
+                if *permanent_id == token_id)
+        });
+        assert!(
+            !has_activate,
+            "Treasure token ability should be locked down by Null Rod"
+        );
+    }
 }

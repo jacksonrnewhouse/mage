@@ -212,6 +212,10 @@ impl GameState {
 
         // --- Activate non-mana abilities ---
         for perm in self.permanents_controlled_by(player_id) {
+            // Collector Ouphe / Null Rod / Stony Silence: artifact activated abilities can't be activated
+            if artifact_lockdown && perm.is_artifact() {
+                continue;
+            }
             let abilities = self.activatable_abilities(perm, sorcery_speed, db);
             for (idx, targets) in abilities {
                 actions.push(Action::ActivateAbility {
@@ -762,7 +766,7 @@ impl GameState {
     ) -> Vec<(u8, Vec<Target>)> {
         let mut abilities = Vec::new();
 
-        // Sacrifice abilities (Black Lotus, Lotus Petal, Lion's Eye Diamond)
+        // Sacrifice abilities (Black Lotus, Lotus Petal, Lion's Eye Diamond, Treasure tokens)
         match perm.card_name {
             CardName::BlackLotus if !perm.tapped => {
                 // Sacrifice for 3 mana of any color - generates color choice
@@ -774,6 +778,10 @@ impl GameState {
                 abilities.push((0, vec![]));
             }
             CardName::LionEyeDiamond if !perm.tapped => {
+                abilities.push((0, vec![]));
+            }
+            // Treasure token: Sacrifice to add one mana of any color
+            CardName::TreasureToken => {
                 abilities.push((0, vec![]));
             }
             _ => {}
@@ -1336,6 +1344,18 @@ impl GameState {
                 }
             }
 
+            // Treasure token: Sacrifice to add one mana of any color
+            CardName::TreasureToken => {
+                if self.remove_permanent(permanent_id).is_some() {
+                    self.pending_choice = Some(PendingChoice {
+                        player: controller,
+                        kind: ChoiceKind::ChooseColor {
+                            reason: ChoiceReason::TreasureSacrificeColor,
+                        },
+                    });
+                }
+            }
+
             // Fetch lands
             CardName::FloodedStrand
             | CardName::PollutedDelta
@@ -1737,6 +1757,12 @@ impl GameState {
                             .add(Some(color), 3);
                     }
                     ChoiceReason::LotusPetalColor => {
+                        self.players[choice.player as usize]
+                            .mana_pool
+                            .add(Some(color), 1);
+                    }
+                    ChoiceReason::TreasureSacrificeColor => {
+                        // Add 1 mana of the chosen color
                         self.players[choice.player as usize]
                             .mana_pool
                             .add(Some(color), 1);

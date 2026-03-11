@@ -111,6 +111,8 @@ pub enum ChoiceReason {
     MyrRetrieverReturn,
     /// Edict effect: the affected player must sacrifice a creature they control
     EdictSacrifice,
+    /// Treasure token sacrifice: choose a color to add 1 mana of
+    TreasureSacrificeColor,
 }
 
 impl GameState {
@@ -1730,6 +1732,13 @@ impl GameState {
                     },
                 });
             }
+            // Generous Plunderer: each player creates a Treasure token
+            CardName::GenerousPlunderer => {
+                let num_players = self.num_players;
+                for pid in 0..num_players {
+                    self.create_treasure_token(pid);
+                }
+            }
             // Loran of the Third Path: destroy artifact or enchantment
             CardName::LoranOfTheThirdPath => {
                 let targets: Vec<ObjectId> = self.battlefield.iter()
@@ -1819,6 +1828,15 @@ impl GameState {
                     self.battlefield.push(token);
                 }
             }
+            TriggeredEffect::CreateTreasures { count } => {
+                for _ in 0..count {
+                    self.create_treasure_token(controller);
+                }
+            }
+            TriggeredEffect::RagavanCombatDamage => {
+                // Create a Treasure token for Ragavan's controller
+                self.create_treasure_token(controller);
+            }
             TriggeredEffect::OrcishBowmastersETB | TriggeredEffect::OrcishBowmastersOpponentDraw => {
                 // Deal 1 damage to any target and amass Orcs 1 (create 1/1 token)
                 if let Some(target) = targets.first() {
@@ -1868,6 +1886,7 @@ impl GameState {
                     }
                     self.draw_cards(controller, 1);
                     self.players[controller as usize].life += 3;
+                    self.create_treasure_token(controller);
                 }
             }
             TriggeredEffect::WurmcoilDeath => {
@@ -2165,6 +2184,26 @@ impl GameState {
             .iter()
             .find(|(obj_id, _)| *obj_id == id)
             .map(|(_, name)| *name)
+    }
+
+    /// Create a Treasure token controlled by the given player and place it on the battlefield.
+    /// Returns the ObjectId of the newly created token.
+    pub fn create_treasure_token(&mut self, controller: PlayerId) -> ObjectId {
+        let token_id = self.new_object_id();
+        let mut token = Permanent::new(
+            token_id,
+            CardName::TreasureToken,
+            controller,
+            controller,
+            None,
+            None,
+            None,
+            Keywords::empty(),
+            &[CardType::Artifact],
+        );
+        token.is_token = true;
+        self.battlefield.push(token);
+        token_id
     }
 }
 

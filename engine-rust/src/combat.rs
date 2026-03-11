@@ -1,6 +1,8 @@
 /// Combat system: damage assignment and resolution.
 
+use crate::card::CardName;
 use crate::game::GameState;
+use crate::stack::{StackItemKind, TriggeredEffect};
 use crate::types::*;
 
 impl GameState {
@@ -55,6 +57,25 @@ impl GameState {
             if blockers_for_attacker.is_empty() {
                 // Unblocked - damage goes to defending player
                 damage_to_players.push((defending_player, attacker_power as i32));
+
+                // Fire combat-damage-to-player triggers for unblocked attackers
+                match attacker.card_name {
+                    CardName::RagavanNimblePilferer => {
+                        let attacker_id_copy = attacker_id;
+                        let attacker_name = attacker.card_name;
+                        let attacker_ctrl = attacker_controller;
+                        self.stack.push(
+                            StackItemKind::TriggeredAbility {
+                                source_id: attacker_id_copy,
+                                source_name: attacker_name,
+                                effect: TriggeredEffect::RagavanCombatDamage,
+                            },
+                            attacker_ctrl,
+                            vec![],
+                        );
+                    }
+                    _ => {}
+                }
             } else {
                 // Blocked - assign damage to blockers
                 let mut remaining_damage = attacker_power;
