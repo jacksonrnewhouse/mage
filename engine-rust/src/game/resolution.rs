@@ -1018,6 +1018,44 @@ impl GameState {
                     self.destroy_permanent(target_id);
                 }
             }
+            // Agent of Treachery: gain control of target permanent on ETB
+            CardName::AgentOfTreachery => {
+                let opp = self.opponent(controller);
+                let opp_perms: Vec<ObjectId> = self.battlefield.iter()
+                    .filter(|p| p.controller == opp && p.id != _card_id)
+                    .map(|p| p.id)
+                    .collect();
+                if let Some(&target_id) = opp_perms.first() {
+                    self.stack.push(
+                        StackItemKind::TriggeredAbility {
+                            source_id: _card_id,
+                            source_name: card_name,
+                            effect: TriggeredEffect::GainControlOfPermanent,
+                        },
+                        controller,
+                        vec![Target::Object(target_id)],
+                    );
+                }
+            }
+            // Gilded Drake: exchange control with target creature an opponent controls
+            CardName::GildedDrake => {
+                let opp = self.opponent(controller);
+                let opp_creatures: Vec<ObjectId> = self.battlefield.iter()
+                    .filter(|p| p.controller == opp && p.is_creature() && p.id != _card_id)
+                    .map(|p| p.id)
+                    .collect();
+                if let Some(&target_id) = opp_creatures.first() {
+                    self.stack.push(
+                        StackItemKind::TriggeredAbility {
+                            source_id: _card_id,
+                            source_name: card_name,
+                            effect: TriggeredEffect::GildedDrakeExchange { drake_id: _card_id },
+                        },
+                        controller,
+                        vec![Target::Object(target_id)],
+                    );
+                }
+            }
             _ => {}
         }
     }
@@ -1199,6 +1237,18 @@ impl GameState {
                             reason: ChoiceReason::MyrRetrieverReturn,
                         },
                     });
+                }
+            }
+            TriggeredEffect::GainControlOfPermanent => {
+                // Agent of Treachery: gain control of target permanent
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    self.gain_control(*target_id, controller);
+                }
+            }
+            TriggeredEffect::GildedDrakeExchange { drake_id } => {
+                // Gilded Drake: exchange control of drake and target creature
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    self.exchange_control(drake_id, *target_id);
                 }
             }
             _ => {}

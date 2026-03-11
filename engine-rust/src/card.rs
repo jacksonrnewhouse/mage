@@ -490,6 +490,8 @@ pub enum CardName {
     CometStellarPup,
 
     // === Simic (GU) ===
+    GildedDrake,
+    AgentOfTreachery,
     MemorysJourney,
     NaduWingedWisdom,
     OkoThiefOfCrowns,
@@ -1766,6 +1768,12 @@ pub fn build_card_db() -> Vec<CardDef> {
         "0: Roll a six-sided die. 1-2: +2 loyalty, create two 1/1 Ragavan tokens. 3-4: -1 loyalty, deal damage and gain life. 5-6: -3 loyalty, return a card from graveyard to hand.");
 
     // === Simic (GU) ===
+    card!(GildedDrake, "Gilded Drake", ManaCost { blue: 1, generic: 1, ..c }, &[Creature], &[],
+        Some(3), Some(3), None, flying(), &[Blue],
+        "Flying. When Gilded Drake enters the battlefield, exchange control of Gilded Drake and up to one target creature an opponent controls. If you don't make an exchange, sacrifice Gilded Drake.");
+    card!(AgentOfTreachery, "Agent of Treachery", ManaCost { blue: 2, generic: 5, ..c }, &[Creature], &[],
+        Some(2), Some(3), None, kw(), &[Blue],
+        "When Agent of Treachery enters the battlefield, gain control of target permanent.");
     card!(MemorysJourney, "Memory's Journey", ManaCost { blue: 1, generic: 1, ..c }, &[Instant], &[], None, None, None, kw(), &[Blue, Green],
         "Target player shuffles up to three target cards from their graveyard into their library. Flashback {G}.");
     card!(NaduWingedWisdom, "Nadu, Winged Wisdom", ManaCost { green: 1, blue: 1, generic: 1, ..c }, &[Creature], &[Legendary],

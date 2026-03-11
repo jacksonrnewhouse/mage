@@ -73,6 +73,10 @@ pub enum TriggeredEffect {
     CreateTreasures { count: u8 },
     /// Ragavan deals combat damage: create a Treasure token
     RagavanCombatDamage,
+    /// Gain control of target permanent (Agent of Treachery ETB, etc.)
+    GainControlOfPermanent,
+    /// Exchange control of this permanent and target creature (Gilded Drake ETB)
+    GildedDrakeExchange { drake_id: ObjectId },
 }
 
 /// Activated ability effects.

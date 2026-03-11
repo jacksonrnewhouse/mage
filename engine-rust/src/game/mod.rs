@@ -499,6 +499,22 @@ impl GameState {
         self.remove_permanent_to_zone(id, DestinationZone::Graveyard)
     }
 
+    /// Change the controller of a permanent. Does not fire triggers.
+    pub fn gain_control(&mut self, perm_id: ObjectId, new_controller: PlayerId) {
+        if let Some(perm) = self.find_permanent_mut(perm_id) {
+            perm.controller = new_controller;
+        }
+    }
+
+    /// Exchange controllers between two permanents.
+    pub fn exchange_control(&mut self, perm_a: ObjectId, perm_b: ObjectId) {
+        let controller_a = self.find_permanent(perm_a).map(|p| p.controller);
+        let controller_b = self.find_permanent(perm_b).map(|p| p.controller);
+        if let (Some(ca), Some(cb)) = (controller_a, controller_b) {
+            self.gain_control(perm_a, cb);
+            self.gain_control(perm_b, ca);
+        }
+    }
 
     // --- Priority system ---
 

@@ -291,3 +291,164 @@ fn test_multiple_temporary_effects_stack() {
     assert_eq!(creature.power(), 2, "Both effects should be reversed");
     assert_eq!(creature.toughness(), 2, "Both effects should be reversed");
 }
+
+#[test]
+fn test_gain_control_basic() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // P1 controls a creature
+    let creature_id = state.new_object_id();
+    state.card_registry.push((creature_id, CardName::GoblinGuide));
+    let def = find_card(&db, CardName::GoblinGuide).unwrap();
+    let perm = crate::permanent::Permanent::new(
+        creature_id, CardName::GoblinGuide, 1, 1,
+        def.power, def.toughness, None, def.keywords, def.card_types,
+    );
+    state.battlefield.push(perm);
+
+    // Verify P1 controls the creature
+    assert_eq!(state.find_permanent(creature_id).unwrap().controller, 1);
+
+    // P0 gains control
+    state.gain_control(creature_id, 0);
+
+    // P0 should now control the creature
+    assert_eq!(
+        state.find_permanent(creature_id).unwrap().controller, 0,
+        "gain_control should change controller to P0"
+    );
+}
+
+#[test]
+fn test_agent_of_treachery_etb_gains_control() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // P1 controls a creature on the battlefield
+    let p1_creature_id = state.new_object_id();
+    state.card_registry.push((p1_creature_id, CardName::LightningBolt)); // use any card
+    let def = find_card(&db, CardName::GoblinGuide).unwrap();
+    let perm = crate::permanent::Permanent::new(
+        p1_creature_id, CardName::GoblinGuide, 1, 1,
+        def.power, def.toughness, None, def.keywords, def.card_types,
+    );
+    state.battlefield.push(perm);
+
+    // P0 plays Agent of Treachery (ETB should queue a trigger to gain control)
+    let agent_id = state.new_object_id();
+    state.card_registry.push((agent_id, CardName::AgentOfTreachery));
+    let agent_def = find_card(&db, CardName::AgentOfTreachery).unwrap();
+    let agent = crate::permanent::Permanent::new(
+        agent_id, CardName::AgentOfTreachery, 0, 0,
+        agent_def.power, agent_def.toughness, None, agent_def.keywords, agent_def.card_types,
+    );
+    state.battlefield.push(agent);
+
+    // Fire ETB
+    state.handle_etb(CardName::AgentOfTreachery, agent_id, 0);
+
+    // Should have a triggered ability on the stack
+    assert!(!state.stack.is_empty(), "Agent of Treachery ETB should push trigger");
+
+    // Resolve the trigger
+    state.phase = Phase::PreCombatMain;
+    state.step = None;
+    state.active_player = 0;
+    state.priority_player = 0;
+    state.pass_priority(&db);
+    state.pass_priority(&db);
+
+    // P0 should now control P1's creature
+    assert_eq!(
+        state.find_permanent(p1_creature_id).unwrap().controller, 0,
+        "After Agent of Treachery ETB resolves, P0 should control the target permanent"
+    );
+}
+
+#[test]
+fn test_gilded_drake_etb_exchanges_control() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // P1 controls a creature on the battlefield
+    let p1_creature_id = state.new_object_id();
+    state.card_registry.push((p1_creature_id, CardName::GoblinGuide));
+    let goblin_def = find_card(&db, CardName::GoblinGuide).unwrap();
+    let perm = crate::permanent::Permanent::new(
+        p1_creature_id, CardName::GoblinGuide, 1, 1,
+        goblin_def.power, goblin_def.toughness, None, goblin_def.keywords, goblin_def.card_types,
+    );
+    state.battlefield.push(perm);
+
+    // P0 plays Gilded Drake (ETB queues exchange)
+    let drake_id = state.new_object_id();
+    state.card_registry.push((drake_id, CardName::GildedDrake));
+    let drake_def = find_card(&db, CardName::GildedDrake).unwrap();
+    let drake = crate::permanent::Permanent::new(
+        drake_id, CardName::GildedDrake, 0, 0,
+        drake_def.power, drake_def.toughness, None, drake_def.keywords, drake_def.card_types,
+    );
+    state.battlefield.push(drake);
+
+    // Fire ETB for Gilded Drake
+    state.handle_etb(CardName::GildedDrake, drake_id, 0);
+
+    assert!(!state.stack.is_empty(), "Gilded Drake ETB should push trigger");
+
+    // Resolve the trigger
+    state.phase = Phase::PreCombatMain;
+    state.step = None;
+    state.active_player = 0;
+    state.priority_player = 0;
+    state.pass_priority(&db);
+    state.pass_priority(&db);
+
+    // Drake should now be controlled by P1; P1's creature by P0
+    assert_eq!(
+        state.find_permanent(drake_id).unwrap().controller, 1,
+        "After exchange, Gilded Drake should be controlled by P1"
+    );
+    assert_eq!(
+        state.find_permanent(p1_creature_id).unwrap().controller, 0,
+        "After exchange, P1's creature should be controlled by P0"
+    );
+}
+
+#[test]
+fn test_exchange_control() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // P0 controls a creature
+    let p0_creature_id = state.new_object_id();
+    state.card_registry.push((p0_creature_id, CardName::GoblinGuide));
+    let def = find_card(&db, CardName::GoblinGuide).unwrap();
+    let perm_a = crate::permanent::Permanent::new(
+        p0_creature_id, CardName::GoblinGuide, 0, 0,
+        def.power, def.toughness, None, def.keywords, def.card_types,
+    );
+    state.battlefield.push(perm_a);
+
+    // P1 controls a creature
+    let p1_creature_id = state.new_object_id();
+    state.card_registry.push((p1_creature_id, CardName::GoblinGuide));
+    let perm_b = crate::permanent::Permanent::new(
+        p1_creature_id, CardName::GoblinGuide, 1, 1,
+        def.power, def.toughness, None, def.keywords, def.card_types,
+    );
+    state.battlefield.push(perm_b);
+
+    // Exchange control
+    state.exchange_control(p0_creature_id, p1_creature_id);
+
+    assert_eq!(
+        state.find_permanent(p0_creature_id).unwrap().controller, 1,
+        "P0's creature should now be controlled by P1"
+    );
+    assert_eq!(
+        state.find_permanent(p1_creature_id).unwrap().controller, 0,
+        "P1's creature should now be controlled by P0"
+    );
+    let _ = db;
+}
