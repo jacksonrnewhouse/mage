@@ -499,6 +499,10 @@ pub enum CardName {
     FlameOfAnor,
     PinnacleEmissary,
     DackFayden,
+    /// Twincast: copy target instant or sorcery spell. You may choose new targets.
+    Twincast,
+    /// Galvanic Relay: exile the top card of your library. Until end of turn, you may play it. Storm.
+    GalvanicRelay,
 
     // === Golgari (BG) ===
     DeathriteShaman,
@@ -2067,6 +2071,10 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(PinnacleEmissary, "Pinnacle Emissary", ManaCost { blue: 1, red: 1, generic: 3, ..c }, &[Creature], &[],
         Some(4), Some(4), None, flash_flying(), &[Blue, Red],
         "Flash. Flying. When Pinnacle Emissary enters, it deals 3 damage to target creature or planeswalker.");
+    card!(Twincast, "Twincast", ManaCost { blue: 2, ..c }, &[Instant], &[], None, None, None, kw(), &[Blue, Red],
+        "Copy target instant or sorcery spell. You may choose new targets for the copy.");
+    card!(GalvanicRelay, "Galvanic Relay", ManaCost { red: 1, ..c }, &[Sorcery], &[], None, None, None, storm(), &[Red],
+        "Exile the top card of your library. Until end of turn, you may play that card. Storm.");
 
     // === Golgari (BG) ===
     card!(DeathriteShaman, "Deathrite Shaman", ManaCost { green: 1, ..c }, &[Creature], &[],

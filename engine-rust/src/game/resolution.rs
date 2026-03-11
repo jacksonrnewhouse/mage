@@ -11,9 +11,10 @@ use crate::types::*;
 impl GameState {
     pub fn resolve_top(&mut self, db: &[CardDef]) {
         if let Some(item) = self.stack.pop() {
+            let is_copy = item.is_copy;
             match item.kind {
                 StackItemKind::Spell { card_name, card_id, cast_via_evoke } => {
-                    self.resolve_spell(card_name, card_id, item.controller, &item.targets, item.x_value, item.cast_from_graveyard, cast_via_evoke, &item.modes, db);
+                    self.resolve_spell(card_name, card_id, item.controller, &item.targets, item.x_value, item.cast_from_graveyard, cast_via_evoke, &item.modes, is_copy, db);
                 }
                 StackItemKind::TriggeredAbility { effect, .. } => {
                     self.resolve_triggered(effect, item.controller, &item.targets, db);
@@ -36,6 +37,7 @@ impl GameState {
         cast_from_graveyard: bool,
         cast_via_evoke: bool,
         modes: &[u8],
+        is_copy: bool,
         db: &[CardDef],
     ) {
         let card_def = find_card(db, card_name);
@@ -48,8 +50,9 @@ impl GameState {
             })
             .unwrap_or(false);
 
-        if is_permanent {
-            // Put permanent onto battlefield
+        if is_permanent && !is_copy {
+            // Put permanent onto battlefield (copies of permanent spells don't create permanents
+            // unless specifically handled; for simplicity copies of permanents are not supported).
             if let Some(def) = card_def {
                 let mut perm = Permanent::new(
                     card_id,
@@ -89,11 +92,13 @@ impl GameState {
                     );
                 }
             }
-        } else {
+        } else if !is_permanent {
             // Instant/sorcery: resolve effect, then place in appropriate zone.
             // If cast via flashback (or via Yawgmoth's Will), exile instead of going to graveyard.
-            self.resolve_card_effect_with_x(card_name, controller, targets, x_value, modes, db);
-            if cast_from_graveyard {
+            self.resolve_card_effect_with_x(card_name, controller, targets, x_value, modes, is_copy, db);
+            if is_copy {
+                // Copies of spells cease to exist after resolving — no card to zone-route.
+            } else if cast_from_graveyard {
                 // Exile the card (flashback / Yawgmoth's Will rule: if it would go to graveyard, exile it)
                 // The card was already removed from graveyard when cast; just push to exile.
                 self.exile.push((card_id, card_name, controller));
@@ -111,9 +116,10 @@ impl GameState {
         targets: &[Target],
         _x_value: u8,
         modes: &[u8],
+        is_copy: bool,
         db: &[CardDef],
     ) {
-        self.resolve_card_effect(card_name, controller, targets, modes, db);
+        self.resolve_card_effect(card_name, controller, targets, modes, is_copy, db);
     }
 
     fn resolve_card_effect(
@@ -122,6 +128,7 @@ impl GameState {
         controller: PlayerId,
         targets: &[Target],
         modes: &[u8],
+        is_copy: bool,
         db: &[CardDef],
     ) {
         match card_name {
@@ -1164,6 +1171,47 @@ impl GameState {
                             target_idx += 1;
                         }
                         _ => {}
+                    }
+                }
+            }
+
+            // === Copy-spell: Twincast ===
+            CardName::Twincast => {
+                // Copy target instant or sorcery spell on the stack.
+                // targets[0] is the Target::Object(stack_item_id) of the spell to copy.
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    self.stack.copy_spell(*target_id);
+                }
+            }
+
+            // === Storm: Galvanic Relay ===
+            CardName::GalvanicRelay => {
+                // Base effect: exile top card of library; simplified as putting it in hand.
+                if let Some(id) = self.players[controller as usize].library.pop() {
+                    self.players[controller as usize].hand.push(id);
+                }
+                // Storm: push storm_count copies onto the stack.
+                // Copies are marked is_copy=true and will only execute the base effect above
+                // (no recursive copy-pushing) because is_copy is true.
+                if !is_copy {
+                    let storm = self.storm_count;
+                    let template = crate::stack::StackItem {
+                        id: 0,
+                        kind: crate::stack::StackItemKind::Spell {
+                            card_name: CardName::GalvanicRelay,
+                            card_id: 0,
+                            cast_via_evoke: false,
+                        },
+                        controller,
+                        targets: targets.to_vec(),
+                        cant_be_countered: false,
+                        x_value: 0,
+                        cast_from_graveyard: false,
+                        modes: vec![],
+                        is_copy: false, // push_copy will override this to true
+                    };
+                    for _ in 0..storm {
+                        self.stack.push_copy(&template);
                     }
                 }
             }
@@ -2440,7 +2488,7 @@ impl GameState {
                     // For targeted instants, we would need a pending choice; for now resolve inline.
                     let targets: Vec<Target> = Vec::new();
                     let modes: Vec<u8> = Vec::new();
-                    self.resolve_card_effect(card_name, controller, &targets, &modes, &[]);
+                    self.resolve_card_effect(card_name, controller, &targets, &modes, false, &[]);
                 }
             }
         }

@@ -21,6 +21,10 @@ pub struct StackItem {
     /// Chosen mode indices for modal spells (e.g., Kolaghan's Command choose 2 of 4).
     /// Empty for non-modal spells.
     pub modes: Vec<u8>,
+    /// True if this item is a copy of another spell (e.g., from storm or Twincast).
+    /// Copies are never cast, so they don't increment storm_count and they don't
+    /// go to the graveyard when they finish resolving.
+    pub is_copy: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -250,6 +254,7 @@ impl GameStack {
             x_value,
             cast_from_graveyard,
             modes,
+            is_copy: false,
         });
         id
     }
@@ -289,5 +294,46 @@ impl GameStack {
         } else {
             None
         }
+    }
+
+    /// Create a copy of the given stack item, push it on the stack, and return the new item's id.
+    /// The copy is a new object with a fresh id but inherits the same kind, controller, targets,
+    /// x_value, and modes. Copies are never "cast from graveyard", can always be countered,
+    /// and are marked as copies (is_copy = true) so they don't re-trigger storm.
+    pub fn copy_spell(&mut self, source_id: ObjectId) -> Option<ObjectId> {
+        let source = self.items.iter().find(|item| item.id == source_id)?.clone();
+        let id = self.next_id;
+        self.next_id += 1;
+        self.items.push(StackItem {
+            id,
+            kind: source.kind.clone(),
+            controller: source.controller,
+            targets: source.targets.clone(),
+            cant_be_countered: false,
+            x_value: source.x_value,
+            cast_from_graveyard: false,
+            modes: source.modes.clone(),
+            is_copy: true,
+        });
+        Some(id)
+    }
+
+    /// Push a spell copy using an explicit StackItem template (for storm copies created
+    /// after the original has already been popped off the stack).
+    pub fn push_copy(&mut self, template: &StackItem) -> ObjectId {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.items.push(StackItem {
+            id,
+            kind: template.kind.clone(),
+            controller: template.controller,
+            targets: template.targets.clone(),
+            cant_be_countered: false,
+            x_value: template.x_value,
+            cast_from_graveyard: false,
+            modes: template.modes.clone(),
+            is_copy: true,
+        });
+        id
     }
 }
