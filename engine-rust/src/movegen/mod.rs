@@ -34,8 +34,13 @@ impl GameState {
 
     fn generate_choice_actions(&self, choice: &PendingChoice) -> Vec<Action> {
         match &choice.kind {
-            ChoiceKind::ChooseFromList { options, .. } => {
-                options.iter().map(|&id| Action::ChooseCard(id)).collect()
+            ChoiceKind::ChooseFromList { options, reason } => {
+                let mut actions: Vec<Action> = options.iter().map(|&id| Action::ChooseCard(id)).collect();
+                // Show and Tell: players may also pass (choose nothing). Use ChooseCard(0) as sentinel.
+                if matches!(reason, ChoiceReason::ShowAndTellChoose { .. }) {
+                    actions.push(Action::ChooseCard(0));
+                }
+                actions
             }
             ChoiceKind::ChooseColor { .. } => {
                 Color::ALL.iter().map(|&c| Action::ChooseColor(c)).collect()

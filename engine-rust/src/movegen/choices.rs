@@ -99,6 +99,59 @@ impl GameState {
                             self.trigger_annihilator(choice.player, remaining);
                         }
                     }
+                    ChoiceReason::ShowAndTellChoose { next_player } => {
+                        // card_id == 0 means the player passes (chooses not to put anything onto the battlefield).
+                        if card_id != 0 {
+                            let pid = choice.player as usize;
+                            // Remove the chosen card from hand
+                            if let Some(pos) = self.players[pid].hand.iter().position(|&id| id == card_id) {
+                                self.players[pid].hand.remove(pos);
+                                let card_name = self.card_name_for_id(card_id);
+                                if let Some(cn) = card_name {
+                                    if let Some(def) = find_card(db, cn) {
+                                        let mut perm = Permanent::new(
+                                            card_id, cn, choice.player, choice.player,
+                                            def.power, def.toughness, def.loyalty, def.keywords, def.card_types,
+                                        );
+                                        if def.is_changeling {
+                                            perm.creature_types = crate::types::CreatureType::ALL.to_vec();
+                                        } else {
+                                            perm.creature_types = def.creature_types.to_vec();
+                                        }
+                                        perm.colors = def.color_identity.to_vec();
+                                        self.battlefield.push(perm);
+                                        self.handle_etb(cn, card_id, choice.player);
+                                    }
+                                }
+                            }
+                        }
+                        // Set up the next player's choice if there is one
+                        if let Some(next) = next_player {
+                            let valid_options: Vec<ObjectId> = self.players[next as usize]
+                                .hand
+                                .iter()
+                                .copied()
+                                .filter(|&id| {
+                                    if let Some(cn) = self.card_name_for_id(id) {
+                                        if let Some(def) = find_card(db, cn) {
+                                            return def.card_types.iter().any(|t| matches!(t,
+                                                CardType::Artifact | CardType::Creature
+                                                | CardType::Enchantment | CardType::Planeswalker
+                                            ));
+                                        }
+                                    }
+                                    false
+                                })
+                                .collect();
+                            self.pending_choice = Some(PendingChoice {
+                                player: next,
+                                kind: ChoiceKind::ChooseFromList {
+                                    options: valid_options,
+                                    reason: ChoiceReason::ShowAndTellChoose { next_player: None },
+                                },
+                            });
+                        }
+                    }
                     ChoiceReason::CloneTarget { clone_id, is_metamorph } => {
                         // Copy the chosen permanent's characteristics onto the clone.
                         // Collect the data we need from the target before mutating.

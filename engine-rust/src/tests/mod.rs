@@ -20,6 +20,7 @@ mod flashback;
 mod land_type_modification;
 mod library_top;
 mod replacement_effects;
+mod show_and_tell;
 mod spells;
 mod statics;
 mod surveil;

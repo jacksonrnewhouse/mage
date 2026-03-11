@@ -528,7 +528,36 @@ impl GameState {
                 self.draw_cards(controller, 2);
             }
             CardName::ShowAndTell => {
-                // Each player may put a permanent from hand - simplified: no-op
+                // Each player may put an artifact, creature, enchantment, or planeswalker
+                // from their hand onto the battlefield simultaneously.
+                // We resolve one player at a time: active player first, then opponent.
+                // Valid permanent types: Artifact, Creature, Enchantment, Planeswalker (not Instant/Sorcery/Land).
+                let valid_options: Vec<ObjectId> = self.players[controller as usize]
+                    .hand
+                    .iter()
+                    .copied()
+                    .filter(|&id| {
+                        if let Some(cn) = self.card_name_for_id(id) {
+                            if let Some(def) = find_card(db, cn) {
+                                return def.card_types.iter().any(|t| matches!(t,
+                                    CardType::Artifact | CardType::Creature
+                                    | CardType::Enchantment | CardType::Planeswalker
+                                ));
+                            }
+                        }
+                        false
+                    })
+                    .collect();
+                let opponent = self.opponent(controller);
+                self.pending_choice = Some(PendingChoice {
+                    player: controller,
+                    kind: ChoiceKind::ChooseFromList {
+                        options: valid_options,
+                        reason: ChoiceReason::ShowAndTellChoose {
+                            next_player: Some(opponent),
+                        },
+                    },
+                });
             }
             CardName::Flash => {
                 // Put creature from hand onto battlefield - simplified

@@ -177,6 +177,13 @@ pub enum ChoiceReason {
     /// `clone_id` is the clone permanent's ObjectId.
     /// `is_metamorph` is true for Phyrexian Metamorph (always keeps Artifact type).
     CloneTarget { clone_id: ObjectId, is_metamorph: bool },
+    /// Show and Tell: the choosing player may put an artifact, creature, enchantment,
+    /// or planeswalker from their hand onto the battlefield.
+    /// `next_player` is the player who will choose next (after this player resolves),
+    /// or None if this is the last player to choose.
+    /// Passing (choosing no card) is represented by ChooseCard(0) — the engine
+    /// uses object ID 0 as a sentinel for "no card".
+    ShowAndTellChoose { next_player: Option<PlayerId> },
 }
 impl GameState {
     /// Create a new two-player game.
