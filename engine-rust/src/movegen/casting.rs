@@ -46,19 +46,47 @@ impl GameState {
                 }
             }
 
-            Action::CastSpell { card_id, targets, x_value } => {
+            Action::CastSpell { card_id, targets, x_value, from_graveyard } => {
                 let player_id = self.priority_player;
                 let card_name = self.card_name_for_id(*card_id);
                 if let Some(cn) = card_name {
                     if let Some(def) = find_card(db, cn) {
-                        let mut cost = self.effective_cost(def, player_id);
+                        // Determine cost: flashback cost if casting from graveyard, else normal cost.
+                        let base_cost = if *from_graveyard {
+                            // Use flashback cost if available, else normal cost (Yawgmoth's Will).
+                            def.flashback_cost.unwrap_or(def.mana_cost)
+                        } else {
+                            def.mana_cost
+                        };
+                        let mut cost = if *from_graveyard {
+                            // Apply tax effects to flashback cost as well.
+                            // We reuse effective_cost logic by temporarily using a fake def.
+                            // Simpler: just apply the same tax calculation.
+                            let tax_only_def = def;
+                            let taxed = self.effective_cost_with_base(tax_only_def, player_id, base_cost);
+                            taxed
+                        } else {
+                            self.effective_cost(def, player_id)
+                        };
                         // For X spells, add X * x_multiplier to the generic cost
                         if def.has_x_cost {
                             let x_cost = (*x_value as u16) * (def.x_multiplier as u16);
                             cost.generic = cost.generic.saturating_add(x_cost as u8);
                         }
                         if self.players[player_id as usize].mana_pool.pay(&cost) {
-                            self.players[player_id as usize].remove_from_hand(*card_id);
+                            // Remove the card from the appropriate zone.
+                            if *from_graveyard {
+                                // Remove from graveyard
+                                let gyd = &mut self.players[player_id as usize].graveyard;
+                                if let Some(pos) = gyd.iter().position(|&id| id == *card_id) {
+                                    gyd.swap_remove(pos);
+                                } else {
+                                    // Card not found in graveyard — bail out
+                                    return;
+                                }
+                            } else {
+                                self.players[player_id as usize].remove_from_hand(*card_id);
+                            }
                             let uncounterable = is_uncounterable(cn);
                             self.stack.push_with_flags(
                                 StackItemKind::Spell {
@@ -69,6 +97,7 @@ impl GameState {
                                 targets.clone(),
                                 uncounterable,
                                 *x_value,
+                                *from_graveyard,
                             );
                             self.players[player_id as usize].spells_cast_this_turn += 1;
                             if !def.card_types.contains(&CardType::Artifact) {

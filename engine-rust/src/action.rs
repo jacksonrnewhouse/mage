@@ -10,12 +10,14 @@ pub enum Action {
     PassPriority,
     /// Play a land from hand
     PlayLand(ObjectId),
-    /// Cast a spell from hand. Includes target selection.
+    /// Cast a spell (from hand or graveyard). Includes target selection.
     /// For X spells, `x_value` is the chosen value of X (0 for non-X spells).
+    /// `from_graveyard` is true when casting via flashback or Yawgmoth's Will.
     CastSpell {
         card_id: ObjectId,
         targets: Vec<Target>,
         x_value: u8,
+        from_graveyard: bool,
     },
     /// Activate an ability on a permanent.
     ActivateAbility {

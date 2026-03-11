@@ -15,6 +15,9 @@ pub struct StackItem {
     pub cant_be_countered: bool,
     /// The chosen value of X for X spells (0 for non-X spells).
     pub x_value: u8,
+    /// True if this spell was cast from the graveyard (flashback or Yawgmoth's Will).
+    /// When true and the spell is an instant/sorcery, it is exiled instead of going to graveyard.
+    pub cast_from_graveyard: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -160,7 +163,7 @@ impl GameStack {
     }
 
     pub fn push(&mut self, kind: StackItemKind, controller: PlayerId, targets: Vec<Target>) -> ObjectId {
-        self.push_with_flags(kind, controller, targets, false, 0)
+        self.push_with_flags(kind, controller, targets, false, 0, false)
     }
 
     pub fn push_with_flags(
@@ -170,6 +173,7 @@ impl GameStack {
         targets: Vec<Target>,
         cant_be_countered: bool,
         x_value: u8,
+        cast_from_graveyard: bool,
     ) -> ObjectId {
         let id = self.next_id;
         self.next_id += 1;
@@ -180,6 +184,7 @@ impl GameStack {
             targets,
             cant_be_countered,
             x_value,
+            cast_from_graveyard,
         });
         id
     }

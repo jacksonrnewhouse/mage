@@ -112,6 +112,7 @@ fn test_ethersworn_canonist_limits_nonartifact_spells() {
             card_id: bolt1_id,
             targets: vec![Target::Player(0)],
             x_value: 0,
+            from_graveyard: false,
         },
         &db,
     );
@@ -160,6 +161,7 @@ fn test_deafening_silence_limits_noncreature_spells() {
             card_id: bolt1_id,
             targets: vec![Target::Player(0)],
             x_value: 0,
+            from_graveyard: false,
         },
         &db,
     );
@@ -209,6 +211,7 @@ fn test_archon_of_emeria_limits_one_spell_per_turn() {
             card_id: bolt1_id,
             targets: vec![Target::Player(0)],
             x_value: 0,
+            from_graveyard: false,
         },
         &db,
     );

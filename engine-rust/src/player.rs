@@ -29,6 +29,8 @@ pub struct Player {
     pub noncreature_spells_cast_this_turn: u16,
     /// Extra turns queued
     pub extra_turns: u8,
+    /// Yawgmoth's Will: until end of turn, you may play cards from your graveyard.
+    pub yawgmoth_will_active: bool,
 }
 
 impl Player {
@@ -51,6 +53,7 @@ impl Player {
             nonartifact_spells_cast_this_turn: 0,
             noncreature_spells_cast_this_turn: 0,
             extra_turns: 0,
+            yawgmoth_will_active: false,
         }
     }
 
@@ -77,6 +80,7 @@ impl Player {
         self.nonartifact_spells_cast_this_turn = 0;
         self.noncreature_spells_cast_this_turn = 0;
         self.mana_pool.empty();
+        self.yawgmoth_will_active = false;
     }
 
     pub fn has_card_in_hand(&self, id: ObjectId) -> bool {

@@ -184,6 +184,7 @@ impl GameState {
                                 card_id,
                                 targets: vec![],
                                 x_value,
+                                from_graveyard: false,
                             });
                         } else {
                             for targets in &target_sets {
@@ -191,6 +192,115 @@ impl GameState {
                                     card_id,
                                     targets: targets.clone(),
                                     x_value,
+                                    from_graveyard: false,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- Cast spells from graveyard (flashback / Yawgmoth's Will / Snapcaster Mage) ---
+        // Check if any graveyard spell-casting effect is active.
+        let yawgmoth_active = self.players[player_id as usize].yawgmoth_will_active;
+        {
+            let graveyard: Vec<ObjectId> = self.players[player_id as usize].graveyard.clone();
+            for card_id in graveyard {
+                if let Some(card_name) = self.card_name_for_id(card_id) {
+                    if let Some(def) = find_card(db, card_name) {
+                        // Skip lands (Yawgmoth's Will lets you play lands, handled separately for now)
+                        if def.card_types.contains(&CardType::Land) {
+                            continue;
+                        }
+                        // Determine if this card can be cast from graveyard and what cost to use.
+                        // Priority: own flashback_cost > snapcaster grant > yawgmoth (normal cost)
+                        let has_own_flashback = def.flashback_cost.is_some();
+                        let has_snapcaster_flashback = self.snapcaster_flashback_cards.contains(&card_id);
+                        let can_cast_from_gyd = has_own_flashback || has_snapcaster_flashback || yawgmoth_active;
+
+                        if !can_cast_from_gyd {
+                            continue;
+                        }
+
+                        // Determine the flashback cost:
+                        // 1. Snapcaster grants flashback using the card's own mana cost.
+                        // 2. Cards with their own flashback_cost use that cost.
+                        // 3. Yawgmoth's Will uses the card's normal mana cost.
+                        let flashback_base_cost = if has_own_flashback {
+                            def.flashback_cost.unwrap()
+                        } else {
+                            // Snapcaster or Yawgmoth: use card's normal mana cost
+                            def.mana_cost
+                        };
+
+                        // Check timing (flashback follows same timing as original spell type)
+                        let can_cast_at_instant_speed = def.card_types.contains(&CardType::Instant)
+                            || def.keywords.has(Keyword::Flash);
+                        let can_cast = if can_cast_at_instant_speed {
+                            true
+                        } else {
+                            sorcery_speed
+                        };
+
+                        if !can_cast {
+                            continue;
+                        }
+
+                        // Apply cast-restriction statics
+                        let archon_active = self.battlefield.iter().any(|p| {
+                            p.card_name == CardName::ArchonOfEmeria
+                        });
+                        if archon_active && player.spells_cast_this_turn >= 1 {
+                            continue;
+                        }
+
+                        let canonist_active = self.battlefield.iter().any(|p| {
+                            p.card_name == CardName::EtherswornCanonist
+                        });
+                        if canonist_active
+                            && !def.card_types.contains(&CardType::Artifact)
+                            && player.nonartifact_spells_cast_this_turn >= 1
+                        {
+                            continue;
+                        }
+
+                        let deafening_silence_active = self.battlefield.iter().any(|p| {
+                            p.card_name == CardName::DeafeningSilence
+                        });
+                        if deafening_silence_active
+                            && !def.card_types.contains(&CardType::Creature)
+                            && player.noncreature_spells_cast_this_turn >= 1
+                        {
+                            continue;
+                        }
+
+                        // Check mana affordability using the flashback cost (with taxes applied)
+                        let effective_flashback_cost = self.effective_cost_with_base(def, player_id, flashback_base_cost);
+
+                        if !player.mana_pool.can_pay(&effective_flashback_cost) {
+                            continue;
+                        }
+
+                        // Generate target permutations
+                        let target_sets = self.generate_targets(card_name, player_id, db);
+                        if target_sets.is_empty() {
+                            if requires_sacrifice_cost(card_name) {
+                                continue;
+                            }
+                            actions.push(Action::CastSpell {
+                                card_id,
+                                targets: vec![],
+                                x_value: 0,
+                                from_graveyard: true,
+                            });
+                        } else {
+                            for targets in &target_sets {
+                                actions.push(Action::CastSpell {
+                                    card_id,
+                                    targets: targets.clone(),
+                                    x_value: 0,
+                                    from_graveyard: true,
                                 });
                             }
                         }
@@ -219,6 +329,7 @@ impl GameState {
                                 card_id,
                                 targets: vec![Target::Object(item.id)],
                                 x_value: 0,
+                                from_graveyard: false,
                             });
                         }
                     }
@@ -331,8 +442,14 @@ impl GameState {
 
     /// Get the effective mana cost of a card after tax effects (Thalia, Trinisphere, etc.)
     /// and cost reduction effects (Foundry Inspector, affinity, etc.).
-    fn effective_cost(&self, def: &CardDef, _controller: PlayerId) -> ManaCost {
-        let mut cost = def.mana_cost;
+    pub(crate) fn effective_cost(&self, def: &CardDef, controller: PlayerId) -> ManaCost {
+        self.effective_cost_with_base(def, controller, def.mana_cost)
+    }
+
+    /// Like `effective_cost`, but uses `base_cost` instead of `def.mana_cost`.
+    /// Used for flashback casting where the alternate cost is different from the normal cost.
+    pub(crate) fn effective_cost_with_base(&self, def: &CardDef, _controller: PlayerId, base_cost: ManaCost) -> ManaCost {
+        let mut cost = base_cost;
 
         // Accumulate total cost increase and decrease separately, then apply at the end.
         // This avoids order-dependence bugs when combining taxes and reductions.
@@ -1289,6 +1406,24 @@ impl GameState {
                 self.players[controller as usize]
                     .graveyard
                     .iter()
+                    .map(|&id| vec![Target::Object(id)])
+                    .collect()
+            }
+
+            // Snapcaster Mage: ETB targets an instant or sorcery in the controller's graveyard.
+            CardName::SnapcasterMage => {
+                self.players[controller as usize]
+                    .graveyard
+                    .iter()
+                    .filter(|&&id| {
+                        self.card_name_for_id(id)
+                            .and_then(|cn| find_card(_db, cn))
+                            .map(|def| {
+                                def.card_types.contains(&CardType::Instant)
+                                    || def.card_types.contains(&CardType::Sorcery)
+                            })
+                            .unwrap_or(false)
+                    })
                     .map(|&id| vec![Target::Object(id)])
                     .collect()
             }

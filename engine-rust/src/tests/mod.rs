@@ -7,6 +7,7 @@ mod combat;
 mod cost_reduction;
 mod dynamic_pt;
 mod equipment;
+mod flashback;
 mod spells;
 mod statics;
 mod triggers;

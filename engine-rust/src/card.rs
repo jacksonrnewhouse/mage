@@ -531,6 +531,9 @@ pub struct CardDef {
     pub keywords: Keywords,
     pub color_identity: &'static [Color],
     pub oracle_text: &'static str,
+    /// Flashback cost: if Some, this card can be cast from the graveyard for this alternate cost.
+    /// When cast via flashback (or countered), the card is exiled instead of going to graveyard.
+    pub flashback_cost: Option<ManaCost>,
 }
 
 /// Equipment bonus: P/T modification and keyword grants applied when equipped.
@@ -614,6 +617,7 @@ pub fn build_card_db() -> Vec<CardDef> {
                 keywords: $kw,
                 color_identity: $colors,
                 oracle_text: $text,
+                flashback_cost: None,
             });
         };
         // Variant with X cost: x_mult is how many times X appears (1 or 2)
@@ -633,6 +637,27 @@ pub fn build_card_db() -> Vec<CardDef> {
                 keywords: $kw,
                 color_identity: $colors,
                 oracle_text: $text,
+                flashback_cost: None,
+            });
+        };
+        // Variant with flashback cost
+        (FB($fb:expr) $name:expr, $display:expr, $cost:expr, $types:expr, $supers:expr,
+         $pow:expr, $tou:expr, $loy:expr, $kw:expr, $colors:expr, $text:expr) => {
+            db.push(CardDef {
+                name: $name,
+                display_name: $display,
+                mana_cost: $cost,
+                has_x_cost: false,
+                x_multiplier: 0,
+                card_types: $types,
+                supertypes: $supers,
+                power: $pow,
+                toughness: $tou,
+                loyalty: $loy,
+                keywords: $kw,
+                color_identity: $colors,
+                oracle_text: $text,
+                flashback_cost: Some($fb),
             });
         };
     }
@@ -1811,7 +1836,7 @@ pub fn build_card_db() -> Vec<CardDef> {
         "I: Destroy each nonland permanent with mana value 1 or less. II: Exile all graveyards. III: Exile this Saga, then return it as Vessel of the All-Consuming, a legendary 3/3 creature that gains abilities from exiled cards.");
 
     // === Gruul (RG) ===
-    card!(AncientGrudge, "Ancient Grudge", ManaCost { red: 1, generic: 1, ..c }, &[Instant], &[], None, None, None, kw(), &[Red, Green],
+    card!(FB(ManaCost { green: 1, ..c }) AncientGrudge, "Ancient Grudge", ManaCost { red: 1, generic: 1, ..c }, &[Instant], &[], None, None, None, kw(), &[Red, Green],
         "Destroy target artifact. Flashback {G}.");
     card!(Cindervines, "Cindervines", ManaCost { red: 1, green: 1, ..c }, &[Enchantment], &[], None, None, None, kw(), &[Red, Green],
         "Whenever an opponent casts a noncreature spell, Cindervines deals 1 damage to that player. {1}, Sacrifice Cindervines: Destroy target artifact or enchantment. Cindervines deals 2 damage to that permanent's controller.");
@@ -1867,7 +1892,7 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(AgentOfTreachery, "Agent of Treachery", ManaCost { blue: 2, generic: 5, ..c }, &[Creature], &[],
         Some(2), Some(3), None, kw(), &[Blue],
         "When Agent of Treachery enters the battlefield, gain control of target permanent.");
-    card!(MemorysJourney, "Memory's Journey", ManaCost { blue: 1, generic: 1, ..c }, &[Instant], &[], None, None, None, kw(), &[Blue, Green],
+    card!(FB(ManaCost { green: 1, ..c }) MemorysJourney, "Memory's Journey", ManaCost { blue: 1, generic: 1, ..c }, &[Instant], &[], None, None, None, kw(), &[Blue, Green],
         "Target player shuffles up to three target cards from their graveyard into their library. Flashback {G}.");
     card!(NaduWingedWisdom, "Nadu, Winged Wisdom", ManaCost { green: 1, blue: 1, generic: 1, ..c }, &[Creature], &[Legendary],
         Some(3), Some(4), None, flying(), &[Green, Blue],

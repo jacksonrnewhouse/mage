@@ -489,6 +489,7 @@ fn test_young_pyromancer_triggers_on_noncreature_spell() {
             card_id: bolt_id,
             targets: vec![Target::Player(1)],
             x_value: 0,
+            from_graveyard: false,
         },
         &db,
     );
@@ -550,6 +551,7 @@ fn test_young_pyromancer_does_not_trigger_on_creature_spell() {
             card_id: goblin_id,
             targets: vec![],
             x_value: 0,
+            from_graveyard: false,
         },
         &db,
     );
@@ -599,6 +601,7 @@ fn test_monastery_mentor_triggers_on_noncreature_spell() {
             card_id: bolt_id,
             targets: vec![Target::Player(1)],
             x_value: 0,
+            from_graveyard: false,
         },
         &db,
     );

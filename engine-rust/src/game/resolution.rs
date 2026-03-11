@@ -13,7 +13,7 @@ impl GameState {
         if let Some(item) = self.stack.pop() {
             match item.kind {
                 StackItemKind::Spell { card_name, card_id } => {
-                    self.resolve_spell(card_name, card_id, item.controller, &item.targets, item.x_value, db);
+                    self.resolve_spell(card_name, card_id, item.controller, &item.targets, item.x_value, item.cast_from_graveyard, db);
                 }
                 StackItemKind::TriggeredAbility { effect, .. } => {
                     self.resolve_triggered(effect, item.controller, &item.targets);
@@ -33,6 +33,7 @@ impl GameState {
         controller: PlayerId,
         targets: &[Target],
         x_value: u8,
+        cast_from_graveyard: bool,
         db: &[CardDef],
     ) {
         let card_def = find_card(db, card_name);
@@ -60,13 +61,22 @@ impl GameState {
                     def.card_types,
                 );
                 self.battlefield.push(perm);
-                // ETB triggers would go here
+                // ETB triggers
                 self.handle_etb_with_x(card_name, card_id, controller, x_value);
+                // Handle ETB effects that need the cast targets (e.g. Snapcaster Mage)
+                self.handle_etb_with_cast_targets(card_name, card_id, controller, targets);
             }
         } else {
-            // Instant/sorcery: resolve effect, then put in graveyard
+            // Instant/sorcery: resolve effect, then place in appropriate zone.
+            // If cast via flashback (or via Yawgmoth's Will), exile instead of going to graveyard.
             self.resolve_card_effect_with_x(card_name, controller, targets, x_value, db);
-            self.players[controller as usize].graveyard.push(card_id);
+            if cast_from_graveyard {
+                // Exile the card (flashback / Yawgmoth's Will rule: if it would go to graveyard, exile it)
+                // The card was already removed from graveyard when cast; just push to exile.
+                self.exile.push((card_id, card_name, controller));
+            } else {
+                self.players[controller as usize].graveyard.push(card_id);
+            }
         }
     }
 
@@ -109,7 +119,9 @@ impl GameState {
                         .map(|item| item.cant_be_countered)
                         .unwrap_or(false);
                     if !is_uncounterable {
-                        self.stack.remove(*spell_id);
+                        if let Some(item) = self.stack.remove(*spell_id) {
+                            self.route_countered_spell(item);
+                        }
                     }
                 }
             }
@@ -164,7 +176,9 @@ impl GameState {
                         .map(|item| item.cant_be_countered)
                         .unwrap_or(false);
                     if !is_uncounterable {
-                        self.stack.remove(*spell_id);
+                        if let Some(item) = self.stack.remove(*spell_id) {
+                            self.route_countered_spell(item);
+                        }
                     }
                 }
             }
@@ -799,9 +813,11 @@ impl GameState {
 
             // === Yawgmoth's Will ===
             CardName::YawgmothsWill => {
-                // This is extremely complex to implement fully.
-                // Simplified: let the controller cast one spell from graveyard this turn.
-                // Full implementation would need a continuous effect tracking.
+                // Until end of turn, you may play lands and cast spells from your graveyard.
+                // If a card would be put into your graveyard from anywhere this turn, exile it instead.
+                // We model this as a flag on the player; the exile-instead-of-graveyard rule
+                // for Yawgmoth's Will is not yet fully implemented (engine-wide complexity).
+                self.players[controller as usize].yawgmoth_will_active = true;
             }
 
             // === Storm ===
@@ -956,6 +972,26 @@ impl GameState {
         self.handle_etb_with_x(card_name, card_id, controller, 0);
     }
 
+    /// Handle ETB effects that require the original CastSpell targets (e.g. Snapcaster Mage).
+    /// Called after handle_etb_with_x for creatures.
+    pub(crate) fn handle_etb_with_cast_targets(
+        &mut self,
+        card_name: CardName,
+        _card_id: ObjectId,
+        _controller: PlayerId,
+        targets: &[Target],
+    ) {
+        match card_name {
+            CardName::SnapcasterMage => {
+                // targets[0] is the graveyard card that gains flashback until end of turn.
+                if let Some(Target::Object(target_card_id)) = targets.first() {
+                    self.snapcaster_flashback_cards.push(*target_card_id);
+                }
+            }
+            _ => {}
+        }
+    }
+
     pub(crate) fn handle_etb_with_x(&mut self, card_name: CardName, _card_id: ObjectId, controller: PlayerId, x_value: u8) {
         match card_name {
             // Orcish Bowmasters: amass 1 and deal 1
@@ -1027,7 +1063,8 @@ impl GameState {
                     vec![],
                 );
             }
-            // Snapcaster Mage: give flashback (simplified: no-op)
+            // Snapcaster Mage: ETB handled separately in handle_etb_with_cast_targets
+            // because it needs the targets from the CastSpell action.
             CardName::SnapcasterMage => {}
             // Stoneforge Mystic: search for equipment
             CardName::StoneforgeMystic => {}
@@ -1648,6 +1685,22 @@ impl GameState {
                 creature.keywords.0 &= !kw_bits;
             }
         }
+    }
+
+    /// Route a countered spell to its destination zone.
+    /// Spells cast from graveyard (flashback / Yawgmoth's Will) go to exile when countered.
+    /// Other spells go to their owner's graveyard.
+    pub(crate) fn route_countered_spell(&mut self, item: crate::stack::StackItem) {
+        if let crate::stack::StackItemKind::Spell { card_id, card_name } = item.kind {
+            if item.cast_from_graveyard {
+                // Flashback / Yawgmoth's Will: exile instead of graveyard
+                self.exile.push((card_id, card_name, item.controller));
+            } else {
+                // Normal: put in owner's graveyard
+                self.players[item.controller as usize].graveyard.push(card_id);
+            }
+        }
+        // Triggered/activated abilities on the stack have no card to route
     }
 
     /// Remove equipment bonuses and then remove the equipment from the battlefield.

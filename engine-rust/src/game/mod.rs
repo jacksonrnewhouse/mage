@@ -67,6 +67,10 @@ pub struct GameState {
 
     // --- Temporary until-end-of-turn effects ---
     pub temporary_effects: Vec<TemporaryEffect>,
+
+    // --- Graveyard casting ---
+    /// Cards in graveyards that have been granted flashback by Snapcaster Mage (cleared at end of turn).
+    pub snapcaster_flashback_cards: Vec<ObjectId>,
 }
 
 /// When the game needs a player to make a choice (tutor, discard, etc.)
@@ -143,6 +147,7 @@ impl GameState {
             pending_choice: None,
             card_registry: Vec::with_capacity(120),
             temporary_effects: Vec::new(),
+            snapcaster_flashback_cards: Vec::new(),
         }
     }
 
@@ -306,6 +311,8 @@ impl GameState {
         }
         // Reverse and clear all temporary until-end-of-turn effects
         self.end_of_turn_cleanup();
+        // Clear Snapcaster Mage flashback grants
+        self.snapcaster_flashback_cards.clear();
     }
 
     /// Apply a temporary effect immediately to the target permanent,
