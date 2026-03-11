@@ -634,8 +634,46 @@ impl GameState {
                     }
                 }
             }
+            CardName::MemoryLapse => {
+                // Counter target spell; its owner puts it on top of their library
+                if let Some(Target::Object(spell_id)) = targets.first() {
+                    let is_uncounterable = self.stack.items()
+                        .iter()
+                        .find(|item| item.id == *spell_id)
+                        .map(|item| item.cant_be_countered)
+                        .unwrap_or(false);
+                    if !is_uncounterable {
+                        if let Some(item) = self.stack.remove(*spell_id) {
+                            if let crate::stack::StackItemKind::Spell { card_id, .. } = item.kind {
+                                // Put on top of owner's library (top = last element)
+                                self.players[item.controller as usize].library.push(card_id);
+                            }
+                        }
+                    }
+                }
+            }
+            CardName::Remand => {
+                // Counter target spell; return it to owner's hand, controller draws 1
+                if let Some(Target::Object(spell_id)) = targets.first() {
+                    let is_uncounterable = self.stack.items()
+                        .iter()
+                        .find(|item| item.id == *spell_id)
+                        .map(|item| item.cant_be_countered)
+                        .unwrap_or(false);
+                    if !is_uncounterable {
+                        if let Some(item) = self.stack.remove(*spell_id) {
+                            if let crate::stack::StackItemKind::Spell { card_id, .. } = item.kind {
+                                // Return spell to its owner's hand
+                                self.players[item.controller as usize].hand.push(card_id);
+                            }
+                        }
+                    }
+                }
+                // Remand controller draws a card regardless of whether the spell was countered
+                self.draw_cards(controller, 1);
+            }
             CardName::MentalMisstep | CardName::Flusterstorm | CardName::Daze
-            | CardName::ManaLeak | CardName::MemoryLapse | CardName::Remand
+            | CardName::ManaLeak
             | CardName::SpellPierce | CardName::MysticalDispute | CardName::ConsignToMemory
             | CardName::SinkIntoStupor => {
                 // Counter unless controller pays - simplified: just counter

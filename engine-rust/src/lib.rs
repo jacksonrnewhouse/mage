@@ -1043,4 +1043,118 @@ mod tests {
         let can_tap_ring = actions.iter().any(|a| matches!(a, Action::ActivateManaAbility { permanent_id, .. } if *permanent_id == ring_id));
         assert!(!can_tap_ring, "Stony Silence should prevent Sol Ring activation");
     }
+
+    #[test]
+    fn test_memory_lapse_puts_on_top() {
+        let db = build_card_db();
+        let mut state = GameState::new_two_player();
+
+        let bolt_id = state.new_object_id();
+        let lapse_id = state.new_object_id();
+        state.card_registry.push((bolt_id, CardName::LightningBolt));
+        state.card_registry.push((lapse_id, CardName::MemoryLapse));
+        state.players[0].hand.push(bolt_id);
+        state.players[1].hand.push(lapse_id);
+
+        state.turn_number = 1;
+        state.phase = Phase::PreCombatMain;
+        state.step = None;
+        state.active_player = 0;
+        state.priority_player = 0;
+        state.players[0].mana_pool.red = 1;
+        state.players[1].mana_pool.blue = 2;
+
+        // P0 casts Bolt
+        state.apply_action(
+            &Action::CastSpell {
+                card_id: bolt_id,
+                targets: vec![Target::Player(1)],
+            },
+            &db,
+        );
+        let bolt_stack_id = state.stack.top().unwrap().id;
+
+        state.pass_priority(&db);
+
+        // P1 casts Memory Lapse targeting the bolt
+        state.apply_action(
+            &Action::CastSpell {
+                card_id: lapse_id,
+                targets: vec![Target::Object(bolt_stack_id)],
+            },
+            &db,
+        );
+
+        state.pass_priority(&db);
+        state.pass_priority(&db);
+
+        // Bolt should be on top of P0's library, not in graveyard
+        let top_of_library = state.players[0].library.last().copied();
+        assert_eq!(
+            state.card_name_for_id(top_of_library.unwrap()),
+            Some(CardName::LightningBolt),
+            "Memory Lapse should put countered spell on top of library"
+        );
+        assert!(
+            !state.players[0].graveyard.contains(&bolt_id),
+            "Countered spell should NOT be in graveyard"
+        );
+    }
+
+    #[test]
+    fn test_remand_returns_to_hand_and_draws() {
+        let db = build_card_db();
+        let mut state = GameState::new_two_player();
+
+        let bolt_id = state.new_object_id();
+        let remand_id = state.new_object_id();
+        state.card_registry.push((bolt_id, CardName::LightningBolt));
+        state.card_registry.push((remand_id, CardName::Remand));
+        state.players[0].hand.push(bolt_id);
+        state.players[1].hand.push(remand_id);
+
+        for _ in 0..5 {
+            let id = state.new_object_id();
+            state.card_registry.push((id, CardName::Island));
+            state.players[1].library.push(id);
+        }
+
+        state.turn_number = 1;
+        state.phase = Phase::PreCombatMain;
+        state.step = None;
+        state.active_player = 0;
+        state.priority_player = 0;
+        state.players[0].mana_pool.red = 1;
+        state.players[1].mana_pool.blue = 1;
+        state.players[1].mana_pool.colorless = 1;
+
+        let p1_hand_size = state.players[1].hand.len();
+
+        // P0 casts Bolt
+        state.apply_action(
+            &Action::CastSpell {
+                card_id: bolt_id,
+                targets: vec![Target::Player(1)],
+            },
+            &db,
+        );
+        let bolt_stack_id = state.stack.top().unwrap().id;
+        state.pass_priority(&db);
+
+        // P1 casts Remand
+        state.apply_action(
+            &Action::CastSpell {
+                card_id: remand_id,
+                targets: vec![Target::Object(bolt_stack_id)],
+            },
+            &db,
+        );
+        state.pass_priority(&db);
+        state.pass_priority(&db);
+
+        // Bolt should be back in P0's hand
+        assert!(state.players[0].hand.contains(&bolt_id), "Remand should return spell to hand");
+        // P1 should have drawn a card (hand size: original - remand + 1 draw)
+        assert_eq!(state.players[1].hand.len(), p1_hand_size, "Remand controller should draw a card");
+    }
 }
