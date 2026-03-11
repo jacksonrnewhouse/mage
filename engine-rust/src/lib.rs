@@ -1157,4 +1157,143 @@ mod tests {
         // P1 should have drawn a card (hand size: original - remand + 1 draw)
         assert_eq!(state.players[1].hand.len(), p1_hand_size, "Remand controller should draw a card");
     }
+
+    #[test]
+    fn test_myr_retriever_dies_trigger() {
+        let db = build_card_db();
+        let mut state = GameState::new_two_player();
+
+        let myr_id = state.new_object_id();
+        state.card_registry.push((myr_id, CardName::MyrRetriever));
+        let def = find_card(&db, CardName::MyrRetriever).unwrap();
+        let mut perm = crate::permanent::Permanent::new(
+            myr_id, CardName::MyrRetriever, 0, 0,
+            def.power, def.toughness, None, def.keywords, def.card_types,
+        );
+        perm.entered_this_turn = false;
+        state.battlefield.push(perm);
+
+        // Put an artifact in P0's graveyard to retrieve
+        let ring_id = state.new_object_id();
+        state.card_registry.push((ring_id, CardName::SolRing));
+        state.players[0].graveyard.push(ring_id);
+
+        // Kill Myr Retriever
+        state.destroy_permanent(myr_id);
+
+        // Should have a triggered ability on the stack
+        assert!(
+            !state.stack.is_empty() || state.pending_choice.is_some(),
+            "Myr Retriever should trigger on death"
+        );
+    }
+
+    #[test]
+    fn test_wurmcoil_engine_dies_trigger() {
+        let db = build_card_db();
+        let mut state = GameState::new_two_player();
+
+        let wurm_id = state.new_object_id();
+        state.card_registry.push((wurm_id, CardName::WurmcoilEngine));
+        let def = find_card(&db, CardName::WurmcoilEngine).unwrap();
+        let mut perm = crate::permanent::Permanent::new(
+            wurm_id, CardName::WurmcoilEngine, 0, 0,
+            def.power, def.toughness, None, def.keywords, def.card_types,
+        );
+        perm.entered_this_turn = false;
+        state.battlefield.push(perm);
+
+        let bf_before = state.battlefield.len();
+
+        // Kill Wurmcoil Engine
+        state.destroy_permanent(wurm_id);
+
+        // Should have a triggered ability on the stack (WurmcoilDeath)
+        assert!(
+            !state.stack.is_empty(),
+            "Wurmcoil Engine should trigger on death"
+        );
+
+        // Resolve the trigger
+        state.phase = Phase::PreCombatMain;
+        state.step = None;
+        state.active_player = 0;
+        state.priority_player = 0;
+        state.pass_priority(&db);
+        state.pass_priority(&db);
+
+        // Should have created two 3/3 tokens
+        let tokens: Vec<_> = state.battlefield.iter().filter(|p| p.is_token).collect();
+        assert_eq!(tokens.len(), 2, "Wurmcoil should create 2 tokens on death");
+        assert!(tokens.iter().any(|t| t.power() == 3 && t.toughness() == 3),
+            "Tokens should be 3/3");
+    }
+
+    #[test]
+    fn test_destroy_permanent_fires_dies_trigger_from_sba() {
+        let db = build_card_db();
+        let mut state = GameState::new_two_player();
+
+        let myr_id = state.new_object_id();
+        state.card_registry.push((myr_id, CardName::MyrRetriever));
+        let def = find_card(&db, CardName::MyrRetriever).unwrap();
+        let mut perm = crate::permanent::Permanent::new(
+            myr_id, CardName::MyrRetriever, 0, 0,
+            def.power, def.toughness, None, def.keywords, def.card_types,
+        );
+        perm.entered_this_turn = false;
+        // Deal lethal damage
+        perm.damage = 10;
+        state.battlefield.push(perm);
+
+        // Put an artifact in P0's graveyard
+        let ring_id = state.new_object_id();
+        state.card_registry.push((ring_id, CardName::SolRing));
+        state.players[0].graveyard.push(ring_id);
+
+        // Run state-based actions - should kill Myr Retriever and trigger
+        state.check_state_based_actions();
+
+        // Myr Retriever should be in graveyard
+        assert!(
+            state.players[0].graveyard.contains(&myr_id),
+            "Myr Retriever should be in graveyard"
+        );
+
+        // Should have a triggered ability on the stack
+        assert!(
+            !state.stack.is_empty(),
+            "Myr Retriever death should trigger from SBA"
+        );
+    }
+
+    #[test]
+    fn test_exile_does_not_fire_dies_trigger() {
+        let db = build_card_db();
+        let mut state = GameState::new_two_player();
+
+        let myr_id = state.new_object_id();
+        state.card_registry.push((myr_id, CardName::MyrRetriever));
+        let def = find_card(&db, CardName::MyrRetriever).unwrap();
+        let mut perm = crate::permanent::Permanent::new(
+            myr_id, CardName::MyrRetriever, 0, 0,
+            def.power, def.toughness, None, def.keywords, def.card_types,
+        );
+        perm.entered_this_turn = false;
+        state.battlefield.push(perm);
+
+        // Put an artifact in P0's graveyard
+        let ring_id = state.new_object_id();
+        state.card_registry.push((ring_id, CardName::SolRing));
+        state.players[0].graveyard.push(ring_id);
+
+        // Exile Myr Retriever (should NOT trigger dies)
+        state.remove_permanent_to_zone(myr_id, crate::game::DestinationZone::Exile);
+
+        // Should NOT have any triggered abilities
+        assert!(
+            state.stack.is_empty(),
+            "Exiling should not fire dies triggers"
+        );
+    }
 }

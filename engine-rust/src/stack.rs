@@ -48,6 +48,8 @@ pub enum TriggeredEffect {
     DarkConfidantUpkeep,
     WurmcoilDeath,
     SkullclampDeath,
+    /// Myr Retriever: return another artifact from graveyard to hand
+    MyrRetrieverDeath,
     /// OrcishBowmasters: amass 1 and deal 1 damage
     OrcishBowmastersETB,
     /// Grief/Solitude evoke ETB

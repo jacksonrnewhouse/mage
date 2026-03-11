@@ -1301,8 +1301,7 @@ impl GameState {
             CardName::BlackLotus => {
                 // Sacrifice + add 3 mana of any color
                 // Color is chosen via follow-up ChooseColor action
-                if let Some(perm) = self.remove_permanent(permanent_id) {
-                    self.players[perm.owner as usize].graveyard.push(perm.id);
+                if self.destroy_permanent(permanent_id).is_some() {
                     self.pending_choice = Some(PendingChoice {
                         player: controller,
                         kind: ChoiceKind::ChooseColor {
@@ -1313,8 +1312,7 @@ impl GameState {
             }
 
             CardName::LotusPetal => {
-                if let Some(perm) = self.remove_permanent(permanent_id) {
-                    self.players[perm.owner as usize].graveyard.push(perm.id);
+                if self.destroy_permanent(permanent_id).is_some() {
                     self.pending_choice = Some(PendingChoice {
                         player: controller,
                         kind: ChoiceKind::ChooseColor {
@@ -1328,8 +1326,7 @@ impl GameState {
                 // Discard hand, sacrifice, add 3 mana of any color
                 let hand = std::mem::take(&mut self.players[controller as usize].hand);
                 self.players[controller as usize].graveyard.extend(hand);
-                if let Some(perm) = self.remove_permanent(permanent_id) {
-                    self.players[perm.owner as usize].graveyard.push(perm.id);
+                if self.destroy_permanent(permanent_id).is_some() {
                     self.pending_choice = Some(PendingChoice {
                         player: controller,
                         kind: ChoiceKind::ChooseColor {
@@ -1351,9 +1348,7 @@ impl GameState {
             | CardName::AridMesa
             | CardName::MarshFlats => {
                 self.players[controller as usize].life -= 1;
-                if let Some(perm) = self.remove_permanent(permanent_id) {
-                    self.players[perm.owner as usize].graveyard.push(perm.id);
-                }
+                self.destroy_permanent(permanent_id);
                 // Search for appropriate land - present as choice
                 let searchable: Vec<ObjectId> = self.players[controller as usize]
                     .library
@@ -1382,14 +1377,10 @@ impl GameState {
                     perm.tapped = true;
                 }
                 // Sacrifice Strip Mine
-                if let Some(perm) = self.remove_permanent(permanent_id) {
-                    self.players[perm.owner as usize].graveyard.push(perm.id);
-                }
+                self.destroy_permanent(permanent_id);
                 // Destroy target land
                 if let Some(Target::Object(target_id)) = targets.first() {
-                    if let Some(target) = self.remove_permanent(*target_id) {
-                        self.players[target.owner as usize].graveyard.push(target.id);
-                    }
+                    self.destroy_permanent(*target_id);
                 }
             }
 
@@ -1398,13 +1389,9 @@ impl GameState {
                 if let Some(perm) = self.find_permanent_mut(permanent_id) {
                     perm.tapped = true;
                 }
-                if let Some(perm) = self.remove_permanent(permanent_id) {
-                    self.players[perm.owner as usize].graveyard.push(perm.id);
-                }
+                self.destroy_permanent(permanent_id);
                 if let Some(Target::Object(target_id)) = targets.first() {
-                    if let Some(target) = self.remove_permanent(*target_id) {
-                        self.players[target.owner as usize].graveyard.push(target.id);
-                    }
+                    self.destroy_permanent(*target_id);
                 }
             }
 
@@ -1697,6 +1684,14 @@ impl GameState {
                                     self.battlefield.push(perm);
                                 }
                             }
+                        }
+                    }
+                    ChoiceReason::MyrRetrieverReturn => {
+                        // Return chosen artifact from graveyard to hand
+                        let pid = choice.player as usize;
+                        if let Some(pos) = self.players[pid].graveyard.iter().position(|&id| id == card_id) {
+                            self.players[pid].graveyard.remove(pos);
+                            self.players[pid].hand.push(card_id);
                         }
                     }
                     _ => {}

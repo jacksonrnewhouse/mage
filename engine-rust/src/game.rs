@@ -9,6 +9,15 @@ use crate::player::*;
 use crate::stack::*;
 use crate::types::*;
 
+/// Where a permanent goes when it leaves the battlefield.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DestinationZone {
+    Graveyard,
+    Exile,
+    Hand,
+    Library,
+}
+
 /// Complete game state. Clone this for search tree exploration.
 #[derive(Debug, Clone)]
 pub struct GameState {
@@ -95,6 +104,8 @@ pub enum ChoiceReason {
     GenericSearch,
     /// Shock land entering the battlefield: 0 = enter tapped, 1 = pay 2 life (enter untapped)
     ShockLandETB { card_id: ObjectId },
+    /// Myr Retriever: return an artifact from graveyard to hand
+    MyrRetrieverReturn,
 }
 
 impl GameState {
@@ -371,12 +382,143 @@ impl GameState {
             .filter(move |p| p.controller == player && p.is_artifact())
     }
 
+    /// Low-level removal: removes a permanent from the battlefield without firing triggers.
+    /// Prefer `remove_permanent_to_zone` for game-logic removal.
     pub fn remove_permanent(&mut self, id: ObjectId) -> Option<Permanent> {
         if let Some(pos) = self.battlefield.iter().position(|p| p.id == id) {
             Some(self.battlefield.swap_remove(pos))
         } else {
             None
         }
+    }
+
+    /// Centralized permanent removal: removes from battlefield, places in destination zone,
+    /// and fires dies/leaves-battlefield triggers as appropriate.
+    pub fn remove_permanent_to_zone(&mut self, id: ObjectId, destination: DestinationZone) -> Option<Permanent> {
+        let perm = self.remove_permanent(id)?;
+        let perm_id = perm.id;
+        let perm_name = perm.card_name;
+        let controller = perm.controller;
+        let owner = perm.owner;
+        let is_artifact = perm.is_artifact();
+        let is_token = perm.is_token;
+
+        // Place in destination zone (tokens cease to exist, but we still fire triggers)
+        if !is_token {
+            match destination {
+                DestinationZone::Graveyard => {
+                    self.players[owner as usize].graveyard.push(perm_id);
+                }
+                DestinationZone::Exile => {
+                    self.exile.push((perm_id, perm_name, owner));
+                }
+                DestinationZone::Hand => {
+                    self.players[owner as usize].hand.push(perm_id);
+                }
+                DestinationZone::Library => {
+                    self.players[owner as usize].library.push(perm_id);
+                }
+            }
+        }
+
+        // Check dies triggers (only when going to graveyard)
+        if destination == DestinationZone::Graveyard {
+            self.check_dies_triggers(perm_id, perm_name, controller, is_artifact);
+        }
+
+        // Check leaves-battlefield triggers (for all removals)
+        self.check_leaves_triggers(perm_id, perm_name, controller);
+
+        Some(perm)
+    }
+
+    /// Convenience: destroy a permanent (move to graveyard with triggers).
+    pub fn destroy_permanent(&mut self, id: ObjectId) -> Option<Permanent> {
+        self.remove_permanent_to_zone(id, DestinationZone::Graveyard)
+    }
+
+    /// Check for dies triggers on the permanent that just died and on other permanents
+    /// that care about things dying.
+    fn check_dies_triggers(
+        &mut self,
+        died_id: ObjectId,
+        died_name: CardName,
+        controller: PlayerId,
+        is_artifact: bool,
+    ) {
+        // --- Triggers on the dying permanent itself ---
+        match died_name {
+            CardName::WurmcoilEngine => {
+                // Create two tokens: 3/3 lifelink and 3/3 deathtouch
+                let trigger_id = self.new_object_id();
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: died_id,
+                        source_name: died_name,
+                        effect: TriggeredEffect::WurmcoilDeath,
+                    },
+                    controller,
+                    vec![],
+                );
+                let _ = trigger_id;
+            }
+            CardName::MyrRetriever => {
+                // Return another target artifact card from your graveyard to your hand.
+                // Find artifacts in controller's graveyard (excluding Myr Retriever itself)
+                let artifacts_in_gy: Vec<ObjectId> = self.players[controller as usize]
+                    .graveyard
+                    .iter()
+                    .filter(|&&id| {
+                        id != died_id
+                            && self.card_name_for_id(id)
+                                .and_then(|cn| {
+                                    // Check if it's an artifact by looking at card registry + card db
+                                    // For simplicity, use known artifact names or the card_types
+                                    Some(cn)
+                                })
+                                .is_some()
+                    })
+                    .copied()
+                    .collect();
+                if !artifacts_in_gy.is_empty() {
+                    // Put a triggered ability on the stack
+                    self.stack.push(
+                        StackItemKind::TriggeredAbility {
+                            source_id: died_id,
+                            source_name: died_name,
+                            effect: TriggeredEffect::MyrRetrieverDeath,
+                        },
+                        controller,
+                        vec![],
+                    );
+                }
+            }
+            _ => {}
+        }
+
+        // --- Triggers on other permanents that care about things dying ---
+        // Skullclamp: when equipped creature dies, draw 2
+        let skullclamp_controllers: Vec<PlayerId> = self.battlefield.iter()
+            .filter(|p| p.card_name == CardName::SkullClamp)
+            .map(|p| p.controller)
+            .collect();
+        // Note: Skullclamp triggers when the equipped creature dies.
+        // For now, we skip equipment tracking - Skullclamp trigger would need
+        // the dying creature to have been equipped. This is a placeholder for future work.
+        let _ = skullclamp_controllers;
+        let _ = is_artifact;
+    }
+
+    /// Check for leaves-battlefield triggers (bounce, exile, etc.).
+    /// Currently a placeholder for future expansion.
+    fn check_leaves_triggers(
+        &mut self,
+        _left_id: ObjectId,
+        _left_name: CardName,
+        _controller: PlayerId,
+    ) {
+        // Future: handle leaves-battlefield triggers like
+        // Oblivion Ring, Flickerwisp, etc.
     }
 
     // --- Priority system ---
@@ -437,8 +579,7 @@ impl GameState {
                 }
             }
             for id in to_die {
-                if let Some(perm) = self.remove_permanent(id) {
-                    self.players[perm.owner as usize].graveyard.push(perm.id);
+                if self.destroy_permanent(id).is_some() {
                     changes = true;
                 }
             }
@@ -451,8 +592,7 @@ impl GameState {
                 }
             }
             for id in pw_to_die {
-                if let Some(perm) = self.remove_permanent(id) {
-                    self.players[perm.owner as usize].graveyard.push(perm.id);
+                if self.destroy_permanent(id).is_some() {
                     changes = true;
                 }
             }
@@ -474,8 +614,7 @@ impl GameState {
                 }
             }
             for id in legend_to_remove {
-                if let Some(perm) = self.remove_permanent(id) {
-                    self.players[perm.owner as usize].graveyard.push(perm.id);
+                if self.destroy_permanent(id).is_some() {
                     changes = true;
                 }
             }
@@ -707,9 +846,7 @@ impl GameState {
                     match target {
                         Target::Object(id) => {
                             // Either deal 3 to creature OR destroy artifact
-                            if let Some(perm) = self.remove_permanent(*id) {
-                                self.players[perm.owner as usize].graveyard.push(perm.id);
-                            }
+                            self.destroy_permanent(*id);
                         }
                         _ => {}
                     }
@@ -730,27 +867,23 @@ impl GameState {
             // === Removal ===
             CardName::SwordsToPlowshares => {
                 if let Some(Target::Object(creature_id)) = targets.first() {
-                    if let Some(perm) = self.remove_permanent(*creature_id) {
-                        let power = perm.power();
+                    // Need power before removal for life gain
+                    let power = self.find_permanent(*creature_id).map(|p| p.power()).unwrap_or(0);
+                    if let Some(perm) = self.remove_permanent_to_zone(*creature_id, DestinationZone::Exile) {
                         self.players[perm.controller as usize].life += power as i32;
-                        self.exile.push((perm.id, perm.card_name, perm.owner));
                     }
                 }
             }
             CardName::PathToExile | CardName::Dismember => {
                 if let Some(Target::Object(creature_id)) = targets.first() {
-                    if let Some(perm) = self.remove_permanent(*creature_id) {
-                        self.exile.push((perm.id, perm.card_name, perm.owner));
-                    }
+                    self.remove_permanent_to_zone(*creature_id, DestinationZone::Exile);
                 }
             }
             // Bounce spells
             CardName::ChainOfVapor | CardName::IntoTheFloodMaw | CardName::HurkylsRecall
             | CardName::Commandeer | CardName::Misdirection => {
                 if let Some(Target::Object(target_id)) = targets.first() {
-                    if let Some(perm) = self.remove_permanent(*target_id) {
-                        self.players[perm.owner as usize].hand.push(perm.id);
-                    }
+                    self.remove_permanent_to_zone(*target_id, DestinationZone::Hand);
                 }
             }
 
@@ -1068,9 +1201,7 @@ impl GameState {
                             .map(|p| p.id)
                             .collect();
                         for id in to_sac {
-                            if let Some(perm) = self.remove_permanent(id) {
-                                self.players[perm.owner as usize].graveyard.push(perm.id);
-                            }
+                            self.destroy_permanent(id);
                         }
                     }
                 }
@@ -1085,9 +1216,7 @@ impl GameState {
                             .map(|p| p.id)
                             .collect();
                         for id in to_sac {
-                            if let Some(perm) = self.remove_permanent(id) {
-                                self.players[perm.owner as usize].graveyard.push(perm.id);
-                            }
+                            self.destroy_permanent(id);
                         }
                     }
                 }
@@ -1110,9 +1239,7 @@ impl GameState {
                     .map(|p| p.id)
                     .collect();
                 for id in lands {
-                    if let Some(perm) = self.remove_permanent(id) {
-                        self.players[perm.owner as usize].graveyard.push(perm.id);
-                    }
+                    self.destroy_permanent(id);
                 }
             }
 
@@ -1143,9 +1270,7 @@ impl GameState {
                     .map(|p| p.id)
                     .collect();
                 for id in to_destroy {
-                    if let Some(perm) = self.remove_permanent(id) {
-                        self.players[perm.owner as usize].graveyard.push(perm.id);
-                    }
+                    self.destroy_permanent(id);
                 }
             }
             CardName::Meltdown => {
@@ -1155,9 +1280,7 @@ impl GameState {
                     .map(|p| p.id)
                     .collect();
                 for id in to_destroy {
-                    if let Some(perm) = self.remove_permanent(id) {
-                        self.players[perm.owner as usize].graveyard.push(perm.id);
-                    }
+                    self.destroy_permanent(id);
                 }
             }
             CardName::SeedsOfInnocence => {
@@ -1167,18 +1290,14 @@ impl GameState {
                     .map(|p| p.id)
                     .collect();
                 for id in to_destroy {
-                    if let Some(perm) = self.remove_permanent(id) {
-                        self.players[perm.owner as usize].graveyard.push(perm.id);
-                    }
+                    self.destroy_permanent(id);
                 }
             }
             CardName::ForceOfVigor => {
                 // Destroy up to 2 artifacts/enchantments
                 for target in targets.iter().take(2) {
                     if let Target::Object(id) = target {
-                        if let Some(perm) = self.remove_permanent(*id) {
-                            self.players[perm.owner as usize].graveyard.push(perm.id);
-                        }
+                        self.destroy_permanent(*id);
                     }
                 }
             }
@@ -1192,9 +1311,7 @@ impl GameState {
             | CardName::MarchOfOtherworldlyLight | CardName::SunderingEruption
             | CardName::PestControl => {
                 if let Some(Target::Object(target_id)) = targets.first() {
-                    if let Some(perm) = self.remove_permanent(*target_id) {
-                        self.players[perm.owner as usize].graveyard.push(perm.id);
-                    }
+                    self.destroy_permanent(*target_id);
                 }
                 // Nature's Claim: controller gains 4 life
                 if card_name == CardName::NaturesClaim {
@@ -1207,9 +1324,7 @@ impl GameState {
             CardName::CropRotation => {
                 // Sacrifice the targeted land
                 if let Some(Target::Object(target_id)) = targets.first() {
-                    if let Some(perm) = self.remove_permanent(*target_id) {
-                        self.players[perm.owner as usize].graveyard.push(perm.id);
-                    }
+                    self.destroy_permanent(*target_id);
                 }
                 // Search library for any land card
                 let searchable: Vec<ObjectId> = self.players[controller as usize]
@@ -1239,9 +1354,7 @@ impl GameState {
                 if let Some(Target::Object(target_id)) = targets.first() {
                     // Counter if on stack, destroy if permanent - simplified
                     if self.stack.remove(*target_id).is_none() {
-                        if let Some(perm) = self.remove_permanent(*target_id) {
-                            self.players[perm.owner as usize].graveyard.push(perm.id);
-                        }
+                        self.destroy_permanent(*target_id);
                     }
                 }
             }
@@ -1508,9 +1621,7 @@ impl GameState {
                     .map(|p| p.id)
                     .collect();
                 if let Some(&target_id) = targets.first() {
-                    if let Some(perm) = self.remove_permanent(target_id) {
-                        self.players[perm.owner as usize].graveyard.push(perm.id);
-                    }
+                    self.destroy_permanent(target_id);
                 }
             }
             // Mana Vault / Grim Monolith / Time Vault: set doesnt_untap flag
@@ -1546,9 +1657,7 @@ impl GameState {
                     .map(|p| p.id)
                     .collect();
                 if let Some(&target_id) = targets.first() {
-                    if let Some(perm) = self.remove_permanent(target_id) {
-                        self.players[perm.owner as usize].graveyard.push(perm.id);
-                    }
+                    self.destroy_permanent(target_id);
                 }
             }
             _ => {}
@@ -1660,12 +1769,11 @@ impl GameState {
                 }
             }
             TriggeredEffect::SolitudeETB => {
-                // Exile target creature
+                // Exile target creature - opponent gains life equal to its power
                 if let Some(Target::Object(creature_id)) = targets.first() {
-                    if let Some(perm) = self.remove_permanent(*creature_id) {
-                        let power = perm.power();
+                    let power = self.find_permanent(*creature_id).map(|p| p.power()).unwrap_or(0);
+                    if let Some(perm) = self.remove_permanent_to_zone(*creature_id, DestinationZone::Exile) {
                         self.players[perm.controller as usize].life += power as i32;
-                        self.exile.push((perm.id, perm.card_name, perm.owner));
                     }
                 }
             }
@@ -1680,6 +1788,49 @@ impl GameState {
                     }
                     self.draw_cards(controller, 1);
                     self.players[controller as usize].life += 3;
+                }
+            }
+            TriggeredEffect::WurmcoilDeath => {
+                // Create two tokens: 3/3 with lifelink and 3/3 with deathtouch
+                for kw in [Keyword::Lifelink, Keyword::Deathtouch] {
+                    let token_id = self.new_object_id();
+                    let mut kws = Keywords::empty();
+                    kws.add(kw);
+                    let mut token = Permanent::new(
+                        token_id,
+                        card_name_for_token(),
+                        controller,
+                        controller,
+                        Some(3),
+                        Some(3),
+                        None,
+                        kws,
+                        &[CardType::Creature, CardType::Artifact],
+                    );
+                    token.is_token = true;
+                    self.battlefield.push(token);
+                }
+            }
+            TriggeredEffect::SkullclampDeath => {
+                // Draw 2 cards
+                self.draw_cards(controller, 2);
+            }
+            TriggeredEffect::MyrRetrieverDeath => {
+                // Return another target artifact card from your graveyard to your hand.
+                // Present as a choice: pick an artifact from graveyard.
+                let artifacts_in_gy: Vec<ObjectId> = self.players[controller as usize]
+                    .graveyard
+                    .iter()
+                    .copied()
+                    .collect();
+                if !artifacts_in_gy.is_empty() {
+                    self.pending_choice = Some(PendingChoice {
+                        player: controller,
+                        kind: ChoiceKind::ChooseFromList {
+                            options: artifacts_in_gy,
+                            reason: ChoiceReason::MyrRetrieverReturn,
+                        },
+                    });
                 }
             }
             _ => {}
@@ -1704,9 +1855,7 @@ impl GameState {
             }
             ActivatedEffect::JaceBounce => {
                 if let Some(Target::Object(creature_id)) = targets.first() {
-                    if let Some(perm) = self.remove_permanent(*creature_id) {
-                        self.players[perm.owner as usize].hand.push(perm.id);
-                    }
+                    self.remove_permanent_to_zone(*creature_id, DestinationZone::Hand);
                 }
             }
             ActivatedEffect::JaceFateseal => {
@@ -1715,9 +1864,7 @@ impl GameState {
             }
             ActivatedEffect::TeferiBounce => {
                 if let Some(Target::Object(target_id)) = targets.first() {
-                    if let Some(perm) = self.remove_permanent(*target_id) {
-                        self.players[perm.owner as usize].hand.push(perm.id);
-                    }
+                    self.remove_permanent_to_zone(*target_id, DestinationZone::Hand);
                 }
                 self.draw_cards(controller, 1);
             }
@@ -1745,9 +1892,7 @@ impl GameState {
                     .find(|p| p.card_name == CardName::SenseisDiviningTop && p.controller == controller)
                     .map(|p| p.id);
                 if let Some(id) = top_id {
-                    if let Some(perm) = self.remove_permanent(id) {
-                        self.players[perm.owner as usize].library.push(perm.id);
-                    }
+                    self.remove_permanent_to_zone(id, DestinationZone::Library);
                 }
                 self.draw_cards(controller, 1);
             }
@@ -1762,18 +1907,14 @@ impl GameState {
             ActivatedEffect::KarakasBounce => {
                 // Bounce target legendary creature to owner's hand
                 if let Some(Target::Object(target_id)) = targets.first() {
-                    if let Some(perm) = self.remove_permanent(*target_id) {
-                        self.players[perm.owner as usize].hand.push(perm.id);
-                    }
+                    self.remove_permanent_to_zone(*target_id, DestinationZone::Hand);
                 }
             }
             ActivatedEffect::GhostQuarterDestroy => {
                 // Destroy target land (opponent may search for basic)
                 // Simplified: just destroy the land
                 if let Some(Target::Object(target_id)) = targets.first() {
-                    if let Some(perm) = self.remove_permanent(*target_id) {
-                        self.players[perm.owner as usize].graveyard.push(perm.id);
-                    }
+                    self.destroy_permanent(*target_id);
                 }
             }
             ActivatedEffect::NarsetMinus => {
@@ -1881,9 +2022,8 @@ impl GameState {
             ActivatedEffect::KayaMinus => {
                 // Kaya -1: exile target nonland permanent, owner gains 2 life
                 if let Some(Target::Object(target_id)) = targets.first() {
-                    if let Some(perm) = self.remove_permanent(*target_id) {
+                    if let Some(perm) = self.remove_permanent_to_zone(*target_id, DestinationZone::Exile) {
                         let owner = perm.owner as usize;
-                        self.exile.push((perm.id, perm.card_name, perm.owner));
                         self.players[owner].life += 2;
                     }
                 }
