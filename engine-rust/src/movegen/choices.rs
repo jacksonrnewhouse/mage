@@ -1,0 +1,130 @@
+/// Choice resolution: handling pending choices (card selection, number, color).
+
+use crate::action::*;
+use crate::card::*;
+use crate::game::*;
+use crate::permanent::Permanent;
+use crate::types::*;
+
+impl GameState {
+    pub(crate) fn resolve_choice(&mut self, choice: PendingChoice, card_id: ObjectId, db: &[CardDef]) {
+        match choice.kind {
+            ChoiceKind::ChooseFromList { reason, .. } => {
+                match reason {
+                    ChoiceReason::DemonicTutorSearch => {
+                        // Move chosen card from library to hand
+                        let pid = choice.player as usize;
+                        if let Some(pos) = self.players[pid].library.iter().position(|&id| id == card_id) {
+                            self.players[pid].library.remove(pos);
+                            self.players[pid].hand.push(card_id);
+                        }
+                    }
+                    ChoiceReason::VampiricTutorSearch | ChoiceReason::MysticalTutorSearch => {
+                        // Move chosen card to top of library
+                        let pid = choice.player as usize;
+                        if let Some(pos) = self.players[pid].library.iter().position(|&id| id == card_id) {
+                            self.players[pid].library.remove(pos);
+                            self.players[pid].library.push(card_id); // push = top of library
+                        }
+                    }
+                    ChoiceReason::EntombSearch => {
+                        // Move chosen card from library to graveyard
+                        let pid = choice.player as usize;
+                        if let Some(pos) = self.players[pid].library.iter().position(|&id| id == card_id) {
+                            self.players[pid].library.remove(pos);
+                            self.players[pid].graveyard.push(card_id);
+                        }
+                    }
+                    ChoiceReason::ThoughtseizeDiscard => {
+                        // Discard chosen card from opponent's hand
+                        let target_player = self.opponent(choice.player) as usize;
+                        if let Some(pos) = self.players[target_player].hand.iter().position(|&id| id == card_id) {
+                            self.players[target_player].hand.remove(pos);
+                            self.players[target_player].graveyard.push(card_id);
+                        }
+                    }
+                    ChoiceReason::GenericSearch => {
+                        // Fetch land: put onto battlefield
+                        let pid = choice.player as usize;
+                        if let Some(pos) = self.players[pid].library.iter().position(|&id| id == card_id) {
+                            self.players[pid].library.remove(pos);
+                            let card_name = self.card_name_for_id(card_id);
+                            if let Some(cn) = card_name {
+                                if let Some(def) = find_card(db, cn) {
+                                    let perm = Permanent::new(
+                                        card_id, cn, choice.player, choice.player,
+                                        def.power, def.toughness, def.loyalty, def.keywords, def.card_types,
+                                    );
+                                    self.battlefield.push(perm);
+                                }
+                            }
+                        }
+                    }
+                    ChoiceReason::MyrRetrieverReturn => {
+                        // Return chosen artifact from graveyard to hand
+                        let pid = choice.player as usize;
+                        if let Some(pos) = self.players[pid].graveyard.iter().position(|&id| id == card_id) {
+                            self.players[pid].graveyard.remove(pos);
+                            self.players[pid].hand.push(card_id);
+                        }
+                    }
+                    ChoiceReason::EdictSacrifice => {
+                        // The chosen player sacrifices the chosen creature
+                        self.destroy_permanent(card_id);
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
+        }
+    }
+
+    pub(crate) fn resolve_number_choice(&mut self, choice: PendingChoice, n: u32) {
+        match choice.kind {
+            ChoiceKind::ChooseNumber { reason, .. } => {
+                match reason {
+                    ChoiceReason::ShockLandETB { card_id } => {
+                        if n == 0 {
+                            // Enter tapped
+                            if let Some(perm) = self.find_permanent_mut(card_id) {
+                                perm.tapped = true;
+                            }
+                        } else {
+                            // Pay 2 life, enter untapped
+                            self.players[choice.player as usize].life -= 2;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
+        }
+    }
+
+    pub(crate) fn resolve_color_choice(&mut self, choice: PendingChoice, color: Color) {
+        match choice.kind {
+            ChoiceKind::ChooseColor { reason } => {
+                match reason {
+                    ChoiceReason::BlackLotusColor => {
+                        self.players[choice.player as usize]
+                            .mana_pool
+                            .add(Some(color), 3);
+                    }
+                    ChoiceReason::LotusPetalColor => {
+                        self.players[choice.player as usize]
+                            .mana_pool
+                            .add(Some(color), 1);
+                    }
+                    ChoiceReason::TreasureSacrificeColor => {
+                        // Add 1 mana of the chosen color
+                        self.players[choice.player as usize]
+                            .mana_pool
+                            .add(Some(color), 1);
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
+        }
+    }
+}

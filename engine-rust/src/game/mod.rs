@@ -1,0 +1,614 @@
+/// Core game state and turn management.
+/// This is the central data structure that search algorithms clone and mutate.
+/// Every field is owned data (no references) for cheap Clone.
+
+mod resolution;
+mod sba;
+mod triggers;
+
+use crate::action::*;
+use crate::card::*;
+use crate::permanent::*;
+use crate::player::*;
+use crate::stack::*;
+use crate::types::*;
+
+/// Where a permanent goes when it leaves the battlefield.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DestinationZone {
+    Graveyard,
+    Exile,
+    Hand,
+    Library,
+}
+
+/// Complete game state. Clone this for search tree exploration.
+#[derive(Debug, Clone)]
+pub struct GameState {
+    // --- Players ---
+    pub players: Vec<Player>,
+    pub active_player: PlayerId,
+    pub priority_player: PlayerId,
+    pub num_players: u8,
+
+    // --- Turn structure ---
+    pub turn_number: u32,
+    pub phase: Phase,
+    pub step: Option<Step>,
+
+    // --- Zones ---
+    pub battlefield: Vec<Permanent>,
+    pub exile: Vec<(ObjectId, CardName, PlayerId)>, // (id, card, owner)
+    pub stack: GameStack,
+
+    // --- Combat ---
+    pub attackers: Vec<(ObjectId, PlayerId)>, // (creature_id, defending_player)
+    pub blockers: Vec<(ObjectId, ObjectId)>,  // (blocker_id, attacker_id)
+    pub combat_damage_dealt: bool,
+
+    // --- Game flow ---
+    pub action_context: ActionContext,
+    pub result: GameResult,
+    pub passed_priority: Vec<bool>, // indexed by player id
+    pub storm_count: u16,
+
+    // --- Object ID counter ---
+    next_object_id: ObjectId,
+
+    // --- Card database reference (shared, not cloned) ---
+    // In practice this is an Arc or &'static, but for simplicity
+    // we'll pass it externally to methods that need it.
+
+    // --- Pending choices ---
+    pub pending_choice: Option<PendingChoice>,
+
+    // --- Card registry: maps ObjectId -> CardName ---
+    pub card_registry: Vec<(ObjectId, CardName)>,
+
+    // --- Temporary until-end-of-turn effects ---
+    pub temporary_effects: Vec<TemporaryEffect>,
+}
+
+/// When the game needs a player to make a choice (tutor, discard, etc.)
+#[derive(Debug, Clone)]
+pub struct PendingChoice {
+    pub player: PlayerId,
+    pub kind: ChoiceKind,
+}
+
+#[derive(Debug, Clone)]
+pub enum ChoiceKind {
+    /// Choose a card from a list (hand, library search result, etc.)
+    ChooseFromList {
+        options: Vec<ObjectId>,
+        reason: ChoiceReason,
+    },
+    /// Choose a color (Black Lotus, etc.)
+    ChooseColor { reason: ChoiceReason },
+    /// Choose a number (X costs, Toxic Deluge, etc.)
+    ChooseNumber {
+        min: u32,
+        max: u32,
+        reason: ChoiceReason,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub enum ChoiceReason {
+    BlackLotusColor,
+    LotusPetalColor,
+    DemonicTutorSearch,
+    VampiricTutorSearch,
+    MysticalTutorSearch,
+    EntombSearch,
+    BrainstormPutBack,
+    ThoughtseizeDiscard,
+    HymnToTourachDiscard,
+    ToxicDelugeLife,
+    WheelOfFortuneDiscard,
+    TimeTwisterShuffle,
+    GenericDiscard,
+    GenericSearch,
+    /// Shock land entering the battlefield: 0 = enter tapped, 1 = pay 2 life (enter untapped)
+    ShockLandETB { card_id: ObjectId },
+    /// Myr Retriever: return an artifact from graveyard to hand
+    MyrRetrieverReturn,
+    /// Edict effect: the affected player must sacrifice a creature they control
+    EdictSacrifice,
+    /// Treasure token sacrifice: choose a color to add 1 mana of
+    TreasureSacrificeColor,
+}
+impl GameState {
+    /// Create a new two-player game.
+    pub fn new_two_player() -> Self {
+        GameState {
+            players: vec![Player::new(0), Player::new(1)],
+            active_player: 0,
+            priority_player: 0,
+            num_players: 2,
+            turn_number: 0,
+            phase: Phase::Beginning,
+            step: Some(Step::Untap),
+            battlefield: Vec::with_capacity(32),
+            exile: Vec::new(),
+            stack: GameStack::new(10000), // Start stack IDs high to avoid collision
+            attackers: Vec::new(),
+            blockers: Vec::new(),
+            combat_damage_dealt: false,
+            action_context: ActionContext::Priority,
+            result: GameResult::InProgress,
+            passed_priority: vec![false, false],
+            storm_count: 0,
+            next_object_id: 1000, // Reserve 0-999 for card IDs
+            pending_choice: None,
+            card_registry: Vec::with_capacity(120),
+            temporary_effects: Vec::new(),
+        }
+    }
+
+    /// Allocate a new unique object ID.
+    pub fn new_object_id(&mut self) -> ObjectId {
+        let id = self.next_object_id;
+        self.next_object_id += 1;
+        id
+    }
+
+    /// Set up a player's library with a deck of card names.
+    /// Returns object IDs assigned to each card.
+    pub fn load_deck(&mut self, player_id: PlayerId, deck: &[CardName], _db: &[CardDef]) -> Vec<ObjectId> {
+        let mut ids = Vec::with_capacity(deck.len());
+        for &card_name in deck {
+            let id = self.new_object_id();
+            ids.push(id);
+            self.players[player_id as usize].library.push(id);
+            // Store the card-to-name mapping in the card registry
+            self.card_registry.push((id, card_name));
+        }
+        ids
+    }
+
+    // --- Turn Structure ---
+
+    /// Start the game: each player draws 7 cards.
+    pub fn start_game(&mut self) {
+        self.turn_number = 1;
+        self.phase = Phase::Beginning;
+        self.step = Some(Step::Upkeep);
+        // Draw opening hands
+        for pid in 0..self.num_players {
+            for _ in 0..7 {
+                if let Some(id) = self.players[pid as usize].library.pop() {
+                    self.players[pid as usize].hand.push(id);
+                }
+            }
+        }
+        self.active_player = 0;
+        self.priority_player = 0;
+    }
+
+    /// Advance to the next phase/step.
+    pub fn advance_phase(&mut self) {
+        // Clear mana pools at phase change
+        for p in &mut self.players {
+            p.mana_pool.empty();
+        }
+
+        match (self.phase, self.step) {
+            (Phase::Beginning, Some(Step::Untap)) => {
+                self.step = Some(Step::Upkeep);
+                self.give_priority_to_active();
+            }
+            (Phase::Beginning, Some(Step::Upkeep)) => {
+                self.step = Some(Step::Draw);
+                // Active player draws a card (skip on turn 1 for first player in 2-player)
+                if self.turn_number > 1 || self.active_player != 0 {
+                    let active = self.active_player as usize;
+                    if let Some(id) = self.players[active].library.pop() {
+                        self.players[active].hand.push(id);
+                    }
+                }
+                self.give_priority_to_active();
+            }
+            (Phase::Beginning, Some(Step::Draw)) => {
+                self.phase = Phase::PreCombatMain;
+                self.step = None;
+                self.give_priority_to_active();
+            }
+            (Phase::PreCombatMain, _) => {
+                self.phase = Phase::Combat;
+                self.step = Some(Step::BeginCombat);
+                self.give_priority_to_active();
+            }
+            (Phase::Combat, Some(Step::BeginCombat)) => {
+                self.step = Some(Step::DeclareAttackers);
+                self.action_context = ActionContext::DeclareAttackers;
+                self.attackers.clear();
+                self.give_priority_to_active();
+            }
+            (Phase::Combat, Some(Step::DeclareAttackers)) => {
+                if self.attackers.is_empty() {
+                    // No attackers, skip to post-combat main
+                    self.phase = Phase::PostCombatMain;
+                    self.step = None;
+                    self.action_context = ActionContext::Priority;
+                    self.give_priority_to_active();
+                } else {
+                    self.step = Some(Step::DeclareBlockers);
+                    self.action_context = ActionContext::DeclareBlockers;
+                    // Non-active player declares blockers
+                    self.priority_player = self.opponent(self.active_player);
+                }
+            }
+            (Phase::Combat, Some(Step::DeclareBlockers)) => {
+                self.action_context = ActionContext::Priority;
+                // Check for first strike
+                let has_first_strike = self.attackers.iter().any(|(id, _)| {
+                    self.find_permanent(*id)
+                        .map(|p| p.keywords.has(Keyword::FirstStrike) || p.keywords.has(Keyword::DoubleStrike))
+                        .unwrap_or(false)
+                });
+                if has_first_strike {
+                    self.step = Some(Step::FirstStrikeDamage);
+                } else {
+                    self.step = Some(Step::CombatDamage);
+                }
+                self.give_priority_to_active();
+            }
+            (Phase::Combat, Some(Step::FirstStrikeDamage)) => {
+                self.step = Some(Step::CombatDamage);
+                self.give_priority_to_active();
+            }
+            (Phase::Combat, Some(Step::CombatDamage)) => {
+                self.step = Some(Step::EndOfCombat);
+                self.give_priority_to_active();
+            }
+            (Phase::Combat, Some(Step::EndOfCombat)) => {
+                self.attackers.clear();
+                self.blockers.clear();
+                self.combat_damage_dealt = false;
+                self.phase = Phase::PostCombatMain;
+                self.step = None;
+                self.action_context = ActionContext::Priority;
+                self.give_priority_to_active();
+            }
+            (Phase::PostCombatMain, _) => {
+                self.phase = Phase::Ending;
+                self.step = Some(Step::End);
+                self.give_priority_to_active();
+            }
+            (Phase::Ending, Some(Step::End)) => {
+                self.step = Some(Step::Cleanup);
+                self.cleanup_step();
+            }
+            (Phase::Ending, Some(Step::Cleanup)) => {
+                self.next_turn();
+            }
+            _ => {
+                // Shouldn't happen, advance to next turn as safety
+                self.next_turn();
+            }
+        }
+        self.reset_priority_passes();
+    }
+
+    fn cleanup_step(&mut self) {
+        // Discard to hand size (7)
+        let active = self.active_player as usize;
+        while self.players[active].hand.len() > 7 {
+            // For AI: this becomes a choice. For now, discard last card.
+            if let Some(id) = self.players[active].hand.pop() {
+                self.players[active].graveyard.push(id);
+            }
+        }
+        // Clear damage and per-turn flags from all permanents
+        for perm in &mut self.battlefield {
+            perm.end_of_turn_cleanup();
+        }
+        // Reverse and clear all temporary until-end-of-turn effects
+        self.end_of_turn_cleanup();
+    }
+
+    /// Apply a temporary effect immediately to the target permanent,
+    /// and record it so it can be reversed at end of turn.
+    pub fn add_temporary_effect(&mut self, effect: TemporaryEffect) {
+        match &effect {
+            TemporaryEffect::ModifyPT { target, power, toughness } => {
+                let (target, power, toughness) = (*target, *power, *toughness);
+                if let Some(perm) = self.find_permanent_mut(target) {
+                    perm.power_mod += power;
+                    perm.toughness_mod += toughness;
+                }
+            }
+            TemporaryEffect::GrantKeyword { target, keyword } => {
+                let (target, keyword) = (*target, *keyword);
+                if let Some(perm) = self.find_permanent_mut(target) {
+                    perm.keywords.add(keyword);
+                }
+            }
+            TemporaryEffect::RemoveAllAbilities { target, .. } => {
+                let target = *target;
+                if let Some(perm) = self.find_permanent_mut(target) {
+                    perm.keywords = Keywords::empty();
+                }
+            }
+        }
+        self.temporary_effects.push(effect);
+    }
+
+    /// Reverse all temporary until-end-of-turn effects and clear the list.
+    /// Called during the cleanup step.
+    pub fn end_of_turn_cleanup(&mut self) {
+        let effects = std::mem::take(&mut self.temporary_effects);
+        for effect in &effects {
+            match effect {
+                TemporaryEffect::ModifyPT { target, power, toughness } => {
+                    if let Some(perm) = self.find_permanent_mut(*target) {
+                        perm.power_mod -= power;
+                        perm.toughness_mod -= toughness;
+                    }
+                }
+                TemporaryEffect::GrantKeyword { target, keyword } => {
+                    if let Some(perm) = self.find_permanent_mut(*target) {
+                        perm.keywords.remove(*keyword);
+                    }
+                }
+                TemporaryEffect::RemoveAllAbilities { target, saved_keywords } => {
+                    if let Some(perm) = self.find_permanent_mut(*target) {
+                        perm.keywords = *saved_keywords;
+                    }
+                }
+            }
+        }
+        // temporary_effects already cleared by mem::take
+    }
+
+    fn next_turn(&mut self) {
+        // Check for extra turns
+        let active = self.active_player as usize;
+        if self.players[active].extra_turns > 0 {
+            self.players[active].extra_turns -= 1;
+        } else {
+            self.active_player = self.opponent(self.active_player);
+        }
+
+        self.turn_number += 1;
+        self.phase = Phase::Beginning;
+        self.step = Some(Step::Untap);
+        self.storm_count = 0;
+
+        let active = self.active_player as usize;
+        self.players[active].reset_for_turn();
+
+        // Untap permanents
+        self.untap_step();
+
+        self.priority_player = self.active_player;
+        self.action_context = ActionContext::Priority;
+    }
+
+    /// Untap all permanents controlled by the active player, skipping those
+    /// that have the `doesnt_untap` flag set (e.g. Mana Vault, Grim Monolith, Time Vault).
+    pub fn untap_step(&mut self) {
+        for perm in &mut self.battlefield {
+            if perm.controller == self.active_player && !perm.doesnt_untap {
+                perm.tapped = false;
+            }
+        }
+    }
+
+    fn give_priority_to_active(&mut self) {
+        self.priority_player = self.active_player;
+        self.action_context = ActionContext::Priority;
+    }
+
+    pub fn reset_priority_passes(&mut self) {
+        for p in &mut self.passed_priority {
+            *p = false;
+        }
+    }
+
+    /// Get the opponent of a player (2-player only).
+    pub fn opponent(&self, player: PlayerId) -> PlayerId {
+        1 - player
+    }
+
+    // --- Battlefield queries ---
+
+    pub fn find_permanent(&self, id: ObjectId) -> Option<&Permanent> {
+        self.battlefield.iter().find(|p| p.id == id)
+    }
+
+    pub fn find_permanent_mut(&mut self, id: ObjectId) -> Option<&mut Permanent> {
+        self.battlefield.iter_mut().find(|p| p.id == id)
+    }
+
+    pub fn permanents_controlled_by(&self, player: PlayerId) -> impl Iterator<Item = &Permanent> {
+        self.battlefield.iter().filter(move |p| p.controller == player)
+    }
+
+    pub fn creatures_controlled_by(&self, player: PlayerId) -> impl Iterator<Item = &Permanent> {
+        self.battlefield
+            .iter()
+            .filter(move |p| p.controller == player && p.is_creature())
+    }
+
+    pub fn lands_controlled_by(&self, player: PlayerId) -> impl Iterator<Item = &Permanent> {
+        self.battlefield
+            .iter()
+            .filter(move |p| p.controller == player && p.is_land())
+    }
+
+    pub fn artifacts_controlled_by(&self, player: PlayerId) -> impl Iterator<Item = &Permanent> {
+        self.battlefield
+            .iter()
+            .filter(move |p| p.controller == player && p.is_artifact())
+    }
+
+    /// Low-level removal: removes a permanent from the battlefield without firing triggers.
+    /// Prefer `remove_permanent_to_zone` for game-logic removal.
+    pub fn remove_permanent(&mut self, id: ObjectId) -> Option<Permanent> {
+        if let Some(pos) = self.battlefield.iter().position(|p| p.id == id) {
+            Some(self.battlefield.swap_remove(pos))
+        } else {
+            None
+        }
+    }
+
+    /// Centralized permanent removal: removes from battlefield, places in destination zone,
+    /// and fires dies/leaves-battlefield triggers as appropriate.
+    pub fn remove_permanent_to_zone(&mut self, id: ObjectId, destination: DestinationZone) -> Option<Permanent> {
+        let perm = self.remove_permanent(id)?;
+        let perm_id = perm.id;
+        let perm_name = perm.card_name;
+        let controller = perm.controller;
+        let owner = perm.owner;
+        let is_artifact = perm.is_artifact();
+        let is_token = perm.is_token;
+
+        // Place in destination zone (tokens cease to exist, but we still fire triggers)
+        if !is_token {
+            match destination {
+                DestinationZone::Graveyard => {
+                    self.players[owner as usize].graveyard.push(perm_id);
+                }
+                DestinationZone::Exile => {
+                    self.exile.push((perm_id, perm_name, owner));
+                }
+                DestinationZone::Hand => {
+                    self.players[owner as usize].hand.push(perm_id);
+                }
+                DestinationZone::Library => {
+                    self.players[owner as usize].library.push(perm_id);
+                }
+            }
+        }
+
+        // Check dies triggers (only when going to graveyard)
+        if destination == DestinationZone::Graveyard {
+            self.check_dies_triggers(perm_id, perm_name, controller, is_artifact);
+        }
+
+        // Check leaves-battlefield triggers (for all removals)
+        self.check_leaves_triggers(perm_id, perm_name, controller);
+
+        Some(perm)
+    }
+
+    /// Convenience: destroy a permanent (move to graveyard with triggers).
+    pub fn destroy_permanent(&mut self, id: ObjectId) -> Option<Permanent> {
+        self.remove_permanent_to_zone(id, DestinationZone::Graveyard)
+    }
+
+
+    // --- Priority system ---
+
+    /// Both players passed priority in succession on an empty stack.
+    pub fn both_passed_on_empty_stack(&self) -> bool {
+        self.stack.is_empty() && self.passed_priority.iter().all(|&p| p)
+    }
+
+    /// Pass priority to the next player, or resolve top of stack.
+    pub fn pass_priority(&mut self, db: &[CardDef]) {
+        self.passed_priority[self.priority_player as usize] = true;
+
+        if self.passed_priority.iter().all(|&p| p) {
+            // Both players passed
+            if self.stack.is_empty() {
+                // Advance the game
+                self.advance_phase();
+            } else {
+                // Resolve top of stack
+                self.resolve_top(db);
+                self.reset_priority_passes();
+                self.give_priority_to_active();
+            }
+        } else {
+            // Pass to opponent
+            self.priority_player = self.opponent(self.priority_player);
+        }
+    }
+
+    // --- Game result ---
+
+    pub fn is_terminal(&self) -> bool {
+        self.result != GameResult::InProgress
+    }
+
+    // --- Utility ---
+
+    pub fn draw_cards(&mut self, player: PlayerId, count: usize) {
+        let pid = player as usize;
+        for _ in 0..count {
+            // Check for draw-limiter statics before each individual draw.
+            // Spirit of the Labyrinth: each player can't draw more than one card per turn.
+            // Narset, Parter of Veils: opponents can't draw more than one card per turn.
+            // Leovold, Emissary of Trest: opponents can't draw more than one card per turn.
+            if self.players[pid].draws_this_turn >= 1 {
+                let limited = self.battlefield.iter().any(|p| {
+                    matches!(p.card_name, CardName::SpiritOfTheLabyrinth)
+                        || (matches!(p.card_name, CardName::NarsetParterOfVeils)
+                            && p.controller != player)
+                        || (matches!(p.card_name, CardName::LeovoldEmissaryOfTrest)
+                            && p.controller != player)
+                });
+                if limited {
+                    break;
+                }
+            }
+            if let Some(id) = self.players[pid].library.pop() {
+                self.players[pid].hand.push(id);
+                self.players[pid].draws_this_turn += 1;
+                self.players[pid].has_drawn_this_turn = true;
+            } else {
+                // Can't draw from empty library - player loses
+                self.players[pid].has_lost = true;
+            }
+        }
+    }
+
+    fn deal_damage_to_target(&mut self, target: Target, amount: u16, _source_controller: PlayerId) {
+        match target {
+            Target::Player(p) => {
+                self.players[p as usize].life -= amount as i32;
+            }
+            Target::Object(id) => {
+                if let Some(perm) = self.find_permanent_mut(id) {
+                    perm.damage += amount as i16;
+                }
+            }
+            Target::None => {}
+        }
+    }
+
+    pub fn card_name_for_id(&self, id: ObjectId) -> Option<CardName> {
+        self.card_registry
+            .iter()
+            .find(|(obj_id, _)| *obj_id == id)
+            .map(|(_, name)| *name)
+    }
+
+    /// Create a Treasure token controlled by the given player and place it on the battlefield.
+    /// Returns the ObjectId of the newly created token.
+    pub fn create_treasure_token(&mut self, controller: PlayerId) -> ObjectId {
+        let token_id = self.new_object_id();
+        let mut token = Permanent::new(
+            token_id,
+            CardName::TreasureToken,
+            controller,
+            controller,
+            None,
+            None,
+            None,
+            Keywords::empty(),
+            &[CardType::Artifact],
+        );
+        token.is_token = true;
+        self.battlefield.push(token);
+        token_id
+    }
+}
+
+/// Placeholder card name for tokens (they don't have real card names).
+pub(crate) fn card_name_for_token() -> CardName {
+    CardName::Plains // Placeholder - tokens would need their own system
+}
