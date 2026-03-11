@@ -292,6 +292,18 @@ impl GameState {
         ids
     }
 
+    /// Register a companion card for a player (outside the game / sideboard).
+    /// The companion card is given a new ObjectId and stored in `player.companion`.
+    /// It is registered in the card_registry so the engine can look it up.
+    /// Call this after `load_deck` but before `start_game`.
+    /// Returns the ObjectId assigned to the companion.
+    pub fn set_companion(&mut self, player_id: PlayerId, card_name: CardName) -> ObjectId {
+        let id = self.new_object_id();
+        self.card_registry.push((id, card_name));
+        self.players[player_id as usize].companion = Some(id);
+        id
+    }
+
     // --- Turn Structure ---
 
     /// Start the game: each player draws 7 cards.

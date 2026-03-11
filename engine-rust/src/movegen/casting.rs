@@ -315,6 +315,22 @@ impl GameState {
             Action::ActivateFromHand { card_id, ability_index, targets, x_value } => {
                 self.apply_activate_from_hand(*card_id, *ability_index, targets, *x_value, db);
             }
+
+            Action::CompanionFromSideboard => {
+                let player_id = self.priority_player;
+                let companion_cost = ManaCost { generic: 3, ..ManaCost::ZERO };
+                let player = &self.players[player_id as usize];
+                if let Some(companion_id) = player.companion {
+                    if player.mana_pool.can_pay(&companion_cost) {
+                        // Pay the {3} cost
+                        self.players[player_id as usize].mana_pool.pay(&companion_cost);
+                        // Move companion from "outside the game" into hand
+                        self.players[player_id as usize].companion = None;
+                        self.players[player_id as usize].hand.push(companion_id);
+                        self.reset_priority_passes();
+                    }
+                }
+            }
         }
     }
 

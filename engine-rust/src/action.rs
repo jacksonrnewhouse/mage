@@ -94,6 +94,10 @@ pub enum Action {
         /// For X-based cycling (Shark Typhoon): the chosen value of X.
         x_value: u8,
     },
+    /// Pay {3} to put the player's companion from outside the game into their hand.
+    /// The companion card is identified by its ObjectId (registered in the card_registry).
+    /// Only legal when the player has an unrevealed/unused companion (player.companion is Some).
+    CompanionFromSideboard,
 }
 
 /// Categories of game situations where different action types are available.

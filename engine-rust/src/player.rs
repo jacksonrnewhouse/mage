@@ -36,6 +36,11 @@ pub struct Player {
     /// The One Ring ETB: until your next turn, you have protection from everything
     /// (all damage dealt to you is prevented).
     pub protection_from_everything: bool,
+    /// Companion card sitting outside the game (in the sideboard).
+    /// Once revealed before the game, the player may pay {3} at any time they have priority
+    /// to put the companion into their hand.
+    /// `None` means no companion, or the companion has already been moved to hand.
+    pub companion: Option<ObjectId>,
 }
 
 impl Player {
@@ -61,6 +66,7 @@ impl Player {
             yawgmoth_will_active: false,
             protection_from_everything: false,
             cards_discarded_this_turn: 0,
+            companion: None,
         }
     }
 

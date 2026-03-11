@@ -511,6 +511,17 @@ impl GameState {
             }
         }
 
+        // --- Companion: pay {3} to put companion into hand (instant speed) ---
+        // The companion is a card that starts outside the game (sideboard).
+        // Once per game, the player may pay {3} at any time they have priority to
+        // put their companion from outside the game into their hand.
+        if player.companion.is_some() {
+            let companion_cost = crate::mana::ManaCost { generic: 3, ..crate::mana::ManaCost::ZERO };
+            if player.mana_pool.can_pay(&companion_cost) {
+                actions.push(Action::CompanionFromSideboard);
+            }
+        }
+
         // --- Cycling abilities (from hand, instant speed) ---
         // ability_index 0 = cycling, 1 = channel
         for &card_id in &player.hand {
