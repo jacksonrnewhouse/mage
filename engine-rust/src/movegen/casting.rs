@@ -46,7 +46,39 @@ impl GameState {
                 }
             }
 
-            Action::CastSpell { card_id, targets, x_value, from_graveyard, alt_cost } => {
+            Action::PlayLandFromTop(card_id) => {
+                let player_id = self.priority_player;
+                let card_name = self.card_name_for_id(*card_id);
+                // The top of the library must be this card
+                let is_top = self.players[player_id as usize].library.last() == Some(card_id);
+                if !is_top {
+                    return;
+                }
+                if let Some(cn) = card_name {
+                    if let Some(def) = find_card(db, cn) {
+                        if def.card_types.contains(&CardType::Land) {
+                            // Remove from top of library
+                            self.players[player_id as usize].library.pop();
+                            self.players[player_id as usize].land_plays_remaining -= 1;
+                            let perm = Permanent::new(
+                                *card_id,
+                                cn,
+                                player_id,
+                                player_id,
+                                def.power,
+                                def.toughness,
+                                def.loyalty,
+                                def.keywords,
+                                def.card_types,
+                            );
+                            self.battlefield.push(perm);
+                            self.handle_etb(cn, *card_id, player_id);
+                        }
+                    }
+                }
+            }
+
+            Action::CastSpell { card_id, targets, x_value, from_graveyard, from_library_top, alt_cost } => {
                 let player_id = self.priority_player;
                 let card_name = self.card_name_for_id(*card_id);
                 if let Some(cn) = card_name {
@@ -59,6 +91,36 @@ impl GameState {
                             let base_cost = def.flashback_cost.unwrap_or(def.mana_cost);
                             let taxed = self.effective_cost_with_base(def, player_id, base_cost);
                             self.players[player_id as usize].mana_pool.pay(&taxed)
+                        } else if *from_library_top {
+                            // Casting from top of library.
+                            // Check if the card is actually on top of the library.
+                            let is_top = self.players[player_id as usize].library.last() == Some(card_id);
+                            if !is_top {
+                                false
+                            } else {
+                                // Check if Bolas's Citadel is on the battlefield (controlled by this player).
+                                let citadel_active = self.battlefield.iter().any(|p| {
+                                    p.card_name == CardName::BolassCitadel && p.controller == player_id
+                                });
+                                if citadel_active {
+                                    // Pay life equal to the card's mana value instead of mana.
+                                    let life_cost = def.mana_cost.cmc() as i32;
+                                    if self.players[player_id as usize].life > life_cost {
+                                        self.players[player_id as usize].life -= life_cost;
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                } else {
+                                    // Future Sight / Mystic Forge / Experimental Frenzy: pay normal mana cost.
+                                    let mut cost = self.effective_cost(def, player_id);
+                                    if def.has_x_cost {
+                                        let x_cost = (*x_value as u16) * (def.x_multiplier as u16);
+                                        cost.generic = cost.generic.saturating_add(x_cost as u8);
+                                    }
+                                    self.players[player_id as usize].mana_pool.pay(&cost)
+                                }
+                            }
                         } else {
                             // Normal mana cost (with tax effects applied).
                             let mut cost = self.effective_cost(def, player_id);
@@ -79,6 +141,14 @@ impl GameState {
                                     gyd.swap_remove(pos);
                                 } else {
                                     // Card not found in graveyard — bail out
+                                    return;
+                                }
+                            } else if *from_library_top {
+                                // Remove from top of library
+                                let lib = &mut self.players[player_id as usize].library;
+                                if lib.last() == Some(card_id) {
+                                    lib.pop();
+                                } else {
                                     return;
                                 }
                             } else {

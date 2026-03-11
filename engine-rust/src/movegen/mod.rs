@@ -185,6 +185,7 @@ impl GameState {
                                 targets: vec![],
                                 x_value,
                                 from_graveyard: false,
+                from_library_top: false,
                                 alt_cost: None,
                             });
                         } else {
@@ -194,6 +195,7 @@ impl GameState {
                                     targets: targets.clone(),
                                     x_value,
                                     from_graveyard: false,
+                from_library_top: false,
                                     alt_cost: None,
                                 });
                             }
@@ -301,6 +303,7 @@ impl GameState {
                                 targets: vec![],
                                 x_value: 0,
                                 from_graveyard: true,
+                from_library_top: false,
                                 alt_cost: None,
                             });
                         } else {
@@ -310,8 +313,125 @@ impl GameState {
                                     targets: targets.clone(),
                                     x_value: 0,
                                     from_graveyard: true,
+                from_library_top: false,
                                     alt_cost: None,
                                 });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- Cast spells / play lands from top of library ---
+        // Bolas's Citadel: you may play lands and cast spells from the top of your library,
+        //   paying life equal to their mana value instead of mana.
+        // Future Sight: you may play the top card of your library.
+        // Mystic Forge: you may cast artifact spells and colorless spells from the top of your library.
+        // Experimental Frenzy: you may cast spells from the top of your library (not from hand).
+        // Grafdigger's Cage also blocks casting from libraries.
+        {
+            let cage_blocks_library = self.grafdiggers_cage_active();
+            let citadel_active = !cage_blocks_library && self.battlefield.iter().any(|p| {
+                p.card_name == CardName::BolassCitadel && p.controller == player_id
+            });
+            let future_sight_active = !cage_blocks_library && self.battlefield.iter().any(|p| {
+                p.card_name == CardName::FutureSight && p.controller == player_id
+            });
+            let mystic_forge_active = !cage_blocks_library && self.battlefield.iter().any(|p| {
+                p.card_name == CardName::MysticForge && p.controller == player_id
+            });
+            let experimental_frenzy_active = !cage_blocks_library && self.battlefield.iter().any(|p| {
+                p.card_name == CardName::ExperimentalFrenzy && p.controller == player_id
+            });
+
+            let any_library_top_active = citadel_active || future_sight_active
+                || mystic_forge_active || experimental_frenzy_active;
+
+            if any_library_top_active {
+                if let Some(&top_card_id) = self.players[player_id as usize].library.last() {
+                    if let Some(top_name) = self.card_name_for_id(top_card_id) {
+                        if let Some(top_def) = find_card(db, top_name) {
+                            let is_land = top_def.card_types.contains(&CardType::Land);
+                            let is_artifact = top_def.card_types.contains(&CardType::Artifact);
+                            // A spell is colorless if it has no colored mana symbols in its cost.
+                            let mc = top_def.mana_cost;
+                            let is_colorless = mc.white == 0 && mc.blue == 0 && mc.black == 0
+                                && mc.red == 0 && mc.green == 0;
+
+                            if is_land {
+                                // Play a land from top of library (sorcery speed, land plays remaining)
+                                if sorcery_speed && player.land_plays_remaining > 0 {
+                                    // Citadel, Future Sight allow playing lands
+                                    if citadel_active || future_sight_active {
+                                        actions.push(Action::PlayLandFromTop(top_card_id));
+                                    }
+                                }
+                            } else {
+                                // Cast a spell from top of library
+                                // Timing check
+                                let can_cast_instant = top_def.card_types.contains(&CardType::Instant)
+                                    || top_def.keywords.has(Keyword::Flash);
+                                let can_cast = can_cast_instant || sorcery_speed;
+
+                                if can_cast {
+                                    // Which enablers allow casting this card?
+                                    let can_cast_with_citadel = citadel_active;
+                                    let can_cast_with_future_sight = future_sight_active;
+                                    let can_cast_with_forge = mystic_forge_active
+                                        && (is_artifact || is_colorless);
+                                    let can_cast_with_frenzy = experimental_frenzy_active;
+                                    let enabled = can_cast_with_citadel || can_cast_with_future_sight
+                                        || can_cast_with_forge || can_cast_with_frenzy;
+
+                                    if enabled {
+                                        // Affordability check
+                                        let can_afford = if citadel_active && !future_sight_active
+                                            && !can_cast_with_forge && !can_cast_with_frenzy
+                                        {
+                                            // Citadel only: pay life equal to mana value
+                                            let life_cost = top_def.mana_cost.cmc() as i32;
+                                            player.life > life_cost
+                                        } else if can_cast_with_citadel {
+                                            // When both citadel and mana-based options available,
+                                            // check if either payment is affordable
+                                            let cost = self.effective_cost(top_def, player_id);
+                                            player.life > top_def.mana_cost.cmc() as i32
+                                                || player.mana_pool.can_pay(&cost)
+                                        } else {
+                                            // Future Sight / Mystic Forge / Frenzy: pay mana
+                                            let cost = self.effective_cost(top_def, player_id);
+                                            player.mana_pool.can_pay(&cost)
+                                        };
+
+                                        if can_afford {
+                                            let target_sets = self.generate_targets(top_name, player_id, db);
+                                            if target_sets.is_empty() {
+                                                if !requires_sacrifice_cost(top_name) {
+                                                    actions.push(Action::CastSpell {
+                                                        card_id: top_card_id,
+                                                        targets: vec![],
+                                                        x_value: 0,
+                                                        from_graveyard: false,
+                                                        from_library_top: true,
+                                                        alt_cost: None,
+                                                    });
+                                                }
+                                            } else {
+                                                for targets in &target_sets {
+                                                    actions.push(Action::CastSpell {
+                                                        card_id: top_card_id,
+                                                        targets: targets.clone(),
+                                                        x_value: 0,
+                                                        from_graveyard: false,
+                                                        from_library_top: true,
+                                                        alt_cost: None,
+                                                    });
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -1601,6 +1721,7 @@ impl GameState {
                                     targets: vec![Target::Object(item.id)],
                                     x_value: 0,
                                     from_graveyard: false,
+                from_library_top: false,
                                     alt_cost: Some(AltCost::ForceOfWill { exile_id }),
                                 });
                             }
@@ -1611,6 +1732,7 @@ impl GameState {
                                     targets: targets.clone(),
                                     x_value: 0,
                                     from_graveyard: false,
+                from_library_top: false,
                                     alt_cost: Some(AltCost::ForceOfWill { exile_id }),
                                 });
                             }
@@ -1642,6 +1764,7 @@ impl GameState {
                                     targets: vec![Target::Object(item.id)],
                                     x_value: 0,
                                     from_graveyard: false,
+                from_library_top: false,
                                     alt_cost: Some(AltCost::ForceOfNegation { exile_id }),
                                 });
                             }
@@ -1652,6 +1775,7 @@ impl GameState {
                                     targets: targets.clone(),
                                     x_value: 0,
                                     from_graveyard: false,
+                from_library_top: false,
                                     alt_cost: Some(AltCost::ForceOfNegation { exile_id }),
                                 });
                             }
@@ -1684,6 +1808,7 @@ impl GameState {
                                     targets: vec![Target::Object(item.id)],
                                     x_value: 0,
                                     from_graveyard: false,
+                from_library_top: false,
                                     alt_cost: Some(AltCost::Misdirection { exile_id }),
                                 });
                             }
@@ -1694,6 +1819,7 @@ impl GameState {
                                     targets: targets.clone(),
                                     x_value: 0,
                                     from_graveyard: false,
+                from_library_top: false,
                                     alt_cost: Some(AltCost::Misdirection { exile_id }),
                                 });
                             }
@@ -1732,6 +1858,7 @@ impl GameState {
                                 targets: vec![Target::Object(item.id)],
                                 x_value: 0,
                                 from_graveyard: false,
+                from_library_top: false,
                                 alt_cost: Some(AltCost::Commandeer { exile_id1, exile_id2 }),
                             });
                         }
@@ -1742,6 +1869,7 @@ impl GameState {
                                 targets: targets.clone(),
                                 x_value: 0,
                                 from_graveyard: false,
+                from_library_top: false,
                                 alt_cost: Some(AltCost::Commandeer { exile_id1, exile_id2 }),
                             });
                         }
@@ -1784,6 +1912,7 @@ impl GameState {
                                 targets: vec![],
                                 x_value: 0,
                                 from_graveyard: false,
+                from_library_top: false,
                                 alt_cost: Some(alt),
                             });
                         } else {
@@ -1793,6 +1922,7 @@ impl GameState {
                                     targets: targets.clone(),
                                     x_value: 0,
                                     from_graveyard: false,
+                from_library_top: false,
                                     alt_cost: Some(alt.clone()),
                                 });
                             }
@@ -1817,6 +1947,7 @@ impl GameState {
                                 targets: targets.clone(),
                                 x_value: 0,
                                 from_graveyard: false,
+                from_library_top: false,
                                 alt_cost: Some(alt.clone()),
                             });
                         }
@@ -1840,6 +1971,7 @@ impl GameState {
                                 targets: targets.clone(),
                                 x_value: 0,
                                 from_graveyard: false,
+                from_library_top: false,
                                 alt_cost: Some(alt.clone()),
                             });
                         }
@@ -1869,6 +2001,7 @@ impl GameState {
                                     targets: targets.clone(),
                                     x_value: 0,
                                     from_graveyard: false,
+                from_library_top: false,
                                     alt_cost: Some(alt.clone()),
                                 });
                             }
@@ -1886,6 +2019,7 @@ impl GameState {
                                     targets: targets.clone(),
                                     x_value: 0,
                                     from_graveyard: false,
+                from_library_top: false,
                                     alt_cost: Some(alt.clone()),
                                 });
                             }
@@ -1943,6 +2077,7 @@ impl GameState {
                     targets: vec![],
                     x_value: 0,
                     from_graveyard: false,
+                from_library_top: false,
                     alt_cost: Some(AltCost::Evoke { exile_id }),
                 });
             } else {
@@ -1952,6 +2087,7 @@ impl GameState {
                         targets: targets.clone(),
                         x_value: 0,
                         from_graveyard: false,
+                from_library_top: false,
                         alt_cost: Some(AltCost::Evoke { exile_id }),
                     });
                 }

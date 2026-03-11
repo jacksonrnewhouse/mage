@@ -34,15 +34,19 @@ pub enum Action {
     PassPriority,
     /// Play a land from hand
     PlayLand(ObjectId),
+    /// Play a land from the top of library (Future Sight, Bolas's Citadel).
+    PlayLandFromTop(ObjectId),
     /// Cast a spell (from hand or graveyard). Includes target selection.
     /// For X spells, `x_value` is the chosen value of X (0 for non-X spells).
     /// `from_graveyard` is true when casting via flashback or Yawgmoth's Will.
+    /// `from_library_top` is true when casting via Bolas's Citadel, Future Sight, Mystic Forge, etc.
     /// `alt_cost` is Some when paying an alternative cost instead of the normal mana cost.
     CastSpell {
         card_id: ObjectId,
         targets: Vec<Target>,
         x_value: u8,
         from_graveyard: bool,
+        from_library_top: bool,
         alt_cost: Option<AltCost>,
     },
     /// Activate an ability on a permanent.

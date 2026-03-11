@@ -104,6 +104,7 @@ fn test_permanent_has_creature_types_after_casting() {
             targets: vec![],
             x_value: 0,
             from_graveyard: false,
+                from_library_top: false,
             alt_cost: None,
         },
         &db,

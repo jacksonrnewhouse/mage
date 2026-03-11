@@ -237,6 +237,7 @@ pub enum CardName {
     SinkIntoStupor,
     SharkTyphoon,
     SharkToken,
+    FutureSight,
 
     // === Black Creatures ===
     Nethergoyf,
@@ -337,6 +338,7 @@ pub enum CardName {
     FableOfTheMirrorBreaker,
     ShatterskullSmashing,
     SunderingEruption,
+    ExperimentalFrenzy,
 
     // === Red/Green extra creatures (madness/pitch) ===
     BaskingRootwalla,
@@ -1493,6 +1495,8 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Whenever you cast a noncreature spell, create an X/X blue Shark creature token with flying, where X is that spell's mana value. Cycling {X}{U}.");
     card!(SharkToken, "Shark Token", ManaCost::ZERO, &[Creature], &[], Some(0), Some(0), None, flying(), &[Blue],
         "Flying. (This is a token created by Shark Typhoon.)");
+    card!(FutureSight, "Future Sight", ManaCost { blue: 1, generic: 4, ..c }, &[Enchantment], &[], None, None, None, kw(), &[Blue],
+        "Play with the top card of your library revealed. You may play the top card of your library.");
 
     // === Black Creatures ===
     card!(Nethergoyf, "Nethergoyf", ManaCost::b(1), &[Creature], &[],
@@ -1676,6 +1680,8 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Shatterskull Smashing deals X damage divided as you choose among up to two target creatures and/or planeswalkers. If X is 6 or more, Shatterskull Smashing deals twice X damage divided as you choose instead.");
     card!(SunderingEruption, "Sundering Eruption", ManaCost { red: 1, generic: 2, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Red],
         "Destroy target artifact or enchantment. Sundering Eruption deals 3 damage to each opponent.");
+    card!(ExperimentalFrenzy, "Experimental Frenzy", ManaCost { red: 1, generic: 3, ..c }, &[Enchantment], &[], None, None, None, kw(), &[Red],
+        "You may look at the top card of your library any time. You may cast spells from the top of your library. You can't cast spells from your hand. {3}{R}: Destroy Experimental Frenzy.");
 
     // === Red/Green Madness/Pitch Creatures ===
     card!(BaskingRootwalla, "Basking Rootwalla", ManaCost::g(1), &[Creature], &[],
