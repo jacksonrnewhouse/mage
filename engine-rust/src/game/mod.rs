@@ -114,6 +114,11 @@ pub struct GameState {
     /// The exiled card is face-down and can be cast for free when the hideaway condition is met.
     pub hideaway_exiled: Vec<(ObjectId, ObjectId)>,
 
+    // --- Adventure ---
+    /// Cards exiled after their adventure resolved, waiting to be cast as the creature half.
+    /// Each entry is (card_id, owner). The card is in `exile` as well.
+    pub adventure_exiled: Vec<(ObjectId, PlayerId)>,
+
     // --- Monarch ---
     /// The player who is currently the monarch, if any. The monarch draws a card
     /// at the beginning of their end step. When a creature deals combat damage to
@@ -277,6 +282,7 @@ impl GameState {
             imprinted: Vec::new(),
             skyclave_token_mv: Vec::new(),
             hideaway_exiled: Vec::new(),
+            adventure_exiled: Vec::new(),
             monarch: None,
             emblems: Vec::new(),
             delayed_triggers: Vec::new(),

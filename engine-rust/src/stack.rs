@@ -18,6 +18,9 @@ pub struct StackItem {
     /// True if this spell was cast from the graveyard (flashback or Yawgmoth's Will).
     /// When true and the spell is an instant/sorcery, it is exiled instead of going to graveyard.
     pub cast_from_graveyard: bool,
+    /// True if this spell is the adventure half of an adventure card.
+    /// When true and the spell resolves, the card goes to exile (where the creature half can be cast).
+    pub cast_as_adventure: bool,
     /// Chosen mode indices for modal spells (e.g., Kolaghan's Command choose 2 of 4).
     /// Empty for non-modal spells.
     pub modes: Vec<u8>,
@@ -255,6 +258,20 @@ impl GameStack {
         cast_from_graveyard: bool,
         modes: Vec<u8>,
     ) -> ObjectId {
+        self.push_with_all_flags(kind, controller, targets, cant_be_countered, x_value, cast_from_graveyard, false, modes)
+    }
+
+    pub fn push_with_all_flags(
+        &mut self,
+        kind: StackItemKind,
+        controller: PlayerId,
+        targets: Vec<Target>,
+        cant_be_countered: bool,
+        x_value: u8,
+        cast_from_graveyard: bool,
+        cast_as_adventure: bool,
+        modes: Vec<u8>,
+    ) -> ObjectId {
         let id = self.next_id;
         self.next_id += 1;
         self.items.push(StackItem {
@@ -265,6 +282,7 @@ impl GameStack {
             cant_be_countered,
             x_value,
             cast_from_graveyard,
+            cast_as_adventure,
             modes,
             is_copy: false,
         });
@@ -324,6 +342,7 @@ impl GameStack {
             cant_be_countered: false,
             x_value: source.x_value,
             cast_from_graveyard: false,
+            cast_as_adventure: false,
             modes: source.modes.clone(),
             is_copy: true,
         });
@@ -343,6 +362,7 @@ impl GameStack {
             cant_be_countered: false,
             x_value: template.x_value,
             cast_from_graveyard: false,
+            cast_as_adventure: false,
             modes: template.modes.clone(),
             is_copy: true,
         });

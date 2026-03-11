@@ -344,6 +344,88 @@ impl GameState {
                     }
                 }
             }
+
+            Action::CastAdventure { card_id, targets } => {
+                let player_id = self.priority_player;
+                let card_name = self.card_name_for_id(*card_id);
+                if let Some(cn) = card_name {
+                    if let Some(def) = find_card(db, cn) {
+                        if let Some(adv) = def.adventure {
+                            // Pay the adventure cost
+                            let adv_cost = self.effective_cost_with_base(def, player_id, adv.cost);
+                            if !self.players[player_id as usize].mana_pool.pay(&adv_cost) {
+                                return;
+                            }
+                            // Remove the card from hand
+                            if !self.players[player_id as usize].remove_from_hand(*card_id) {
+                                return;
+                            }
+                            // Push the adventure spell onto the stack, marked as cast_as_adventure
+                            self.stack.push_with_all_flags(
+                                StackItemKind::Spell {
+                                    card_name: cn,
+                                    card_id: *card_id,
+                                    cast_via_evoke: false,
+                                },
+                                player_id,
+                                targets.clone(),
+                                false,  // cant_be_countered
+                                0,      // x_value
+                                false,  // cast_from_graveyard
+                                true,   // cast_as_adventure
+                                vec![], // modes
+                            );
+                            self.players[player_id as usize].spells_cast_this_turn += 1;
+                            self.players[player_id as usize].nonartifact_spells_cast_this_turn += 1;
+                            self.players[player_id as usize].noncreature_spells_cast_this_turn += 1;
+                            self.storm_count += 1;
+                            self.check_noncreature_cast_triggers(player_id);
+                            self.reset_priority_passes();
+                        }
+                    }
+                }
+            }
+
+            Action::CastCreatureFromAdventureExile { card_id } => {
+                let player_id = self.priority_player;
+                let card_name = self.card_name_for_id(*card_id);
+                if let Some(cn) = card_name {
+                    if let Some(def) = find_card(db, cn) {
+                        // Pay the creature's normal mana cost
+                        let cost = self.effective_cost(def, player_id);
+                        if !self.players[player_id as usize].mana_pool.pay(&cost) {
+                            return;
+                        }
+                        // Remove from exile
+                        let pos = self.exile.iter().position(|(id, _, _)| *id == *card_id);
+                        if let Some(p) = pos {
+                            self.exile.swap_remove(p);
+                        } else {
+                            return; // Not in exile
+                        }
+                        // Remove from adventure_exiled tracker
+                        if let Some(p) = self.adventure_exiled.iter().position(|(id, _)| *id == *card_id) {
+                            self.adventure_exiled.swap_remove(p);
+                        }
+                        // Push the creature spell onto the stack normally
+                        self.stack.push(
+                            StackItemKind::Spell {
+                                card_name: cn,
+                                card_id: *card_id,
+                                cast_via_evoke: false,
+                            },
+                            player_id,
+                            vec![],
+                        );
+                        self.players[player_id as usize].spells_cast_this_turn += 1;
+                        if !def.card_types.contains(&CardType::Artifact) {
+                            self.players[player_id as usize].nonartifact_spells_cast_this_turn += 1;
+                        }
+                        self.storm_count += 1;
+                        self.reset_priority_passes();
+                    }
+                }
+            }
         }
     }
 

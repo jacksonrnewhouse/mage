@@ -98,6 +98,18 @@ pub enum Action {
     /// The companion card is identified by its ObjectId (registered in the card_registry).
     /// Only legal when the player has an unrevealed/unused companion (player.companion is Some).
     CompanionFromSideboard,
+    /// Cast the adventure half of an adventure card from hand.
+    /// `card_id` is the ObjectId of the card in hand (the full card, e.g., Bonecrusher Giant).
+    /// After the adventure resolves, the card goes to exile, from which the creature half can be cast.
+    CastAdventure {
+        card_id: ObjectId,
+        targets: Vec<Target>,
+    },
+    /// Cast the creature half of an adventure card from exile (after its adventure resolved).
+    /// `card_id` is the ObjectId of the card in exile.
+    CastCreatureFromAdventureExile {
+        card_id: ObjectId,
+    },
 }
 
 /// Categories of game situations where different action types are available.

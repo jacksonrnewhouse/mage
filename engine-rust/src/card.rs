@@ -568,6 +568,21 @@ pub struct CardDef {
     pub creature_types: &'static [CreatureType],
     /// True if this card is a changeling (has all creature types).
     pub is_changeling: bool,
+    /// Adventure: if Some, this creature card has an adventure half.
+    /// The adventure is an instant or sorcery spell with its own cost, types, and name.
+    /// When you cast the adventure, it goes to exile; then you may cast the creature from exile.
+    pub adventure: Option<AdventureDef>,
+}
+
+/// The adventure half of an adventure card (e.g., "Stomp" on Bonecrusher Giant).
+#[derive(Debug, Clone, Copy)]
+pub struct AdventureDef {
+    /// The display name of the adventure spell (e.g., "Stomp").
+    pub display_name: &'static str,
+    /// The mana cost of the adventure spell.
+    pub cost: ManaCost,
+    /// The card types of the adventure spell (always Instant or Sorcery).
+    pub card_types: &'static [CardType],
 }
 
 /// Equipment bonus: P/T modification and keyword grants applied when equipped.
@@ -711,6 +726,7 @@ pub fn build_card_db() -> Vec<CardDef> {
                 madness_cost: None,
                 creature_types: &[],
                 is_changeling: false,
+                adventure: None,
             });
         };
         // Variant with creature types
@@ -734,6 +750,7 @@ pub fn build_card_db() -> Vec<CardDef> {
                 madness_cost: None,
                 creature_types: $ct,
                 is_changeling: false,
+                adventure: None,
             });
         };
         // Variant with changeling (all creature types)
@@ -757,6 +774,7 @@ pub fn build_card_db() -> Vec<CardDef> {
                 madness_cost: None,
                 creature_types: &[],
                 is_changeling: true,
+                adventure: None,
             });
         };
         // Variant with X cost: x_mult is how many times X appears (1 or 2)
@@ -780,6 +798,7 @@ pub fn build_card_db() -> Vec<CardDef> {
                 madness_cost: None,
                 creature_types: &[],
                 is_changeling: false,
+                adventure: None,
             });
         };
         // Variant with flashback cost
@@ -803,6 +822,7 @@ pub fn build_card_db() -> Vec<CardDef> {
                 madness_cost: None,
                 creature_types: &[],
                 is_changeling: false,
+                adventure: None,
             });
         };
         // Variant with madness cost
@@ -826,6 +846,31 @@ pub fn build_card_db() -> Vec<CardDef> {
                 madness_cost: Some($mc),
                 creature_types: &[],
                 is_changeling: false,
+                adventure: None,
+            });
+        };
+        // Variant with adventure half
+        (ADVENTURE($adv:expr) $name:expr, $display:expr, $cost:expr, $types:expr, $supers:expr,
+         $pow:expr, $tou:expr, $loy:expr, $kw:expr, $colors:expr, $text:expr) => {
+            db.push(CardDef {
+                name: $name,
+                display_name: $display,
+                mana_cost: $cost,
+                has_x_cost: false,
+                x_multiplier: 0,
+                card_types: $types,
+                supertypes: $supers,
+                power: $pow,
+                toughness: $tou,
+                loyalty: $loy,
+                keywords: $kw,
+                color_identity: $colors,
+                oracle_text: $text,
+                flashback_cost: None,
+                madness_cost: None,
+                creature_types: &[],
+                is_changeling: false,
+                adventure: Some($adv),
             });
         };
     }
@@ -1460,7 +1505,11 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(ThundertrapTrainer, "Thundertrap Trainer", ManaCost { blue: 1, generic: 1, ..c }, &[Creature], &[],
         Some(2), Some(2), None, kw(), &[Blue],
         "Whenever you cast a noncreature spell, tap target creature an opponent controls.");
-    card!(BrazenBorrower, "Brazen Borrower", ManaCost { blue: 1, generic: 2, ..c }, &[Creature], &[],
+    card!(ADVENTURE(AdventureDef {
+        display_name: "Petty Theft",
+        cost: ManaCost { blue: 1, generic: 1, ..c },
+        card_types: &[CardType::Instant],
+    }) BrazenBorrower, "Brazen Borrower", ManaCost { blue: 1, generic: 2, ..c }, &[Creature], &[],
         Some(3), Some(1), None, flash_flying(), &[Blue],
         "Flash. Flying. Brazen Borrower can block only creatures with flying. Adventure - Petty Theft {1}{U}: Return target nonland permanent an opponent controls to its owner's hand.");
     card!(EmryLurkerOfTheLoch, "Emry, Lurker of the Loch", ManaCost { blue: 1, generic: 2, ..c }, &[Creature], &[Legendary],
@@ -1687,7 +1736,11 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(AvalancheOfSector7, "Avalanche of Sector 7", ManaCost { red: 1, generic: 2, ..c }, &[Creature], &[],
         Some(3), Some(3), None, kw(), &[Red],
         "When Avalanche of Sector 7 enters, it deals damage equal to its power to target creature or planeswalker an opponent controls.");
-    card!(BonecrusherGiant, "Bonecrusher Giant", ManaCost { red: 1, generic: 2, ..c }, &[Creature], &[],
+    card!(ADVENTURE(AdventureDef {
+        display_name: "Stomp",
+        cost: ManaCost { red: 1, generic: 1, ..c },
+        card_types: &[CardType::Instant],
+    }) BonecrusherGiant, "Bonecrusher Giant", ManaCost { red: 1, generic: 2, ..c }, &[Creature], &[],
         Some(4), Some(3), None, kw(), &[Red],
         "Whenever Bonecrusher Giant becomes the target of a spell, Bonecrusher Giant deals 2 damage to that spell's controller. Adventure - Stomp {1}{R}: Deal 2 damage to any target. Damage can't be prevented this turn.");
     card!(BroadsideBombardiers, "Broadside Bombardiers", ManaCost { red: 1, generic: 2, ..c }, &[Creature], &[],

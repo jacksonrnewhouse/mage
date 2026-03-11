@@ -559,6 +559,69 @@ impl GameState {
             }
         }
 
+        // --- Adventure spells (cast adventure half from hand) ---
+        // For each adventure card in hand, generate a CastAdventure action at instant speed
+        // (if the adventure is an instant) or sorcery speed (if sorcery).
+        for &card_id in &player.hand {
+            if let Some(card_name) = self.card_name_for_id(card_id) {
+                if let Some(def) = find_card(db, card_name) {
+                    if let Some(ref adv) = def.adventure {
+                        // Check timing: adventure instants can be cast anytime, sorceries at sorcery speed
+                        let adv_is_instant = adv.card_types.contains(&CardType::Instant);
+                        let can_cast_adv = if adv_is_instant { true } else { sorcery_speed };
+                        if !can_cast_adv {
+                            continue;
+                        }
+                        // Check affordability of adventure cost
+                        let adv_cost = self.effective_cost_with_base(def, player_id, adv.cost);
+                        if !player.mana_pool.can_pay(&adv_cost) {
+                            continue;
+                        }
+                        // Generate targets for the adventure effect (reuse card_name targeting logic)
+                        let target_sets = self.generate_targets(card_name, player_id, db);
+                        if target_sets.is_empty() {
+                            actions.push(Action::CastAdventure {
+                                card_id,
+                                targets: vec![],
+                            });
+                        } else {
+                            for targets in &target_sets {
+                                actions.push(Action::CastAdventure {
+                                    card_id,
+                                    targets: targets.clone(),
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- Cast creature from adventure exile ---
+        // Cards in adventure_exiled can be cast as creatures at sorcery speed.
+        let adventure_exiled: Vec<(ObjectId, PlayerId)> = self.adventure_exiled.clone();
+        for (card_id, owner) in adventure_exiled {
+            if owner != player_id {
+                continue;
+            }
+            if let Some(card_name) = self.card_name_for_id(card_id) {
+                if let Some(def) = find_card(db, card_name) {
+                    // Creatures can only be cast at sorcery speed (unless flash)
+                    let has_flash = def.keywords.has(Keyword::Flash);
+                    let can_cast = has_flash || sorcery_speed;
+                    if !can_cast {
+                        continue;
+                    }
+                    // Check affordability of creature cost
+                    let creature_cost = self.effective_cost(def, player_id);
+                    if !player.mana_pool.can_pay(&creature_cost) {
+                        continue;
+                    }
+                    actions.push(Action::CastCreatureFromAdventureExile { card_id });
+                }
+            }
+        }
+
         // --- Cycling abilities (from hand, instant speed) ---
         // ability_index 0 = cycling, 1 = channel
         for &card_id in &player.hand {

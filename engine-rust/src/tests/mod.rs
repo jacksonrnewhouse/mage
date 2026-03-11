@@ -38,6 +38,7 @@ mod imprint;
 mod madness;
 mod hideaway;
 mod saga;
+mod adventure;
 
 pub(crate) fn setup_simple_game() -> (GameState, Vec<CardDef>) {
     let db = build_card_db();

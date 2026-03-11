@@ -12,9 +12,10 @@ impl GameState {
     pub fn resolve_top(&mut self, db: &[CardDef]) {
         if let Some(item) = self.stack.pop() {
             let is_copy = item.is_copy;
+            let cast_as_adventure = item.cast_as_adventure;
             match item.kind {
                 StackItemKind::Spell { card_name, card_id, cast_via_evoke } => {
-                    self.resolve_spell(card_name, card_id, item.controller, &item.targets, item.x_value, item.cast_from_graveyard, cast_via_evoke, &item.modes, is_copy, db);
+                    self.resolve_spell(card_name, card_id, item.controller, &item.targets, item.x_value, item.cast_from_graveyard, cast_as_adventure, cast_via_evoke, &item.modes, is_copy, db);
                 }
                 StackItemKind::TriggeredAbility { effect, .. } => {
                     self.resolve_triggered(effect, item.controller, &item.targets, db);
@@ -35,20 +36,27 @@ impl GameState {
         targets: &[Target],
         x_value: u8,
         cast_from_graveyard: bool,
+        cast_as_adventure: bool,
         cast_via_evoke: bool,
         modes: &[u8],
         is_copy: bool,
         db: &[CardDef],
     ) {
         let card_def = find_card(db, card_name);
-        let is_permanent = card_def
-            .map(|c| {
-                c.card_types.iter().any(|t| matches!(t,
-                    CardType::Creature | CardType::Artifact | CardType::Enchantment
-                    | CardType::Planeswalker | CardType::Land
-                ))
-            })
-            .unwrap_or(false);
+        // When cast as an adventure, the card resolves as the adventure spell (instant/sorcery),
+        // NOT as the permanent (creature). So treat it as non-permanent in that case.
+        let is_permanent = if cast_as_adventure {
+            false
+        } else {
+            card_def
+                .map(|c| {
+                    c.card_types.iter().any(|t| matches!(t,
+                        CardType::Creature | CardType::Artifact | CardType::Enchantment
+                        | CardType::Planeswalker | CardType::Land
+                    ))
+                })
+                .unwrap_or(false)
+        };
 
         if is_permanent && !is_copy {
             // Put permanent onto battlefield (copies of permanent spells don't create permanents
@@ -95,6 +103,7 @@ impl GameState {
         } else if !is_permanent {
             // Instant/sorcery: resolve effect, then place in appropriate zone.
             // If cast via flashback (or via Yawgmoth's Will), exile instead of going to graveyard.
+            // If cast as an adventure, exile the card (so creature half can be cast from exile).
             self.resolve_card_effect_with_x(card_name, controller, targets, x_value, modes, is_copy, db);
             if is_copy {
                 // Copies of spells cease to exist after resolving — no card to zone-route.
@@ -102,6 +111,12 @@ impl GameState {
                 // Exile the card (flashback / Yawgmoth's Will rule: if it would go to graveyard, exile it)
                 // The card was already removed from graveyard when cast; just push to exile.
                 self.exile.push((card_id, card_name, controller));
+            } else if cast_as_adventure {
+                // Adventure rule: after the adventure resolves, exile the card.
+                // The card was already removed from hand when cast.
+                // Mark it in adventure_exiled so the creature half can be cast later.
+                self.exile.push((card_id, card_name, controller));
+                self.adventure_exiled.push((card_id, controller));
             } else {
                 // Apply graveyard-replacement effects (Rest in Peace).
                 self.send_to_graveyard(card_id, card_name, controller);
@@ -226,6 +241,21 @@ impl GameState {
             CardName::LightningBolt | CardName::ChainLightning => {
                 if let Some(target) = targets.first() {
                     self.deal_damage_to_target(*target, 3, controller);
+                }
+            }
+            // === Adventure spells ===
+            // Stomp (adventure of Bonecrusher Giant): deal 2 damage to any target.
+            // Note: "damage can't be prevented" — not modeled yet, treated as normal damage.
+            CardName::BonecrusherGiant => {
+                if let Some(target) = targets.first() {
+                    self.deal_damage_to_target(*target, 2, controller);
+                }
+            }
+            // Petty Theft (adventure of Brazen Borrower): return target nonland permanent
+            // an opponent controls to its owner's hand.
+            CardName::BrazenBorrower => {
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    self.remove_permanent_to_zone(*target_id, DestinationZone::Hand);
                 }
             }
             CardName::Abrade => {
@@ -1207,6 +1237,7 @@ impl GameState {
                         cant_be_countered: false,
                         x_value: 0,
                         cast_from_graveyard: false,
+                        cast_as_adventure: false,
                         modes: vec![],
                         is_copy: false, // push_copy will override this to true
                     };

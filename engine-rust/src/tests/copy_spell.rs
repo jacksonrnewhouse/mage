@@ -190,6 +190,7 @@ fn test_copy_does_not_go_to_graveyard() {
         cant_be_countered: false,
         x_value: 0,
         cast_from_graveyard: false,
+        cast_as_adventure: false,
         modes: vec![],
         is_copy: false,
     };
