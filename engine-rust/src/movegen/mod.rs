@@ -150,6 +150,11 @@ impl GameState {
                     // Generate target permutations
                     let target_sets = self.generate_targets(card_name, player_id, db);
                     if target_sets.is_empty() {
+                        // If this spell requires a sacrifice as an additional cost,
+                        // it cannot be cast without a valid sacrifice target.
+                        if requires_sacrifice_cost(card_name) {
+                            continue;
+                        }
                         actions.push(Action::CastSpell {
                             card_id,
                             targets: vec![],
@@ -1008,7 +1013,7 @@ impl GameState {
     ) -> Vec<Vec<Target>> {
         match card_name {
             // Target any player or creature (damage spells)
-            CardName::LightningBolt | CardName::ChainLightning | CardName::ShrapnelBlast => {
+            CardName::LightningBolt | CardName::ChainLightning => {
                 let mut targets = Vec::new();
                 for pid in 0..self.num_players {
                     targets.push(vec![Target::Player(pid)]);
@@ -1019,6 +1024,67 @@ impl GameState {
                     }
                 }
                 targets
+            }
+
+            // Shrapnel Blast: sacrifice an artifact as additional cost, deal 5 to any target.
+            // targets[0] = artifact to sacrifice (controlled by caster), targets[1] = damage target.
+            CardName::ShrapnelBlast => {
+                let artifacts: Vec<ObjectId> = self.battlefield.iter()
+                    .filter(|p| p.controller == controller && p.is_artifact())
+                    .map(|p| p.id)
+                    .collect();
+                if artifacts.is_empty() {
+                    return vec![];
+                }
+                let mut target_sets = Vec::new();
+                for &art_id in &artifacts {
+                    // Damage can go to any player or creature
+                    for pid in 0..self.num_players {
+                        target_sets.push(vec![Target::Object(art_id), Target::Player(pid)]);
+                    }
+                    for perm in &self.battlefield {
+                        if perm.is_creature() {
+                            target_sets.push(vec![Target::Object(art_id), Target::Object(perm.id)]);
+                        }
+                    }
+                }
+                target_sets
+            }
+
+            // Village Rites: sacrifice a creature as additional cost, draw 2.
+            // targets[0] = creature to sacrifice (controlled by caster).
+            CardName::VillageRites => {
+                self.battlefield.iter()
+                    .filter(|p| p.controller == controller && p.is_creature())
+                    .map(|p| vec![Target::Object(p.id)])
+                    .collect()
+            }
+
+            // Deadly Dispute: sacrifice an artifact or creature as additional cost, draw 2 + Treasure.
+            // targets[0] = artifact or creature to sacrifice (controlled by caster).
+            CardName::DeadlyDispute => {
+                self.battlefield.iter()
+                    .filter(|p| p.controller == controller && (p.is_artifact() || p.is_creature()))
+                    .map(|p| vec![Target::Object(p.id)])
+                    .collect()
+            }
+
+            // Natural Order: sacrifice a green creature as additional cost, tutor a green creature.
+            // targets[0] = green creature to sacrifice (controlled by caster).
+            CardName::NaturalOrder => {
+                self.battlefield.iter()
+                    .filter(|p| p.controller == controller && p.is_creature())
+                    .map(|p| vec![Target::Object(p.id)])
+                    .collect()
+            }
+
+            // Crop Rotation: sacrifice a land as additional cost, tutor any land.
+            // targets[0] = land to sacrifice (controlled by caster).
+            CardName::CropRotation => {
+                self.battlefield.iter()
+                    .filter(|p| p.controller == controller && p.is_land())
+                    .map(|p| vec![Target::Object(p.id)])
+                    .collect()
             }
 
             // Target creature or planeswalker (damage-based removal)
@@ -1166,5 +1232,18 @@ pub fn is_uncounterable(name: CardName) -> bool {
     matches!(
         name,
         CardName::AbruptDecay
+    )
+}
+
+/// Returns true if a spell requires sacrificing a permanent as an additional cost.
+/// Such spells cannot be cast if generate_targets returns no valid targets.
+pub fn requires_sacrifice_cost(name: CardName) -> bool {
+    matches!(
+        name,
+        CardName::VillageRites
+            | CardName::DeadlyDispute
+            | CardName::ShrapnelBlast
+            | CardName::NaturalOrder
+            | CardName::CropRotation
     )
 }

@@ -837,3 +837,271 @@ fn test_treasure_lockdown_under_null_rod() {
         "Treasure token ability should be locked down by Null Rod"
     );
 }
+
+// === Sacrifice-as-cost spell tests ===
+
+#[test]
+fn test_village_rites_sacrifices_creature_and_draws() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    let rites_id = state.new_object_id();
+    let creature_id = state.new_object_id();
+    state.card_registry.push((rites_id, CardName::VillageRites));
+    state.card_registry.push((creature_id, CardName::DarkConfidant));
+    state.players[0].hand.push(rites_id);
+
+    // Put a creature on the battlefield for player 0
+    let def = find_card(&db, CardName::DarkConfidant).unwrap();
+    let perm = crate::permanent::Permanent::new(
+        creature_id, CardName::DarkConfidant, 0, 0,
+        def.power, def.toughness, None, def.keywords, def.card_types,
+    );
+    state.battlefield.push(perm);
+
+    // Populate library so draw works
+    for _ in 0..5 {
+        let card_id = state.new_object_id();
+        state.card_registry.push((card_id, CardName::Swamp));
+        state.players[0].library.push(card_id);
+    }
+
+    state.turn_number = 1;
+    state.phase = Phase::PreCombatMain;
+    state.step = None;
+    state.active_player = 0;
+    state.priority_player = 0;
+    state.players[0].mana_pool.black = 1;
+
+    // Village Rites should generate a target (the creature)
+    let actions = state.legal_actions(&db);
+    let cast_action = actions.iter().find(|a| {
+        matches!(a, Action::CastSpell { card_id, targets }
+            if *card_id == rites_id && targets.len() == 1
+            && matches!(targets[0], Target::Object(id) if id == creature_id))
+    });
+    assert!(cast_action.is_some(), "Should be able to cast Village Rites targeting the creature");
+
+    // Apply the cast action
+    state.apply_action(cast_action.unwrap(), &db);
+
+    // Both players pass priority to resolve
+    state.pass_priority(&db);
+    state.pass_priority(&db);
+
+    // The creature should be gone (sacrificed on resolution)
+    let has_creature = state.battlefield.iter().any(|p| p.card_name == CardName::DarkConfidant);
+    assert!(!has_creature, "Dark Confidant should have been sacrificed by Village Rites");
+
+    // Player 0 should have drawn 2 cards
+    // Initial hand was [rites_id] (1 card), cast removes it (-1), draw 2 (+2) = 2 cards
+    assert_eq!(
+        state.players[0].hand.len(), 2,
+        "Player should have drawn 2 cards from Village Rites"
+    );
+}
+
+#[test]
+fn test_village_rites_requires_creature_to_cast() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    let rites_id = state.new_object_id();
+    state.card_registry.push((rites_id, CardName::VillageRites));
+    state.players[0].hand.push(rites_id);
+
+    // No creatures on battlefield
+    state.turn_number = 1;
+    state.phase = Phase::PreCombatMain;
+    state.step = None;
+    state.active_player = 0;
+    state.priority_player = 0;
+    state.players[0].mana_pool.black = 1;
+
+    // Village Rites should NOT be castable without a creature
+    let actions = state.legal_actions(&db);
+    let can_cast = actions.iter().any(|a| {
+        matches!(a, Action::CastSpell { card_id, .. } if *card_id == rites_id)
+    });
+    assert!(!can_cast, "Village Rites should not be castable without a creature to sacrifice");
+}
+
+#[test]
+fn test_deadly_dispute_sacrifices_artifact_draws_and_creates_treasure() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    let dispute_id = state.new_object_id();
+    let artifact_id = state.new_object_id();
+    state.card_registry.push((dispute_id, CardName::DeadlyDispute));
+    state.card_registry.push((artifact_id, CardName::SolRing));
+    state.players[0].hand.push(dispute_id);
+
+    // Put Sol Ring on the battlefield for player 0
+    let def = find_card(&db, CardName::SolRing).unwrap();
+    let perm = crate::permanent::Permanent::new(
+        artifact_id, CardName::SolRing, 0, 0,
+        def.power, def.toughness, None, def.keywords, def.card_types,
+    );
+    state.battlefield.push(perm);
+
+    // Populate library so draw works
+    for _ in 0..5 {
+        let card_id = state.new_object_id();
+        state.card_registry.push((card_id, CardName::Swamp));
+        state.players[0].library.push(card_id);
+    }
+
+    state.turn_number = 1;
+    state.phase = Phase::PreCombatMain;
+    state.step = None;
+    state.active_player = 0;
+    state.priority_player = 0;
+    state.players[0].mana_pool.black = 1;
+    state.players[0].mana_pool.colorless = 1;
+
+    // Deadly Dispute should generate a target (the artifact)
+    let actions = state.legal_actions(&db);
+    let cast_action = actions.iter().find(|a| {
+        matches!(a, Action::CastSpell { card_id, targets }
+            if *card_id == dispute_id && targets.len() == 1
+            && matches!(targets[0], Target::Object(id) if id == artifact_id))
+    });
+    assert!(cast_action.is_some(), "Should be able to cast Deadly Dispute targeting Sol Ring");
+
+    let initial_hand_size = state.players[0].hand.len(); // 1 (just dispute_id)
+
+    // Apply the cast action
+    state.apply_action(cast_action.unwrap(), &db);
+
+    // Both players pass priority to resolve
+    state.pass_priority(&db);
+    state.pass_priority(&db);
+
+    // Sol Ring should be gone (sacrificed)
+    let has_sol_ring = state.battlefield.iter().any(|p| p.card_name == CardName::SolRing);
+    assert!(!has_sol_ring, "Sol Ring should have been sacrificed by Deadly Dispute");
+
+    // Player 0 should have drawn 2 cards (hand was empty after casting, now +2)
+    let hand_after = state.players[0].hand.len();
+    assert_eq!(
+        hand_after,
+        initial_hand_size - 1 + 2,  // cast spell (-1) then draw 2 (+2)
+        "Player should have drawn 2 cards from Deadly Dispute (had {}, now {})",
+        initial_hand_size, hand_after
+    );
+
+    // A Treasure token should be on the battlefield
+    let has_treasure = state.battlefield.iter().any(|p| p.card_name == CardName::TreasureToken);
+    assert!(has_treasure, "Deadly Dispute should have created a Treasure token");
+}
+
+#[test]
+fn test_deadly_dispute_requires_sacrifice_target() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    let dispute_id = state.new_object_id();
+    state.card_registry.push((dispute_id, CardName::DeadlyDispute));
+    state.players[0].hand.push(dispute_id);
+
+    // No artifacts or creatures on battlefield
+    state.turn_number = 1;
+    state.phase = Phase::PreCombatMain;
+    state.step = None;
+    state.active_player = 0;
+    state.priority_player = 0;
+    state.players[0].mana_pool.black = 1;
+    state.players[0].mana_pool.colorless = 1;
+
+    // Deadly Dispute should NOT be castable without a valid sacrifice target
+    let actions = state.legal_actions(&db);
+    let can_cast = actions.iter().any(|a| {
+        matches!(a, Action::CastSpell { card_id, .. } if *card_id == dispute_id)
+    });
+    assert!(!can_cast, "Deadly Dispute should not be castable without an artifact or creature to sacrifice");
+}
+
+#[test]
+fn test_shrapnel_blast_sacrifices_artifact_and_deals_damage() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    let blast_id = state.new_object_id();
+    let artifact_id = state.new_object_id();
+    state.card_registry.push((blast_id, CardName::ShrapnelBlast));
+    state.card_registry.push((artifact_id, CardName::SolRing));
+    state.players[0].hand.push(blast_id);
+
+    // Put Sol Ring on the battlefield for player 0
+    let def = find_card(&db, CardName::SolRing).unwrap();
+    let perm = crate::permanent::Permanent::new(
+        artifact_id, CardName::SolRing, 0, 0,
+        def.power, def.toughness, None, def.keywords, def.card_types,
+    );
+    state.battlefield.push(perm);
+
+    state.turn_number = 1;
+    state.phase = Phase::PreCombatMain;
+    state.step = None;
+    state.active_player = 0;
+    state.priority_player = 0;
+    state.players[0].mana_pool.red = 1;
+    state.players[0].mana_pool.colorless = 1;
+
+    let initial_life_p1 = state.players[1].life;
+
+    // Find the CastSpell action targeting opponent with Sol Ring as sacrifice
+    let actions = state.legal_actions(&db);
+    let cast_action = actions.iter().find(|a| {
+        matches!(a, Action::CastSpell { card_id, targets }
+            if *card_id == blast_id
+            && targets.len() == 2
+            && matches!(targets[0], Target::Object(id) if id == artifact_id)
+            && matches!(targets[1], Target::Player(1)))
+    });
+    assert!(cast_action.is_some(), "Should be able to cast Shrapnel Blast sacrificing Sol Ring targeting opponent");
+
+    state.apply_action(cast_action.unwrap(), &db);
+
+    // Both players pass priority
+    state.pass_priority(&db);
+    state.pass_priority(&db);
+
+    // Sol Ring should be gone (sacrificed)
+    let has_sol_ring = state.battlefield.iter().any(|p| p.card_name == CardName::SolRing);
+    assert!(!has_sol_ring, "Sol Ring should have been sacrificed by Shrapnel Blast");
+
+    // Opponent should have taken 5 damage
+    assert_eq!(
+        state.players[1].life,
+        initial_life_p1 - 5,
+        "Opponent should have taken 5 damage from Shrapnel Blast"
+    );
+}
+
+#[test]
+fn test_shrapnel_blast_requires_artifact() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    let blast_id = state.new_object_id();
+    state.card_registry.push((blast_id, CardName::ShrapnelBlast));
+    state.players[0].hand.push(blast_id);
+
+    // No artifacts on battlefield
+    state.turn_number = 1;
+    state.phase = Phase::PreCombatMain;
+    state.step = None;
+    state.active_player = 0;
+    state.priority_player = 0;
+    state.players[0].mana_pool.red = 1;
+    state.players[0].mana_pool.colorless = 1;
+
+    // Shrapnel Blast should NOT be castable without an artifact
+    let actions = state.legal_actions(&db);
+    let can_cast = actions.iter().any(|a| {
+        matches!(a, Action::CastSpell { card_id, .. } if *card_id == blast_id)
+    });
+    assert!(!can_cast, "Shrapnel Blast should not be castable without an artifact to sacrifice");
+}

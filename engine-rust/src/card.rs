@@ -248,6 +248,8 @@ pub enum CardName {
     Griselbrand,
 
     // === Black Spells ===
+    VillageRites,
+    DeadlyDispute,
     DarkRitual,
     DemonicConsultation,
     DemonicTutor,
@@ -1302,6 +1304,10 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Flying, lifelink. Pay 7 life: Draw seven cards.");
 
     // === Black Spells ===
+    card!(VillageRites, "Village Rites", ManaCost::b(1), &[Instant], &[], None, None, None, kw(), &[Black],
+        "As an additional cost to cast this spell, sacrifice a creature. Draw 2 cards.");
+    card!(DeadlyDispute, "Deadly Dispute", ManaCost { black: 1, generic: 1, ..c }, &[Instant], &[], None, None, None, kw(), &[Black],
+        "As an additional cost to cast this spell, sacrifice an artifact or creature. Draw 2 cards and create a Treasure token.");
     card!(DemonicConsultation, "Demonic Consultation", ManaCost::b(1), &[Instant], &[], None, None, None, kw(), &[Black],
         "Choose a card name. Exile the top six cards of your library, then reveal cards from the top of your library until you reveal a card with the chosen name. Put that card into your hand and exile all other cards revealed this way.");
     card!(FatalPush, "Fatal Push", ManaCost::b(1), &[Instant], &[], None, None, None, kw(), &[Black],

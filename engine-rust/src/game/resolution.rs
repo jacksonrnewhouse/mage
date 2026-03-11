@@ -181,9 +181,12 @@ impl GameState {
                 }
             }
             CardName::ShrapnelBlast => {
-                // Sacrifice artifact (already done as cost), deal 5 damage
-                if let Some(target) = targets.first() {
-                    self.deal_damage_to_target(*target, 5, controller);
+                // targets[0] = artifact to sacrifice (additional cost), targets[1] = damage target
+                if let Some(Target::Object(sac_id)) = targets.first() {
+                    self.destroy_permanent(*sac_id);
+                }
+                if let Some(damage_target) = targets.get(1) {
+                    self.deal_damage_to_target(*damage_target, 5, controller);
                 }
             }
             CardName::RedirectLightning => {
@@ -218,6 +221,24 @@ impl GameState {
             // === Mana generation ===
             CardName::DarkRitual => {
                 self.players[controller as usize].mana_pool.add(Some(Color::Black), 3);
+            }
+
+            // === Sacrifice-cost draw spells ===
+            // Village Rites: sacrifice a creature (targets[0]), draw 2 cards.
+            CardName::VillageRites => {
+                if let Some(Target::Object(sac_id)) = targets.first() {
+                    self.destroy_permanent(*sac_id);
+                }
+                self.draw_cards(controller, 2);
+            }
+
+            // Deadly Dispute: sacrifice an artifact or creature (targets[0]), draw 2, create Treasure.
+            CardName::DeadlyDispute => {
+                if let Some(Target::Object(sac_id)) = targets.first() {
+                    self.destroy_permanent(*sac_id);
+                }
+                self.draw_cards(controller, 2);
+                self.create_treasure_token(controller);
             }
 
             // === Extra turns ===
@@ -685,6 +706,36 @@ impl GameState {
                         self.card_name_for_id(id)
                             .and_then(|cn| find_card(db, cn))
                             .map(|def| def.card_types.contains(&CardType::Land))
+                            .unwrap_or(false)
+                    })
+                    .copied()
+                    .collect();
+                if !searchable.is_empty() {
+                    self.pending_choice = Some(PendingChoice {
+                        player: controller,
+                        kind: ChoiceKind::ChooseFromList {
+                            options: searchable,
+                            reason: ChoiceReason::GenericSearch,
+                        },
+                    });
+                }
+            }
+
+            // Natural Order: sacrifice a green creature (targets[0]), tutor a green creature.
+            CardName::NaturalOrder => {
+                if let Some(Target::Object(sac_id)) = targets.first() {
+                    self.destroy_permanent(*sac_id);
+                }
+                let searchable: Vec<ObjectId> = self.players[controller as usize]
+                    .library
+                    .iter()
+                    .filter(|&&id| {
+                        self.card_name_for_id(id)
+                            .and_then(|cn| find_card(db, cn))
+                            .map(|def| {
+                                def.card_types.contains(&CardType::Creature)
+                                    && def.color_identity.contains(&Color::Green)
+                            })
                             .unwrap_or(false)
                     })
                     .copied()
