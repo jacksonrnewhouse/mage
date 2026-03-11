@@ -5,6 +5,7 @@ use crate::types::*;
 mod basic;
 mod combat;
 mod dynamic_pt;
+mod equipment;
 mod spells;
 mod statics;
 mod triggers;

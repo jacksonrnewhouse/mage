@@ -138,6 +138,10 @@ pub enum ActivatedEffect {
     KayaExile,
     /// Kaya -1: exile permanent
     KayaMinus,
+    /// Equip: attach equipment to a creature (targets[0] = creature ObjectId)
+    EquipCreature { equipment_id: ObjectId },
+    /// Batterskull bounce: return Batterskull to owner's hand
+    BatterskullBounce,
 }
 
 /// The game stack.

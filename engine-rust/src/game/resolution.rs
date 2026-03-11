@@ -1487,6 +1487,8 @@ impl GameState {
                     loyalty_activated_this_turn: false,
                     card_types: vec![CardType::Artifact],
                     is_token: true,
+                    attached_to: None,
+                    attachments: Vec::new(),
                 };
                 self.battlefield.push(token);
             }
@@ -1573,6 +1575,93 @@ impl GameState {
             ActivatedEffect::PlaneswalkerAbility { .. } => {
                 // Generic planeswalker ability - handled by specific variants above
             }
+            ActivatedEffect::EquipCreature { equipment_id } => {
+                // Attach equipment to target creature
+                if let Some(Target::Object(creature_id)) = targets.first() {
+                    self.do_attach_equipment(equipment_id, *creature_id);
+                }
+            }
+            ActivatedEffect::BatterskullBounce => {
+                // Return Batterskull to owner's hand
+                let batterskull_id = self.battlefield.iter()
+                    .find(|p| p.card_name == CardName::Batterskull && p.controller == controller)
+                    .map(|p| p.id);
+                if let Some(id) = batterskull_id {
+                    self.detach_and_remove(id, DestinationZone::Hand);
+                }
+            }
         }
+    }
+
+    /// Detach from old host, attach equipment to creature, apply bonuses.
+    pub(crate) fn do_attach_equipment(&mut self, equip_id: ObjectId, creature_id: ObjectId) {
+        // First, detach from current host (if any)
+        let old_host = self.find_permanent(equip_id).and_then(|p| p.attached_to);
+        if let Some(old_host_id) = old_host {
+            self.remove_equipment_bonuses(equip_id, old_host_id);
+            // Remove equip_id from old host's attachments
+            if let Some(host) = self.find_permanent_mut(old_host_id) {
+                host.attachments.retain(|&id| id != equip_id);
+            }
+        }
+        // Update attached_to on the equipment
+        if let Some(equip) = self.find_permanent_mut(equip_id) {
+            equip.attached_to = Some(creature_id);
+        }
+        // Add to new host's attachments
+        if let Some(host) = self.find_permanent_mut(creature_id) {
+            if !host.attachments.contains(&equip_id) {
+                host.attachments.push(equip_id);
+            }
+        }
+        // Apply equipment bonuses to the new host
+        self.apply_equipment_bonuses(equip_id, creature_id);
+    }
+
+    /// Apply equipment stat bonuses/keywords to the host creature.
+    pub(crate) fn apply_equipment_bonuses(&mut self, equip_id: ObjectId, creature_id: ObjectId) {
+        let equip_name = match self.find_permanent(equip_id) {
+            Some(p) => p.card_name,
+            None => return,
+        };
+        if let Some(bonus) = crate::card::equipment_bonus(equip_name) {
+            if let Some(creature) = self.find_permanent_mut(creature_id) {
+                creature.power_mod += bonus.power_mod;
+                creature.toughness_mod += bonus.toughness_mod;
+                let kw_bits = bonus.keywords.0;
+                creature.keywords.0 |= kw_bits;
+            }
+        }
+    }
+
+    /// Remove equipment stat bonuses/keywords from the host creature (on detach/death).
+    pub(crate) fn remove_equipment_bonuses(&mut self, equip_id: ObjectId, creature_id: ObjectId) {
+        let equip_name = match self.find_permanent(equip_id) {
+            Some(p) => p.card_name,
+            None => return,
+        };
+        if let Some(bonus) = crate::card::equipment_bonus(equip_name) {
+            if let Some(creature) = self.find_permanent_mut(creature_id) {
+                creature.power_mod -= bonus.power_mod;
+                creature.toughness_mod -= bonus.toughness_mod;
+                let kw_bits = bonus.keywords.0;
+                creature.keywords.0 &= !kw_bits;
+            }
+        }
+    }
+
+    /// Remove equipment bonuses and then remove the equipment from the battlefield.
+    pub(crate) fn detach_and_remove(&mut self, equip_id: ObjectId, zone: DestinationZone) {
+        let old_host = self.find_permanent(equip_id).and_then(|p| p.attached_to);
+        if let Some(host_id) = old_host {
+            self.remove_equipment_bonuses(equip_id, host_id);
+            if let Some(host) = self.find_permanent_mut(host_id) {
+                host.attachments.retain(|&id| id != equip_id);
+            }
+            if let Some(equip) = self.find_permanent_mut(equip_id) {
+                equip.attached_to = None;
+            }
+        }
+        self.remove_permanent_to_zone(equip_id, zone);
     }
 }

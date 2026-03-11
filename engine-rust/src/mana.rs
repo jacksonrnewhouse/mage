@@ -93,6 +93,28 @@ impl ManaPool {
         remaining + colorless_after >= cost.generic as u16
     }
 
+    /// Pay a given amount of generic (any-color) mana. Returns true if successful.
+    pub fn pay_generic(&mut self, amount: u32) -> bool {
+        if self.total() < amount as u16 {
+            return false;
+        }
+        let mut remaining = amount as u8;
+        // Pay with colorless first, then colors
+        let from_colorless = remaining.min(self.colorless);
+        self.colorless -= from_colorless;
+        remaining -= from_colorless;
+        let pools = [&mut self.white, &mut self.blue, &mut self.black, &mut self.red, &mut self.green];
+        for pool in pools {
+            if remaining == 0 {
+                break;
+            }
+            let from_pool = remaining.min(*pool);
+            *pool -= from_pool;
+            remaining -= from_pool;
+        }
+        true
+    }
+
     /// Pay a mana cost from this pool. Returns true if successful.
     /// Uses a greedy strategy: pay colored first, then colorless-specific, then generic.
     pub fn pay(&mut self, cost: &ManaCost) -> bool {

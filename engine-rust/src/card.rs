@@ -533,6 +533,61 @@ pub struct CardDef {
     pub oracle_text: &'static str,
 }
 
+/// Equipment bonus: P/T modification and keyword grants applied when equipped.
+#[derive(Debug, Clone, Copy)]
+pub struct EquipmentBonus {
+    pub power_mod: i16,
+    pub toughness_mod: i16,
+    pub keywords: Keywords,
+}
+
+/// Returns the equip cost (generic mana) for a known equipment card, or None if not equipment.
+pub fn equip_cost(card_name: CardName) -> Option<u8> {
+    match card_name {
+        CardName::SkullClamp => Some(1),
+        CardName::Batterskull => Some(5),
+        CardName::Shadowspear => Some(2),
+        CardName::Shuko => Some(0),
+        _ => None,
+    }
+}
+
+/// Returns the stat bonus granted by an equipment when attached to a creature.
+pub fn equipment_bonus(card_name: CardName) -> Option<EquipmentBonus> {
+    let mut kw = Keywords::empty();
+    match card_name {
+        CardName::SkullClamp => Some(EquipmentBonus {
+            power_mod: 1,
+            toughness_mod: -1,
+            keywords: kw,
+        }),
+        CardName::Batterskull => {
+            kw.add(Keyword::Vigilance);
+            kw.add(Keyword::Lifelink);
+            Some(EquipmentBonus {
+                power_mod: 4,
+                toughness_mod: 4,
+                keywords: kw,
+            })
+        }
+        CardName::Shadowspear => {
+            kw.add(Keyword::Trample);
+            kw.add(Keyword::Lifelink);
+            Some(EquipmentBonus {
+                power_mod: 1,
+                toughness_mod: 1,
+                keywords: kw,
+            })
+        }
+        CardName::Shuko => Some(EquipmentBonus {
+            power_mod: 1,
+            toughness_mod: 0,
+            keywords: kw,
+        }),
+        _ => None,
+    }
+}
+
 /// Build the complete card database. Called once at startup.
 pub fn build_card_db() -> Vec<CardDef> {
     use CardName::*;

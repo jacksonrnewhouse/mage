@@ -341,6 +341,47 @@ impl GameState {
                 }
             }
 
+            // Equipment: equip ability (ability_index == 20) — attach to target creature
+            _ if ability_index == 20 && crate::card::equip_cost(card_name).is_some() => {
+                // Pay equip cost (generic mana)
+                let equip_generic = crate::card::equip_cost(card_name).unwrap();
+                let paid = self.players[controller as usize].mana_pool.pay_generic(equip_generic as u32);
+                if !paid {
+                    return; // Can't afford equip
+                }
+                // Attach to the target creature
+                if let Some(Target::Object(creature_id)) = targets.first() {
+                    let creature_id = *creature_id;
+                    // Push the equip as a triggered-like activated ability to the stack
+                    self.stack.push(
+                        StackItemKind::ActivatedAbility {
+                            source_id: permanent_id,
+                            source_name: card_name,
+                            effect: ActivatedEffect::EquipCreature { equipment_id: permanent_id },
+                        },
+                        controller,
+                        vec![Target::Object(creature_id)],
+                    );
+                }
+            }
+
+            // Batterskull bounce ability (ability_index == 21): {3}: Return to hand
+            CardName::Batterskull if ability_index == 21 => {
+                let paid = self.players[controller as usize].mana_pool.pay_generic(3);
+                if !paid {
+                    return;
+                }
+                self.stack.push(
+                    StackItemKind::ActivatedAbility {
+                        source_id: permanent_id,
+                        source_name: card_name,
+                        effect: ActivatedEffect::BatterskullBounce,
+                    },
+                    controller,
+                    vec![],
+                );
+            }
+
             _ => {}
         }
     }

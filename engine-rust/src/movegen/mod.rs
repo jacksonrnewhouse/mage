@@ -1019,6 +1019,36 @@ impl GameState {
             }
         }
 
+        // --- Equip abilities (sorcery speed) ---
+        // Equipment can equip to any creature the controller controls.
+        if sorcery_speed {
+            if let Some(equip_generic) = crate::card::equip_cost(perm.card_name) {
+                // Can pay the equip cost?
+                let can_afford = u32::from(self.players[perm.controller as usize].mana_pool.colorless) >= equip_generic as u32
+                    || u32::from(self.players[perm.controller as usize].mana_pool.total()) >= equip_generic as u32;
+                let _ = can_afford; // We generate the action; payment is enforced at apply time
+                // Generate one action per legal creature target
+                let controller = perm.controller;
+                let perm_id = perm.id;
+                let creature_targets: Vec<ObjectId> = self.battlefield.iter()
+                    .filter(|p| p.is_creature() && p.controller == controller && p.id != perm_id)
+                    .map(|p| p.id)
+                    .collect();
+                for creature_id in creature_targets {
+                    abilities.push((20, vec![Target::Object(creature_id)]));
+                }
+            }
+        }
+
+        // --- Batterskull bounce ability ---
+        // {3}: Return Batterskull to owner's hand (at any time with priority)
+        if perm.card_name == CardName::Batterskull {
+            let controller = perm.controller;
+            let can_afford = self.players[controller as usize].mana_pool.total() >= 3;
+            let _ = can_afford;
+            abilities.push((21, vec![]));
+        }
+
         abilities
     }
 

@@ -40,6 +40,10 @@ pub struct Permanent {
     pub card_types: Vec<CardType>,
     /// For tokens
     pub is_token: bool,
+    /// For equipment/auras: the ObjectId of the permanent this is attached to (None = unattached).
+    pub attached_to: Option<ObjectId>,
+    /// For creatures/permanents: ObjectIds of equipment and auras attached to this permanent.
+    pub attachments: Vec<ObjectId>,
 }
 
 /// Compact counter storage. Most permanents have 0-2 counter types.
@@ -105,6 +109,8 @@ impl Permanent {
             loyalty_activated_this_turn: false,
             card_types: card_types.to_vec(),
             is_token: false,
+            attached_to: None,
+            attachments: Vec::new(),
         }
     }
 

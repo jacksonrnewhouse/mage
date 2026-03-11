@@ -457,6 +457,52 @@ impl GameState {
     /// Centralized permanent removal: removes from battlefield, places in destination zone,
     /// and fires dies/leaves-battlefield triggers as appropriate.
     pub fn remove_permanent_to_zone(&mut self, id: ObjectId, destination: DestinationZone) -> Option<Permanent> {
+        // Before removing: collect attachment info for cleanup.
+        // If this is a creature, detach all its equipment (equipment stays, becomes unattached).
+        // If this is an equipment, remove its bonuses from its host.
+        let attachments_to_unequip: Vec<ObjectId> = self.find_permanent(id)
+            .map(|p| p.attachments.clone())
+            .unwrap_or_default();
+        let attached_to_host: Option<ObjectId> = self.find_permanent(id).and_then(|p| p.attached_to);
+
+        // Collect Skullclamp trigger info before removing (equip_id and controller)
+        // A Skullclamp trigger fires when its equipped creature dies.
+        let skullclamp_trigger: Option<(ObjectId, PlayerId)> = {
+            let mut result = None;
+            if destination == DestinationZone::Graveyard {
+                // Check if dying permanent is a creature equipped with Skullclamp
+                if let Some(dying) = self.find_permanent(id) {
+                    if dying.is_creature() {
+                        for &att_id in &dying.attachments {
+                            if let Some(att) = self.find_permanent(att_id) {
+                                if att.card_name == CardName::SkullClamp {
+                                    result = Some((att_id, att.controller));
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            result
+        };
+
+        // If the leaving permanent is an equipment attached to a creature, remove its bonuses.
+        if let Some(host_id) = attached_to_host {
+            self.remove_equipment_bonuses(id, host_id);
+            if let Some(host) = self.find_permanent_mut(host_id) {
+                host.attachments.retain(|&att_id| att_id != id);
+            }
+        }
+
+        // If the leaving permanent is a creature, detach all equipment from it.
+        for equip_id in &attachments_to_unequip {
+            self.remove_equipment_bonuses(*equip_id, id);
+            if let Some(equip) = self.find_permanent_mut(*equip_id) {
+                equip.attached_to = None;
+            }
+        }
+
         let perm = self.remove_permanent(id)?;
         let perm_id = perm.id;
         let perm_name = perm.card_name;
@@ -486,6 +532,19 @@ impl GameState {
         // Check dies triggers (only when going to graveyard)
         if destination == DestinationZone::Graveyard {
             self.check_dies_triggers(perm_id, perm_name, controller, is_artifact);
+        }
+
+        // Fire Skullclamp trigger: when equipped creature dies, draw 2
+        if let Some((skullclamp_id, skullclamp_controller)) = skullclamp_trigger {
+            self.stack.push(
+                StackItemKind::TriggeredAbility {
+                    source_id: skullclamp_id,
+                    source_name: CardName::SkullClamp,
+                    effect: TriggeredEffect::SkullclampDeath,
+                },
+                skullclamp_controller,
+                vec![],
+            );
         }
 
         // Check leaves-battlefield triggers (for all removals)
