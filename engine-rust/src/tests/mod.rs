@@ -4,6 +4,7 @@ use crate::types::*;
 
 mod alt_cost;
 mod basic;
+mod clone;
 mod protection;
 mod devotion_metalcraft;
 mod combat;

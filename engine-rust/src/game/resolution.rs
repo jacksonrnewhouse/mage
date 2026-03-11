@@ -1340,6 +1340,25 @@ impl GameState {
                 });
             }
 
+            // Phyrexian Metamorph: enter as a copy of any artifact or creature on the battlefield.
+            // The controller chooses a target from all artifacts and creatures (excluding itself).
+            // The clone is always an artifact in addition to any other types it copies.
+            CardName::PhyrexianMetamorph => {
+                let options: Vec<ObjectId> = self.battlefield.iter()
+                    .filter(|p| p.id != _card_id && (p.is_artifact() || p.is_creature()))
+                    .map(|p| p.id)
+                    .collect();
+                if !options.is_empty() {
+                    self.pending_choice = Some(PendingChoice {
+                        player: controller,
+                        kind: ChoiceKind::ChooseFromList {
+                            options,
+                            reason: ChoiceReason::CloneTarget { clone_id: _card_id, is_metamorph: true },
+                        },
+                    });
+                }
+            }
+
             // Rest in Peace: exile all graveyards when it enters the battlefield.
             // Its static replacement effect (cards go to exile instead of graveyard) is
             // applied at the point of send_to_graveyard / remove_permanent_to_zone.

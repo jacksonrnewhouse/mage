@@ -91,6 +91,45 @@ impl GameState {
                         // The chosen player sacrifices the chosen creature
                         self.destroy_permanent(card_id);
                     }
+                    ChoiceReason::CloneTarget { clone_id, is_metamorph } => {
+                        // Copy the chosen permanent's characteristics onto the clone.
+                        // Collect the data we need from the target before mutating.
+                        let copy_data = self.find_permanent(card_id).map(|target| {
+                            (
+                                target.card_name,
+                                target.base_power,
+                                target.base_toughness,
+                                target.keywords,
+                                target.card_types.clone(),
+                                target.creature_types.clone(),
+                                target.colors.clone(),
+                            )
+                        });
+                        if let Some((
+                            copied_name,
+                            copied_power,
+                            copied_toughness,
+                            copied_keywords,
+                            mut copied_types,
+                            copied_creature_types,
+                            copied_colors,
+                        )) = copy_data
+                        {
+                            // Phyrexian Metamorph is always an artifact in addition to other types.
+                            if is_metamorph && !copied_types.contains(&CardType::Artifact) {
+                                copied_types.push(CardType::Artifact);
+                            }
+                            if let Some(clone_perm) = self.find_permanent_mut(clone_id) {
+                                clone_perm.card_name = copied_name;
+                                clone_perm.base_power = copied_power;
+                                clone_perm.base_toughness = copied_toughness;
+                                clone_perm.keywords = copied_keywords;
+                                clone_perm.card_types = copied_types;
+                                clone_perm.creature_types = copied_creature_types;
+                                clone_perm.colors = copied_colors;
+                            }
+                        }
+                    }
                     _ => {}
                 }
             }

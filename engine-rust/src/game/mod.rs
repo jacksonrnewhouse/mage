@@ -148,6 +148,10 @@ pub enum ChoiceReason {
     /// True-Name Nemesis ETB: choose a player (by player id).
     /// The permanent_id is the True-Name Nemesis's ObjectId so we can grant protection.
     TrueNameNemesisETB { permanent_id: ObjectId },
+    /// Clone ETB: choose a permanent to copy.
+    /// `clone_id` is the clone permanent's ObjectId.
+    /// `is_metamorph` is true for Phyrexian Metamorph (always keeps Artifact type).
+    CloneTarget { clone_id: ObjectId, is_metamorph: bool },
 }
 impl GameState {
     /// Create a new two-player game.
