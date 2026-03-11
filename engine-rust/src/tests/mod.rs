@@ -9,6 +9,7 @@ mod cost_reduction;
 mod cycling;
 mod dynamic_pt;
 mod equipment;
+mod exile_linked;
 mod flashback;
 mod replacement_effects;
 mod spells;

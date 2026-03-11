@@ -95,6 +95,13 @@ pub enum TriggeredEffect {
     GainControlOfPermanent,
     /// Exchange control of this permanent and target creature (Gilded Drake ETB)
     GildedDrakeExchange { drake_id: ObjectId },
+    /// Skyclave Apparition ETB: exile target nonland nontoken permanent with MV <= 4
+    SkyclaveApparitionETB,
+    /// Skyclave Apparition leaves the battlefield: create a token for the opponent
+    /// The token's MV is stored in skyclave_token_mv on GameState, keyed by the apparition's id
+    SkyclaveApparitionLeaves { apparition_id: ObjectId, token_mv: u32, opponent: PlayerId },
+    /// Exile-until-leaves return trigger: return an exiled card to the battlefield
+    ExileLinkedReturn { card_id: ObjectId, card_owner: PlayerId },
 }
 
 /// Activated ability effects.

@@ -134,6 +134,7 @@ pub enum CardName {
     WhitePlumeAdventurer,
     SeasonedDungeoneer,
     Solitude,
+    SkyclaveApparition,
     StoneforgeMystic,
     PalaceJailer,
 
@@ -1103,6 +1104,9 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(CT(&[CreatureType::Elemental]) Solitude, "Solitude", ManaCost { white: 2, generic: 3, ..c }, &[Creature], &[],
         Some(3), Some(2), None, flash_flying(), &[White],
         "Flash. Flying. Lifelink. When Solitude enters, exile up to one other target creature. That creature's controller gains life equal to its power. Evoke - Exile a white card from your hand.");
+    card!(CT(&[CreatureType::Spirit]) SkyclaveApparition, "Skyclave Apparition", ManaCost { white: 2, generic: 1, ..c }, &[Creature], &[],
+        Some(2), Some(2), None, flying(), &[White],
+        "Flying. When Skyclave Apparition enters, exile up to one target nonland, nontoken permanent you don't control with mana value 4 or less. When Skyclave Apparition leaves the battlefield, that permanent's controller creates an X/X blue Illusion creature token, where X is the exiled card's mana value.");
     card!(CT(&[CreatureType::Kor, CreatureType::Artificer]) StoneforgeMystic, "Stoneforge Mystic", ManaCost { white: 1, generic: 1, ..c }, &[Creature], &[],
         Some(1), Some(2), None, kw(), &[White],
         "When Stoneforge Mystic enters, you may search your library for an Equipment card, reveal it, put it into your hand, then shuffle. {1}{W}, {T}: You may put an Equipment card from your hand onto the battlefield.");

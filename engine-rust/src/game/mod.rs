@@ -71,6 +71,15 @@ pub struct GameState {
     // --- Graveyard casting ---
     /// Cards in graveyards that have been granted flashback by Snapcaster Mage (cleared at end of turn).
     pub snapcaster_flashback_cards: Vec<ObjectId>,
+
+    // --- Exile-linked permanents ---
+    /// Maps (exiling_permanent_id, exiled_card_id) for "exile until leaves" effects.
+    /// When the exiling permanent leaves the battlefield, the exiled card returns.
+    pub exile_linked: Vec<(ObjectId, ObjectId)>,
+
+    /// Maps (exiling_permanent_id, token_mv) for Skyclave Apparition.
+    /// When Skyclave Apparition leaves, the opponent gets a token with MV equal to the exiled card's MV.
+    pub skyclave_token_mv: Vec<(ObjectId, u32)>,
 }
 
 /// When the game needs a player to make a choice (tutor, discard, etc.)
@@ -150,6 +159,8 @@ impl GameState {
             card_registry: Vec::with_capacity(120),
             temporary_effects: Vec::new(),
             snapcaster_flashback_cards: Vec::new(),
+            exile_linked: Vec::new(),
+            skyclave_token_mv: Vec::new(),
         }
     }
 

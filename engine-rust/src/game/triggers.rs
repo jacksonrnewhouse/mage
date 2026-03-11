@@ -1,7 +1,7 @@
 /// Dies triggers, leaves-battlefield triggers, and permanent removal with trigger checks.
 
 use crate::card::*;
-use crate::game::{DestinationZone, GameState};
+use crate::game::GameState;
 use crate::stack::*;
 use crate::types::*;
 
@@ -79,15 +79,75 @@ impl GameState {
     }
 
     /// Check for leaves-battlefield triggers (bounce, exile, etc.).
-    /// Currently a placeholder for future expansion.
+    /// Handles exile-until-leaves effects: when the exiling permanent leaves,
+    /// return the exiled card to the battlefield.
     pub(crate) fn check_leaves_triggers(
         &mut self,
-        _left_id: ObjectId,
+        left_id: ObjectId,
         _left_name: CardName,
-        _controller: PlayerId,
+        controller: PlayerId,
     ) {
-        // Future: handle leaves-battlefield triggers like
-        // Oblivion Ring, Flickerwisp, etc.
+        // --- Exile-linked return triggers ---
+        // Collect all cards exiled by this permanent
+        let linked_cards: Vec<ObjectId> = self
+            .exile_linked
+            .iter()
+            .filter(|(exiler_id, _)| *exiler_id == left_id)
+            .map(|(_, exiled_id)| *exiled_id)
+            .collect();
+
+        if !linked_cards.is_empty() {
+            // Remove the links for this exiler
+            self.exile_linked.retain(|(exiler_id, _)| *exiler_id != left_id);
+
+            for card_id in linked_cards {
+                // Find the owner of the exiled card
+                let card_owner = self.exile
+                    .iter()
+                    .find(|(id, _, _)| *id == card_id)
+                    .map(|(_, _, owner)| *owner)
+                    .unwrap_or(controller);
+
+                // Push return trigger onto the stack
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: left_id,
+                        source_name: _left_name,
+                        effect: TriggeredEffect::ExileLinkedReturn {
+                            card_id,
+                            card_owner,
+                        },
+                    },
+                    card_owner,
+                    vec![],
+                );
+            }
+        }
+
+        // --- Skyclave Apparition leaves: create token for opponent ---
+        let skyclave_mv: Option<u32> = self
+            .skyclave_token_mv
+            .iter()
+            .find(|(app_id, _)| *app_id == left_id)
+            .map(|(_, mv)| *mv);
+
+        if let Some(token_mv) = skyclave_mv {
+            self.skyclave_token_mv.retain(|(app_id, _)| *app_id != left_id);
+            let opponent = self.opponent(controller);
+            self.stack.push(
+                StackItemKind::TriggeredAbility {
+                    source_id: left_id,
+                    source_name: _left_name,
+                    effect: TriggeredEffect::SkyclaveApparitionLeaves {
+                        apparition_id: left_id,
+                        token_mv,
+                        opponent,
+                    },
+                },
+                opponent,
+                vec![],
+            );
+        }
     }
 
     /// Check for noncreature spell cast triggers.

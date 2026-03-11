@@ -16,7 +16,7 @@ impl GameState {
                     self.resolve_spell(card_name, card_id, item.controller, &item.targets, item.x_value, item.cast_from_graveyard, cast_via_evoke, db);
                 }
                 StackItemKind::TriggeredAbility { effect, .. } => {
-                    self.resolve_triggered(effect, item.controller, &item.targets);
+                    self.resolve_triggered(effect, item.controller, &item.targets, db);
                 }
                 StackItemKind::ActivatedAbility { effect, .. } => {
                     self.resolve_activated(effect, item.controller, &item.targets);
@@ -1114,6 +1114,29 @@ impl GameState {
                     vec![],
                 );
             }
+            // Skyclave Apparition: exile target nonland nontoken permanent MV <= 4 an opponent controls
+            CardName::SkyclaveApparition => {
+                let opp = self.opponent(controller);
+                let targets: Vec<ObjectId> = self.battlefield.iter()
+                    .filter(|p| {
+                        p.controller == opp
+                            && !p.is_land()
+                            && !p.is_token
+                    })
+                    .map(|p| p.id)
+                    .collect();
+                if let Some(&target_id) = targets.first() {
+                    self.stack.push(
+                        StackItemKind::TriggeredAbility {
+                            source_id: _card_id,
+                            source_name: card_name,
+                            effect: TriggeredEffect::SkyclaveApparitionETB,
+                        },
+                        controller,
+                        vec![Target::Object(target_id)],
+                    );
+                }
+            }
             // Snapcaster Mage: ETB handled separately in handle_etb_with_cast_targets
             // because it needs the targets from the CastSpell action.
             CardName::SnapcasterMage => {}
@@ -1276,7 +1299,7 @@ impl GameState {
         }
     }
 
-    fn resolve_triggered(&mut self, effect: TriggeredEffect, controller: PlayerId, targets: &[Target]) {
+    fn resolve_triggered(&mut self, effect: TriggeredEffect, controller: PlayerId, targets: &[Target], db: &[CardDef]) {
         match effect {
             TriggeredEffect::ManaCryptUpkeep => {
                 // Flip coin - simplified: 50% chance of 3 damage
@@ -1414,10 +1437,47 @@ impl GameState {
             }
             TriggeredEffect::SolitudeETB => {
                 // Exile target creature - opponent gains life equal to its power
+                // Record exile link so the creature returns when Solitude leaves
                 if let Some(Target::Object(creature_id)) = targets.first() {
-                    let power = self.find_permanent(*creature_id).map(|p| p.power()).unwrap_or(0);
-                    if let Some(perm) = self.remove_permanent_to_zone(*creature_id, DestinationZone::Exile) {
+                    let creature_id = *creature_id;
+                    let power = self.find_permanent(creature_id).map(|p| p.power()).unwrap_or(0);
+                    // source_id is the Solitude permanent id (same as card_id when it entered)
+                    // We need the Solitude id: find it on battlefield
+                    let solitude_id = self.battlefield.iter()
+                        .find(|p| p.card_name == CardName::Solitude)
+                        .map(|p| p.id);
+                    if let Some(perm) = self.remove_permanent_to_zone(creature_id, DestinationZone::Exile) {
                         self.players[perm.controller as usize].life += power as i32;
+                        // Record exile link: when Solitude leaves, this card returns
+                        if let Some(sol_id) = solitude_id {
+                            self.exile_linked.push((sol_id, perm.id));
+                        }
+                    }
+                }
+            }
+            TriggeredEffect::SkyclaveApparitionETB => {
+                // Exile target nonland nontoken permanent MV <= 4 an opponent controls
+                // Record exile link and token MV for when Apparition leaves
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    let target_id = *target_id;
+                    // Find the Skyclave Apparition on battlefield controlled by the resolver
+                    let apparition_id = self.battlefield.iter()
+                        .find(|p| p.card_name == CardName::SkyclaveApparition && p.controller == controller)
+                        .map(|p| p.id);
+                    let exiled_card_name = self.find_permanent(target_id).map(|p| p.card_name);
+                    if let Some(perm) = self.remove_permanent_to_zone(target_id, DestinationZone::Exile) {
+                        if let Some(app_id) = apparition_id {
+                            // Record exile link
+                            self.exile_linked.push((app_id, perm.id));
+                            // Record the MV from db (we store the exiled card name in card_registry)
+                            // Use 0 as fallback; the token MV is resolved later in the leaves trigger
+                            let mv = exiled_card_name
+                                .and_then(|cn| {
+                                    db.iter().find(|d| d.name == cn).map(|d| d.mana_cost.cmc() as u32)
+                                })
+                                .unwrap_or(0);
+                            self.skyclave_token_mv.push((app_id, mv));
+                        }
                     }
                 }
             }
@@ -1495,8 +1555,59 @@ impl GameState {
                 // The creature's card goes to the graveyard (owner's zone).
                 self.destroy_permanent(permanent_id);
             }
+            TriggeredEffect::ExileLinkedReturn { card_id, card_owner } => {
+                // Return the exiled card to the battlefield under its owner's control.
+                // Remove from exile first.
+                self.exile.retain(|(id, _, _)| *id != card_id);
+                if let Some(card_name) = self.card_name_for_id(card_id) {
+                    if let Some(card_def) = find_card(db, card_name) {
+                        let is_creature = card_def.card_types.iter().any(|t| matches!(t, CardType::Creature));
+                        let is_artifact = card_def.card_types.iter().any(|t| matches!(t, CardType::Artifact));
+                        let is_enchantment = card_def.card_types.iter().any(|t| matches!(t, CardType::Enchantment));
+                        let is_planeswalker = card_def.card_types.iter().any(|t| matches!(t, CardType::Planeswalker));
+                        let is_land = card_def.card_types.iter().any(|t| matches!(t, CardType::Land));
+                        let is_permanent_type = is_creature || is_artifact || is_enchantment || is_planeswalker || is_land;
+                        if is_permanent_type {
+                            let mut perm = Permanent::new(
+                                card_id,
+                                card_name,
+                                card_owner,
+                                card_owner,
+                                card_def.power,
+                                card_def.toughness,
+                                card_def.loyalty,
+                                card_def.keywords,
+                                card_def.card_types,
+                            );
+                            perm.is_token = false;
+                            self.battlefield.push(perm);
+                        }
+                    }
+                }
+            }
+            TriggeredEffect::SkyclaveApparitionLeaves { opponent, token_mv, .. } => {
+                // Create an X/X blue Illusion token for the opponent, where X = token_mv
+                let x = token_mv as i16;
+                if x > 0 {
+                    let token_id = self.new_object_id();
+                    let mut token = Permanent::new(
+                        token_id,
+                        CardName::SkyclaveApparition, // placeholder name for token
+                        opponent,
+                        opponent,
+                        Some(x),
+                        Some(x),
+                        None,
+                        Keywords::empty(),
+                        &[CardType::Creature],
+                    );
+                    token.is_token = true;
+                    self.battlefield.push(token);
+                }
+            }
             _ => {}
         }
+        let _ = db; // suppress unused warning when db not used in all arms
     }
 
     fn resolve_activated(&mut self, effect: ActivatedEffect, controller: PlayerId, targets: &[Target]) {
