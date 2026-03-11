@@ -492,6 +492,34 @@ impl GameState {
             .filter(move |p| p.controller == player && p.is_artifact())
     }
 
+    /// Count the number of colored mana symbols of a given color among permanents controlled by
+    /// player. This implements the "devotion to <color>" mechanic (e.g. Thassa's Oracle, Nykthos).
+    /// Lands are excluded (they don't have mana costs that contribute to devotion).
+    pub fn devotion_to(&self, player: PlayerId, color: Color, db: &[CardDef]) -> u32 {
+        let mut count: u32 = 0;
+        for perm in self.permanents_controlled_by(player) {
+            // Lands don't contribute to devotion
+            if perm.is_land() {
+                continue;
+            }
+            if let Some(def) = find_card(db, perm.card_name) {
+                count += match color {
+                    Color::White => def.mana_cost.white as u32,
+                    Color::Blue => def.mana_cost.blue as u32,
+                    Color::Black => def.mana_cost.black as u32,
+                    Color::Red => def.mana_cost.red as u32,
+                    Color::Green => def.mana_cost.green as u32,
+                };
+            }
+        }
+        count
+    }
+
+    /// Returns true if the player controls three or more artifacts (metalcraft condition).
+    pub fn metalcraft(&self, player: PlayerId) -> bool {
+        self.artifacts_controlled_by(player).count() >= 3
+    }
+
     /// Low-level removal: removes a permanent from the battlefield without firing triggers.
     /// Prefer `remove_permanent_to_zone` for game-logic removal.
     pub fn remove_permanent(&mut self, id: ObjectId) -> Option<Permanent> {

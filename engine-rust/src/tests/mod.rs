@@ -4,6 +4,7 @@ use crate::types::*;
 
 mod alt_cost;
 mod basic;
+mod devotion_metalcraft;
 mod combat;
 mod monarch;
 mod cost_reduction;

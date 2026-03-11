@@ -925,11 +925,23 @@ impl GameState {
                 Some(Color::Red), Some(Color::Green),
             ],
 
-            // Chrome Mox, Mox Diamond, Mox Opal: any color (simplified)
-            CardName::ChromeMox | CardName::MoxDiamond | CardName::MoxOpal => vec![
+            // Chrome Mox, Mox Diamond: any color (simplified)
+            CardName::ChromeMox | CardName::MoxDiamond => vec![
                 Some(Color::White), Some(Color::Blue), Some(Color::Black),
                 Some(Color::Red), Some(Color::Green),
             ],
+
+            // Mox Opal: Metalcraft — tap for any color only if controller has 3+ artifacts
+            CardName::MoxOpal => {
+                if self.metalcraft(perm.controller) {
+                    vec![
+                        Some(Color::White), Some(Color::Blue), Some(Color::Black),
+                        Some(Color::Red), Some(Color::Green),
+                    ]
+                } else {
+                    vec![]
+                }
+            }
 
             // Chromatic Star: any color
             CardName::ChromaticStar => vec![
@@ -1073,10 +1085,23 @@ impl GameState {
             | CardName::Gleemox
             | CardName::ChromeMox
             | CardName::MoxDiamond
-            | CardName::MoxOpal
             | CardName::ChromaticStar
             | CardName::DelightedHalfling
             | CardName::UndermountainAdventurer => {
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.tapped = true;
+                }
+                self.players[controller as usize]
+                    .mana_pool
+                    .add(color_choice, 1);
+                true
+            }
+
+            // Mox Opal: Metalcraft — only active if controller has 3+ artifacts
+            CardName::MoxOpal => {
+                if !self.metalcraft(controller) {
+                    return false;
+                }
                 if let Some(perm) = self.find_permanent_mut(permanent_id) {
                     perm.tapped = true;
                 }
