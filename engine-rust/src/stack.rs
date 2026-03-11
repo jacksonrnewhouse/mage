@@ -13,6 +13,8 @@ pub struct StackItem {
     pub targets: Vec<Target>,
     /// True if this spell can't be countered (e.g. Abrupt Decay).
     pub cant_be_countered: bool,
+    /// The chosen value of X for X spells (0 for non-X spells).
+    pub x_value: u8,
 }
 
 #[derive(Debug, Clone)]
@@ -154,7 +156,7 @@ impl GameStack {
     }
 
     pub fn push(&mut self, kind: StackItemKind, controller: PlayerId, targets: Vec<Target>) -> ObjectId {
-        self.push_with_flags(kind, controller, targets, false)
+        self.push_with_flags(kind, controller, targets, false, 0)
     }
 
     pub fn push_with_flags(
@@ -163,6 +165,7 @@ impl GameStack {
         controller: PlayerId,
         targets: Vec<Target>,
         cant_be_countered: bool,
+        x_value: u8,
     ) -> ObjectId {
         let id = self.next_id;
         self.next_id += 1;
@@ -172,6 +175,7 @@ impl GameStack {
             controller,
             targets,
             cant_be_countered,
+            x_value,
         });
         id
     }

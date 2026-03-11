@@ -517,6 +517,12 @@ pub struct CardDef {
     pub name: CardName,
     pub display_name: &'static str,
     pub mana_cost: ManaCost,
+    /// True if this card has X in its mana cost (e.g., Walking Ballista {X}{X},
+    /// Chalice of the Void {X}{X}, Stonecoil Serpent {X}).
+    /// When casting, the player chooses X and pays mana_cost + (x_multiplier * X).
+    pub has_x_cost: bool,
+    /// How many times X appears in the mana cost symbol (1 for {X}, 2 for {X}{X}).
+    pub x_multiplier: u8,
     pub card_types: &'static [CardType],
     pub supertypes: &'static [SuperType],
     pub power: Option<i16>,
@@ -543,6 +549,27 @@ pub fn build_card_db() -> Vec<CardDef> {
                 name: $name,
                 display_name: $display,
                 mana_cost: $cost,
+                has_x_cost: false,
+                x_multiplier: 0,
+                card_types: $types,
+                supertypes: $supers,
+                power: $pow,
+                toughness: $tou,
+                loyalty: $loy,
+                keywords: $kw,
+                color_identity: $colors,
+                oracle_text: $text,
+            });
+        };
+        // Variant with X cost: x_mult is how many times X appears (1 or 2)
+        (X($x_mult:expr) $name:expr, $display:expr, $cost:expr, $types:expr, $supers:expr,
+         $pow:expr, $tou:expr, $loy:expr, $kw:expr, $colors:expr, $text:expr) => {
+            db.push(CardDef {
+                name: $name,
+                display_name: $display,
+                mana_cost: $cost,
+                has_x_cost: true,
+                x_multiplier: $x_mult,
                 card_types: $types,
                 supertypes: $supers,
                 power: $pow,
@@ -1541,7 +1568,8 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Flying. When Kishla Skimmer enters, mill three cards.");
 
     // === Colorless Creatures ===
-    card!(StonecoilSerpent, "Stonecoil Serpent", c, &[Artifact, Creature], &[],
+    // Stonecoil Serpent: {X} — X appears once, pays 1 per X
+    card!(X(1) StonecoilSerpent, "Stonecoil Serpent", c, &[Artifact, Creature], &[],
         Some(0), Some(0), None, {
             let mut k = Keywords::empty();
             k.add(Keyword::Reach);
@@ -1549,7 +1577,8 @@ pub fn build_card_db() -> Vec<CardDef> {
             k
         }, &[],
         "Reach, trample, protection from multicolored. Stonecoil Serpent enters with X +1/+1 counters on it.");
-    card!(WalkingBallista, "Walking Ballista", c, &[Artifact, Creature], &[],
+    // Walking Ballista: {X}{X} — X appears twice, pays 2 per X
+    card!(X(2) WalkingBallista, "Walking Ballista", c, &[Artifact, Creature], &[],
         Some(0), Some(0), None, kw(), &[],
         "Walking Ballista enters with X +1/+1 counters on it. {4}: Put a +1/+1 counter on Walking Ballista. Remove a +1/+1 counter from Walking Ballista: It deals 1 damage to any target.");
     card!(PhyrexianDreadnought, "Phyrexian Dreadnought", ManaCost::generic(1), &[Artifact, Creature], &[],
@@ -1624,11 +1653,14 @@ pub fn build_card_db() -> Vec<CardDef> {
         "You may pay 2 life instead of {U}. Look at target player's hand. Draw a card.");
 
     // === Colorless Artifacts ===
-    card!(ChaliceOfTheVoid, "Chalice of the Void", c, &[Artifact], &[], None, None, None, kw(), &[],
+    // Chalice of the Void: {X}{X} — X appears twice
+    card!(X(2) ChaliceOfTheVoid, "Chalice of the Void", c, &[Artifact], &[], None, None, None, kw(), &[],
         "Chalice of the Void enters with X charge counters on it. Whenever a player casts a spell with mana value equal to the number of charge counters on Chalice of the Void, counter that spell.");
-    card!(ClownCar, "Clown Car", c, &[Artifact], &[], None, None, None, kw(), &[],
+    // Clown Car: {X} — X appears once
+    card!(X(1) ClownCar, "Clown Car", c, &[Artifact], &[], None, None, None, kw(), &[],
         "When Clown Car enters, roll X six-sided dice. For each odd result, create a 1/1 white Clown Robot artifact creature token. Crew 2.");
-    card!(EngineeredExplosives, "Engineered Explosives", c, &[Artifact], &[], None, None, None, kw(), &[],
+    // Engineered Explosives: {X} — X appears once (sunburst adds charge counters based on colors)
+    card!(X(1) EngineeredExplosives, "Engineered Explosives", c, &[Artifact], &[], None, None, None, kw(), &[],
         "Sunburst. {2}, Sacrifice Engineered Explosives: Destroy each nonland permanent with mana value equal to the number of charge counters on Engineered Explosives.");
     card!(Gleemox, "Gleemox", c, &[Artifact], &[], None, None, None, kw(), &[],
         "{T}: Add one mana of any color.");

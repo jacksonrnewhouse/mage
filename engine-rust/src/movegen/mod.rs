@@ -141,30 +141,58 @@ impl GameState {
 
                     // Check mana cost (including Thalia tax, etc.)
                     let effective_cost = self.effective_cost(def, player_id);
-                    if !player.mana_pool.can_pay(&effective_cost) {
-                        // Can't pay - but first check if we could tap lands to get mana
-                        // For search, we generate mana ability actions separately
-                        continue;
-                    }
+
+                    // For X spells, determine the range of valid X values
+                    let x_values: Vec<u8> = if def.has_x_cost {
+                        // Check if we can afford at least the base cost (X=0)
+                        if !player.mana_pool.can_pay(&effective_cost) {
+                            continue;
+                        }
+                        // Compute remaining mana after paying the base cost
+                        let mut temp_pool = player.mana_pool;
+                        temp_pool.pay(&effective_cost);
+                        let remaining = temp_pool.total() as u8;
+                        // Max X is limited by remaining mana divided by x_multiplier
+                        let max_x = if def.x_multiplier > 0 {
+                            remaining / def.x_multiplier
+                        } else {
+                            remaining
+                        };
+                        // Generate X values from 0 to max_x (inclusive)
+                        // For search efficiency, cap at a reasonable limit
+                        let cap = max_x.min(10);
+                        (0..=cap).collect()
+                    } else {
+                        if !player.mana_pool.can_pay(&effective_cost) {
+                            // Can't pay - but first check if we could tap lands to get mana
+                            // For search, we generate mana ability actions separately
+                            continue;
+                        }
+                        vec![0u8]
+                    };
 
                     // Generate target permutations
                     let target_sets = self.generate_targets(card_name, player_id, db);
-                    if target_sets.is_empty() {
-                        // If this spell requires a sacrifice as an additional cost,
-                        // it cannot be cast without a valid sacrifice target.
-                        if requires_sacrifice_cost(card_name) {
-                            continue;
-                        }
-                        actions.push(Action::CastSpell {
-                            card_id,
-                            targets: vec![],
-                        });
-                    } else {
-                        for targets in target_sets {
+                    for x_value in x_values {
+                        if target_sets.is_empty() {
+                            // If this spell requires a sacrifice as an additional cost,
+                            // it cannot be cast without a valid sacrifice target.
+                            if requires_sacrifice_cost(card_name) {
+                                continue;
+                            }
                             actions.push(Action::CastSpell {
                                 card_id,
-                                targets,
+                                targets: vec![],
+                                x_value,
                             });
+                        } else {
+                            for targets in &target_sets {
+                                actions.push(Action::CastSpell {
+                                    card_id,
+                                    targets: targets.clone(),
+                                    x_value,
+                                });
+                            }
                         }
                     }
                 }
@@ -190,6 +218,7 @@ impl GameState {
                             actions.push(Action::CastSpell {
                                 card_id,
                                 targets: vec![Target::Object(item.id)],
+                                x_value: 0,
                             });
                         }
                     }

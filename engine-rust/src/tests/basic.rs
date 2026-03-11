@@ -126,6 +126,7 @@ fn test_cast_lightning_bolt() {
         &Action::CastSpell {
             card_id: bolt_id,
             targets: vec![Target::Player(1)],
+            x_value: 0,
         },
         &db,
     );

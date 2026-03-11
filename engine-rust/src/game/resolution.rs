@@ -13,7 +13,7 @@ impl GameState {
         if let Some(item) = self.stack.pop() {
             match item.kind {
                 StackItemKind::Spell { card_name, card_id } => {
-                    self.resolve_spell(card_name, card_id, item.controller, &item.targets, db);
+                    self.resolve_spell(card_name, card_id, item.controller, &item.targets, item.x_value, db);
                 }
                 StackItemKind::TriggeredAbility { effect, .. } => {
                     self.resolve_triggered(effect, item.controller, &item.targets);
@@ -32,6 +32,7 @@ impl GameState {
         card_id: ObjectId,
         controller: PlayerId,
         targets: &[Target],
+        x_value: u8,
         db: &[CardDef],
     ) {
         let card_def = find_card(db, card_name);
@@ -60,13 +61,24 @@ impl GameState {
                 );
                 self.battlefield.push(perm);
                 // ETB triggers would go here
-                self.handle_etb(card_name, card_id, controller);
+                self.handle_etb_with_x(card_name, card_id, controller, x_value);
             }
         } else {
             // Instant/sorcery: resolve effect, then put in graveyard
-            self.resolve_card_effect(card_name, controller, targets, db);
+            self.resolve_card_effect_with_x(card_name, controller, targets, x_value, db);
             self.players[controller as usize].graveyard.push(card_id);
         }
+    }
+
+    fn resolve_card_effect_with_x(
+        &mut self,
+        card_name: CardName,
+        controller: PlayerId,
+        targets: &[Target],
+        _x_value: u8,
+        db: &[CardDef],
+    ) {
+        self.resolve_card_effect(card_name, controller, targets, db);
     }
 
     fn resolve_card_effect(
@@ -939,7 +951,12 @@ impl GameState {
         }
     }
 
-    pub(crate) fn handle_etb(&mut self, card_name: CardName, _card_id: ObjectId, controller: PlayerId) {
+    /// Handle ETB for spells cast without an X value (e.g., lands played directly).
+    pub(crate) fn handle_etb(&mut self, card_name: CardName, card_id: ObjectId, controller: PlayerId) {
+        self.handle_etb_with_x(card_name, card_id, controller, 0);
+    }
+
+    pub(crate) fn handle_etb_with_x(&mut self, card_name: CardName, _card_id: ObjectId, controller: PlayerId, x_value: u8) {
         match card_name {
             // Orcish Bowmasters: amass 1 and deal 1
             CardName::OrcishBowmasters => {
@@ -1107,6 +1124,39 @@ impl GameState {
                     );
                 }
             }
+
+            // Walking Ballista: enters with X +1/+1 counters (X chosen when cast, {X}{X} cost)
+            CardName::WalkingBallista => {
+                if x_value > 0 {
+                    if let Some(perm) = self.find_permanent_mut(_card_id) {
+                        perm.counters.add(CounterType::PlusOnePlusOne, x_value as i16);
+                    }
+                }
+            }
+
+            // Stonecoil Serpent: enters with X +1/+1 counters (X chosen when cast, {X} cost)
+            CardName::StonecoilSerpent => {
+                if x_value > 0 {
+                    if let Some(perm) = self.find_permanent_mut(_card_id) {
+                        perm.counters.add(CounterType::PlusOnePlusOne, x_value as i16);
+                    }
+                }
+            }
+
+            // Chalice of the Void: enters with X charge counters
+            CardName::ChaliceOfTheVoid => {
+                if let Some(perm) = self.find_permanent_mut(_card_id) {
+                    perm.counters.add(CounterType::Charge, x_value as i16);
+                }
+            }
+
+            // Engineered Explosives: enters with X charge counters (sunburst; simplified as X)
+            CardName::EngineeredExplosives => {
+                if let Some(perm) = self.find_permanent_mut(_card_id) {
+                    perm.counters.add(CounterType::Charge, x_value as i16);
+                }
+            }
+
             _ => {}
         }
     }

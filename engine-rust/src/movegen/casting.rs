@@ -46,12 +46,17 @@ impl GameState {
                 }
             }
 
-            Action::CastSpell { card_id, targets } => {
+            Action::CastSpell { card_id, targets, x_value } => {
                 let player_id = self.priority_player;
                 let card_name = self.card_name_for_id(*card_id);
                 if let Some(cn) = card_name {
                     if let Some(def) = find_card(db, cn) {
-                        let cost = self.effective_cost(def, player_id);
+                        let mut cost = self.effective_cost(def, player_id);
+                        // For X spells, add X * x_multiplier to the generic cost
+                        if def.has_x_cost {
+                            let x_cost = (*x_value as u16) * (def.x_multiplier as u16);
+                            cost.generic = cost.generic.saturating_add(x_cost as u8);
+                        }
                         if self.players[player_id as usize].mana_pool.pay(&cost) {
                             self.players[player_id as usize].remove_from_hand(*card_id);
                             let uncounterable = is_uncounterable(cn);
@@ -63,6 +68,7 @@ impl GameState {
                                 player_id,
                                 targets.clone(),
                                 uncounterable,
+                                *x_value,
                             );
                             self.players[player_id as usize].spells_cast_this_turn += 1;
                             if !def.card_types.contains(&CardType::Artifact) {
