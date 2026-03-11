@@ -80,6 +80,8 @@ pub enum CardName {
     SpireOfIndustry,
     StartingTown,
     TalonGatesOfMadara,
+    ShelldockIsle,
+    MosswortBridge,
     TheMycoSynthGardens,
     UrzasSaga,
     BazaarOfBaghdad,
@@ -1321,6 +1323,10 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Starting Town enters tapped unless you control two or fewer other lands. {T}: Add one mana of any color.");
     card!(TalonGatesOfMadara, "Talon Gates of Madara", c, &[Land], &[], None, None, None, kw(), &[],
         "Hideaway 5. {T}: Add {C}. {T}: You may play the exiled card without paying its mana cost if you attacked with three or more creatures this turn.");
+    card!(ShelldockIsle, "Shelldock Isle", c, &[Land], &[], None, None, None, kw(), &[],
+        "Hideaway 4. {T}: Add {U}. {T}: You may play the exiled card without paying its mana cost if there are twenty or fewer cards in your library.");
+    card!(MosswortBridge, "Mosswort Bridge", c, &[Land], &[], None, None, None, kw(), &[],
+        "Hideaway 4. {T}: Add {G}. {T}: You may play the exiled card without paying its mana cost if you control a creature with power 10 or greater.");
     card!(TheMycoSynthGardens, "The Mycosynth Gardens", c, &[Land], &[], None, None, None, kw(), &[],
         "{T}: Add {C}. {1}, {T}: Add one mana of any color. {X}: The Mycosynth Gardens becomes a copy of target artifact you control with mana value X.");
     card!(UrzasSaga, "Urza's Saga", c, &[Land, Enchantment], &[], None, None, None, kw(), &[],

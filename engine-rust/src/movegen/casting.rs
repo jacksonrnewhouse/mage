@@ -578,6 +578,42 @@ impl GameState {
                 self.reset_priority_passes();
             }
 
+            // Shelldock Isle: {T} — cast the hidden card for free (ability_index 1).
+            // Condition (library <=20) is already verified in activatable_abilities.
+            CardName::ShelldockIsle if ability_index == 1 => {
+                if let Some(perm_mut) = self.find_permanent_mut(permanent_id) {
+                    perm_mut.tapped = true;
+                }
+                self.stack.push(
+                    StackItemKind::ActivatedAbility {
+                        source_id: permanent_id,
+                        source_name: card_name,
+                        effect: ActivatedEffect::HideawayActivated { land_id: permanent_id },
+                    },
+                    controller,
+                    vec![],
+                );
+                self.reset_priority_passes();
+            }
+
+            // Mosswort Bridge: {T} — cast the hidden card for free (ability_index 1).
+            // Condition (control creature with power >= 10) is already verified in activatable_abilities.
+            CardName::MosswortBridge if ability_index == 1 => {
+                if let Some(perm_mut) = self.find_permanent_mut(permanent_id) {
+                    perm_mut.tapped = true;
+                }
+                self.stack.push(
+                    StackItemKind::ActivatedAbility {
+                        source_id: permanent_id,
+                        source_name: card_name,
+                        effect: ActivatedEffect::HideawayActivated { land_id: permanent_id },
+                    },
+                    controller,
+                    vec![],
+                );
+                self.reset_priority_passes();
+            }
+
             // The One Ring: {T}: Put a burden counter, then draw cards equal to burden counters.
             CardName::TheOneRing if ability_index == 0 => {
                 self.stack.push(

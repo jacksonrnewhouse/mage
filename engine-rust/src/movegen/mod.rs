@@ -973,6 +973,10 @@ impl GameState {
                 }
             }
 
+            // Hideaway lands producing colored mana
+            CardName::ShelldockIsle => vec![Some(Color::Blue)],
+            CardName::MosswortBridge => vec![Some(Color::Green)],
+
             // Lands producing colorless
             CardName::CityOfTraitors | CardName::GhostQuarter
             | CardName::SpireOfIndustry | CardName::TheMycoSynthGardens
@@ -1196,6 +1200,9 @@ impl GameState {
             | CardName::UrborgTombOfYawgmoth
             | CardName::YavimayaCradleOfGrowth
             | CardName::DryadArbor
+            // Hideaway lands producing colored mana
+            | CardName::ShelldockIsle
+            | CardName::MosswortBridge
             // Any-color mana producers
             | CardName::ForbiddenOrchard
             | CardName::StartingTown
@@ -1474,6 +1481,30 @@ impl GameState {
             let has_imprint = self.imprinted.iter().any(|(perm_id, _)| *perm_id == perm.id);
             if has_imprint {
                 abilities.push((0, vec![]));
+            }
+        }
+
+        // Shelldock Isle: {T} — cast the hidden card for free if library has 20 or fewer cards.
+        if perm.card_name == CardName::ShelldockIsle && !perm.tapped {
+            let has_hidden = self.hideaway_exiled.iter().any(|(lid, _)| *lid == perm.id);
+            if has_hidden {
+                let lib_size = self.players[perm.controller as usize].library.len();
+                if lib_size <= 20 {
+                    abilities.push((1, vec![]));
+                }
+            }
+        }
+
+        // MosswortBridge: {T} — cast the hidden card for free if you control a creature with power 10 or greater.
+        if perm.card_name == CardName::MosswortBridge && !perm.tapped {
+            let has_hidden = self.hideaway_exiled.iter().any(|(lid, _)| *lid == perm.id);
+            if has_hidden {
+                let has_big_creature = self.battlefield.iter().any(|p| {
+                    p.controller == perm.controller && p.is_creature() && p.power() >= 10
+                });
+                if has_big_creature {
+                    abilities.push((1, vec![]));
+                }
             }
         }
 

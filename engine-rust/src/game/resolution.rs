@@ -1619,6 +1619,41 @@ impl GameState {
                 );
             }
 
+            // Hideaway lands: enter tapped, then look at top N cards, exile one face-down.
+            // ShelldockIsle: hideaway 4, enters tapped
+            CardName::ShelldockIsle => {
+                // Enter tapped
+                if let Some(perm) = self.find_permanent_mut(_card_id) {
+                    perm.tapped = true;
+                }
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: _card_id,
+                        source_name: CardName::ShelldockIsle,
+                        effect: TriggeredEffect::HideawayETB { land_id: _card_id, n: 4 },
+                    },
+                    controller,
+                    vec![],
+                );
+            }
+
+            // MosswortBridge: hideaway 4, enters tapped
+            CardName::MosswortBridge => {
+                // Enter tapped
+                if let Some(perm) = self.find_permanent_mut(_card_id) {
+                    perm.tapped = true;
+                }
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: _card_id,
+                        source_name: CardName::MosswortBridge,
+                        effect: TriggeredEffect::HideawayETB { land_id: _card_id, n: 4 },
+                    },
+                    controller,
+                    vec![],
+                );
+            }
+
             // Mana Crypt: register a recurring "at the beginning of your upkeep, flip a coin"
             // trigger. The trigger fires every upkeep for the controller and creates a
             // PendingChoice so both outcomes can be explored by the search tree.
@@ -2083,6 +2118,48 @@ impl GameState {
                     });
                 }
             }
+
+            TriggeredEffect::HideawayETB { land_id, n } => {
+                // Look at the top N cards of the controller's library.
+                // The controller chooses one to exile face-down (linked to the land).
+                // The rest go on the bottom of the library.
+                let pid = controller as usize;
+                let lib_len = self.players[pid].library.len();
+                let take = (n as usize).min(lib_len);
+                if take == 0 {
+                    // No cards to look at; do nothing.
+                } else {
+                    // Pop the top `take` cards (last elements = top of library)
+                    let top_cards: Vec<ObjectId> = self.players[pid].library
+                        .drain(lib_len - take..)
+                        .rev() // reverse so index 0 = topmost card
+                        .collect();
+
+                    if top_cards.len() == 1 {
+                        // Only one card: auto-exile it (no choice needed)
+                        let card_id = top_cards[0];
+                        let card_name = self.card_name_for_id(card_id).unwrap_or(CardName::Plains);
+                        self.exile.push((card_id, card_name, controller));
+                        self.hideaway_exiled.push((land_id, card_id));
+                    } else {
+                        // Put all top_cards at the bottom of the library so the choice handler
+                        // can remove the chosen one from the library and exile it.
+                        // Insert at bottom (front of vector) preserving relative order.
+                        for &card in top_cards.iter().rev() {
+                            self.players[pid].library.insert(0, card);
+                        }
+                        // Present the choice: pick one to exile face-down.
+                        self.pending_choice = Some(PendingChoice {
+                            player: controller,
+                            kind: ChoiceKind::ChooseFromList {
+                                options: top_cards,
+                                reason: ChoiceReason::HideawayExile { land_id },
+                            },
+                        });
+                    }
+                }
+            }
+
             _ => {}
         }
         let _ = db; // suppress unused warning when db not used in all arms
@@ -2489,6 +2566,72 @@ impl GameState {
                     let targets: Vec<Target> = Vec::new();
                     let modes: Vec<u8> = Vec::new();
                     self.resolve_card_effect(card_name, controller, &targets, &modes, false, &[]);
+                }
+            }
+
+            // Hideaway land {T}: cast the hidden card for free (condition already checked in movegen).
+            ActivatedEffect::HideawayActivated { land_id } => {
+                // Tap the land.
+                if let Some(perm) = self.find_permanent_mut(land_id) {
+                    perm.tapped = true;
+                }
+                // Find the exiled card linked to this land.
+                let exiled_card_id = self.hideaway_exiled
+                    .iter()
+                    .find(|(lid, _)| *lid == land_id)
+                    .map(|(_, card_id)| *card_id);
+
+                if let Some(card_id) = exiled_card_id {
+                    // Remove from hideaway_exiled tracking
+                    self.hideaway_exiled.retain(|(lid, _)| *lid != land_id);
+                    // Remove from exile
+                    let card_name = if let Some(pos) = self.exile.iter().position(|(id, _, _)| *id == card_id) {
+                        let (_, cn, _) = self.exile.swap_remove(pos);
+                        cn
+                    } else {
+                        CardName::Plains // fallback
+                    };
+                    // Cast/play the card for free
+                    if let Some(def) = find_card(db, card_name) {
+                        let is_permanent = def.card_types.iter().any(|t| matches!(t,
+                            CardType::Creature | CardType::Artifact
+                            | CardType::Enchantment | CardType::Planeswalker
+                            | CardType::Land
+                        ));
+                        if is_permanent {
+                            // Permanents enter the battlefield directly
+                            let mut perm = crate::permanent::Permanent::new(
+                                card_id, card_name, controller, controller,
+                                def.power, def.toughness, def.loyalty, def.keywords, def.card_types,
+                            );
+                            if def.is_changeling {
+                                perm.creature_types = crate::types::CreatureType::ALL.to_vec();
+                            } else {
+                                perm.creature_types = def.creature_types.to_vec();
+                            }
+                            perm.colors = def.color_identity.to_vec();
+                            self.battlefield.push(perm);
+                            self.handle_etb(card_name, card_id, controller);
+                        } else {
+                            // Instant/sorcery: push onto stack, cast without paying cost
+                            let uncounterable = crate::movegen::is_uncounterable(card_name);
+                            self.stack.push_with_flags(
+                                crate::stack::StackItemKind::Spell {
+                                    card_name,
+                                    card_id,
+                                    cast_via_evoke: false,
+                                },
+                                controller,
+                                vec![],
+                                uncounterable,
+                                0,
+                                false,
+                                vec![],
+                            );
+                            self.players[controller as usize].spells_cast_this_turn += 1;
+                            self.reset_priority_passes();
+                        }
+                    }
                 }
             }
         }

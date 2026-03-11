@@ -180,6 +180,19 @@ impl GameState {
                             }
                         }
                     }
+                    ChoiceReason::HideawayExile { land_id } => {
+                        // The player chooses one card from the top N to exile face-down.
+                        // The rest (already inserted at the bottom of library) remain there.
+                        let pid = choice.player as usize;
+                        // Remove the chosen card from the bottom of the library (it was inserted there).
+                        if let Some(pos) = self.players[pid].library.iter().position(|&id| id == card_id) {
+                            self.players[pid].library.remove(pos);
+                            let card_name = self.card_name_for_id(card_id).unwrap_or(crate::card::CardName::Plains);
+                            // Exile it face-down (linked to the hideaway land)
+                            self.exile.push((card_id, card_name, choice.player));
+                            self.hideaway_exiled.push((land_id, card_id));
+                        }
+                    }
                     ChoiceReason::CloneTarget { clone_id, is_metamorph } => {
                         // Copy the chosen permanent's characteristics onto the clone.
                         // Collect the data we need from the target before mutating.

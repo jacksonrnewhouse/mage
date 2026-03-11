@@ -36,6 +36,7 @@ mod tribal;
 mod one_ring;
 mod imprint;
 mod madness;
+mod hideaway;
 
 pub(crate) fn setup_simple_game() -> (GameState, Vec<CardDef>) {
     let db = build_card_db();

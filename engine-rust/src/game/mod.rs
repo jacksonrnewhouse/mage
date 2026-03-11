@@ -109,6 +109,11 @@ pub struct GameState {
     /// When Skyclave Apparition leaves, the opponent gets a token with MV equal to the exiled card's MV.
     pub skyclave_token_mv: Vec<(ObjectId, u32)>,
 
+    // --- Hideaway ---
+    /// Maps (land_permanent_id, exiled_card_id) for hideaway lands (Shelldock Isle, Mosswort Bridge, etc.).
+    /// The exiled card is face-down and can be cast for free when the hideaway condition is met.
+    pub hideaway_exiled: Vec<(ObjectId, ObjectId)>,
+
     // --- Monarch ---
     /// The player who is currently the monarch, if any. The monarch draws a card
     /// at the beginning of their end step. When a creature deals combat damage to
@@ -209,6 +214,9 @@ pub enum ChoiceReason {
     /// scepter_id is the Isochron Scepter's ObjectId so we can record the imprint link.
     /// Passing (choosing no card) is represented by ChooseCard(0).
     IsochronScepterImprint { scepter_id: ObjectId },
+    /// Hideaway ETB: look at top N cards, choose one to exile face-down, put the rest on bottom.
+    /// land_id is the hideaway land's ObjectId so we can record the hideaway link.
+    HideawayExile { land_id: ObjectId },
     /// Dredge replacement: before a draw, the player may dredge a card instead.
     /// `dredge_card_id` is the ObjectId of the dredge card in the graveyard.
     /// `dredge_n` is the dredge value (number of cards to mill).
@@ -265,6 +273,7 @@ impl GameState {
             exile_linked: Vec::new(),
             imprinted: Vec::new(),
             skyclave_token_mv: Vec::new(),
+            hideaway_exiled: Vec::new(),
             monarch: None,
             emblems: Vec::new(),
             delayed_triggers: Vec::new(),

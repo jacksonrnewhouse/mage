@@ -127,6 +127,9 @@ pub enum TriggeredEffect {
     ChromeMoxETB { mox_id: ObjectId },
     /// Isochron Scepter ETB: imprint an instant with MV <= 2 from hand (exile it).
     IsochronScepterETB { scepter_id: ObjectId },
+    /// Hideaway ETB: look at top N cards, choose one to exile face-down, put the rest on bottom.
+    /// land_id is the hideaway land's ObjectId so we can record the hideaway link.
+    HideawayETB { land_id: ObjectId, n: u8 },
 }
 
 /// Activated ability effects.
@@ -212,6 +215,8 @@ pub enum ActivatedEffect {
     TheOneRingDraw { ring_id: ObjectId },
     /// Isochron Scepter {2},{T}: copy and cast the imprinted instant without paying mana cost.
     IsochronScepterActivated { scepter_id: ObjectId },
+    /// Hideaway land {T}: cast the hidden card for free (condition already checked in movegen).
+    HideawayActivated { land_id: ObjectId },
 }
 
 /// The game stack.
