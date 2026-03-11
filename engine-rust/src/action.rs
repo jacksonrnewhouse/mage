@@ -20,6 +20,11 @@ pub enum AltCost {
     /// `exile_id` is the ObjectId of the card being exiled.
     /// When cast via evoke, the creature enters, ETB triggers, then is sacrificed.
     Evoke { exile_id: ObjectId },
+    /// Phyrexian mana cost: pay life instead of colored mana.
+    /// `life_paid` is the total life paid (each Phyrexian pip costs 2 life).
+    /// The remaining mana cost (normal_cost) must still be paid from the mana pool.
+    /// `normal_cost` is the reduced mana cost after substituting some pips with life.
+    PhyrexianMana { life_paid: u8, normal_cost: crate::mana::ManaCost },
 }
 
 /// A game action that can be taken by the active/priority player.

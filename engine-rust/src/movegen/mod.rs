@@ -1511,6 +1511,17 @@ impl GameState {
                 targets
             }
 
+            // Surgical Extraction: target a card in any graveyard
+            CardName::SurgicalExtraction => {
+                let mut targets = Vec::new();
+                for pid in 0..self.num_players as usize {
+                    for &card_id in &self.players[pid].graveyard {
+                        targets.push(vec![Target::Object(card_id)]);
+                    }
+                }
+                targets
+            }
+
             // No targets needed (tutors, cantrips, board wipes, etc.)
             _ => vec![],
         }
@@ -1728,6 +1739,133 @@ impl GameState {
                 // Endurance: exile a green card
                 CardName::Endurance => {
                     self.generate_evoke_actions(card_id, card_name, Color::Green, player_id, db, actions, sorcery_speed);
+                }
+
+                // --- Phyrexian mana cards ---
+                // GitaxianProbe {U/P}: can pay 2 life instead of {U}
+                CardName::GitaxianProbe => {
+                    // Sorcery speed (GitaxianProbe is a sorcery)
+                    if !sorcery_speed {
+                        continue;
+                    }
+                    // Life payment option: 2 life instead of {U}
+                    if player.life > 2 {
+                        let target_sets = self.generate_targets(card_name, player_id, db);
+                        let normal_cost = ManaCost::ZERO; // entire mana cost paid with life
+                        let alt = AltCost::PhyrexianMana { life_paid: 2, normal_cost };
+                        if target_sets.is_empty() {
+                            actions.push(Action::CastSpell {
+                                card_id,
+                                targets: vec![],
+                                x_value: 0,
+                                from_graveyard: false,
+                                alt_cost: Some(alt),
+                            });
+                        } else {
+                            for targets in &target_sets {
+                                actions.push(Action::CastSpell {
+                                    card_id,
+                                    targets: targets.clone(),
+                                    x_value: 0,
+                                    from_graveyard: false,
+                                    alt_cost: Some(alt.clone()),
+                                });
+                            }
+                        }
+                    }
+                }
+
+                // MentalMisstep {U/P}: can pay 2 life instead of {U}, instant speed
+                // MentalMisstep requires a spell on the stack as target; skip if stack empty.
+                CardName::MentalMisstep => {
+                    if player.life > 2 {
+                        let target_sets = self.generate_targets(card_name, player_id, db);
+                        if target_sets.is_empty() {
+                            // No spells on stack to target; cannot cast
+                            continue;
+                        }
+                        let normal_cost = ManaCost::ZERO;
+                        let alt = AltCost::PhyrexianMana { life_paid: 2, normal_cost };
+                        for targets in &target_sets {
+                            actions.push(Action::CastSpell {
+                                card_id,
+                                targets: targets.clone(),
+                                x_value: 0,
+                                from_graveyard: false,
+                                alt_cost: Some(alt.clone()),
+                            });
+                        }
+                    }
+                }
+
+                // SurgicalExtraction {B/P}: can pay 2 life instead of {B}, instant speed
+                // SurgicalExtraction requires a graveyard target; no target → cannot be cast
+                CardName::SurgicalExtraction => {
+                    if player.life > 2 {
+                        let target_sets = self.generate_targets(card_name, player_id, db);
+                        if target_sets.is_empty() {
+                            // No graveyard targets available; cannot cast
+                            continue;
+                        }
+                        let normal_cost = ManaCost::ZERO;
+                        let alt = AltCost::PhyrexianMana { life_paid: 2, normal_cost };
+                        for targets in &target_sets {
+                            actions.push(Action::CastSpell {
+                                card_id,
+                                targets: targets.clone(),
+                                x_value: 0,
+                                from_graveyard: false,
+                                alt_cost: Some(alt.clone()),
+                            });
+                        }
+                    }
+                }
+
+                // Dismember {1}{B/P}{B/P}: each B/P can be paid with 2 life each
+                // Normal cost (stored as all-mana): {1}{B}{B}
+                // Phyrexian options:
+                //   life_paid=2: pay {1}{B} + 2 life (one pip replaced)
+                //   life_paid=4: pay {1} + 4 life (both pips replaced)
+                // Dismember requires a creature target; skip if none available.
+                CardName::Dismember => {
+                    let target_sets = self.generate_targets(card_name, player_id, db);
+                    if target_sets.is_empty() {
+                        continue;
+                    }
+
+                    // Variant 1: pay one B/P with life → {1}{B} + 2 life
+                    if player.life > 2 {
+                        let normal_cost = ManaCost { generic: 1, black: 1, ..ManaCost::ZERO };
+                        if player.mana_pool.can_pay(&normal_cost) {
+                            let alt = AltCost::PhyrexianMana { life_paid: 2, normal_cost };
+                            for targets in &target_sets {
+                                actions.push(Action::CastSpell {
+                                    card_id,
+                                    targets: targets.clone(),
+                                    x_value: 0,
+                                    from_graveyard: false,
+                                    alt_cost: Some(alt.clone()),
+                                });
+                            }
+                        }
+                    }
+
+                    // Variant 2: pay both B/P with life → {1} + 4 life
+                    if player.life > 4 {
+                        let normal_cost = ManaCost { generic: 1, ..ManaCost::ZERO };
+                        if player.mana_pool.can_pay(&normal_cost) {
+                            let alt = AltCost::PhyrexianMana { life_paid: 4, normal_cost };
+                            for targets in &target_sets {
+                                actions.push(Action::CastSpell {
+                                    card_id,
+                                    targets: targets.clone(),
+                                    x_value: 0,
+                                    from_graveyard: false,
+                                    alt_cost: Some(alt.clone()),
+                                });
+                            }
+                        }
+                    }
                 }
 
                 _ => {}

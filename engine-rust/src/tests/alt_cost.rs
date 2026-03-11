@@ -612,3 +612,494 @@ fn test_fow_can_still_be_cast_for_mana() {
         "Force of Will should also be castable for its normal mana cost when player has enough mana"
     );
 }
+
+// ==========================================
+// Phyrexian Mana Tests — Gitaxian Probe
+// ==========================================
+
+#[test]
+fn test_gitaxian_probe_generates_phyrexian_alt_cost_at_sorcery_speed() {
+    let (mut state, db) = setup_base();
+
+    // Player 0 has Gitaxian Probe and enough life but no mana
+    let probe_id = add_to_hand(&mut state, 0, CardName::GitaxianProbe);
+    state.players[0].life = 10;
+    state.players[0].mana_pool = crate::mana::ManaPool::default();
+
+    // Sorcery speed: main phase, empty stack, active player
+    let actions = state.legal_actions(&db);
+    let phyrexian_actions: Vec<_> = actions.iter().filter(|a| {
+        matches!(a, Action::CastSpell {
+            card_id,
+            alt_cost: Some(AltCost::PhyrexianMana { life_paid: 2, .. }),
+            ..
+        } if *card_id == probe_id)
+    }).collect();
+
+    assert!(
+        !phyrexian_actions.is_empty(),
+        "Gitaxian Probe should generate a Phyrexian mana alt-cost action at sorcery speed"
+    );
+}
+
+#[test]
+fn test_gitaxian_probe_phyrexian_not_available_at_instant_speed() {
+    let (mut state, db) = setup_base();
+
+    let probe_id = add_to_hand(&mut state, 0, CardName::GitaxianProbe);
+    state.players[0].life = 10;
+
+    // Not sorcery speed: opponent's turn
+    state.active_player = 1;
+    state.priority_player = 0;
+    // Put something on the stack to ensure it's not sorcery speed
+    push_spell_on_stack(&mut state, CardName::LightningBolt, 1);
+
+    let actions = state.legal_actions(&db);
+    let phyrexian_actions: Vec<_> = actions.iter().filter(|a| {
+        matches!(a, Action::CastSpell {
+            card_id,
+            alt_cost: Some(AltCost::PhyrexianMana { .. }),
+            ..
+        } if *card_id == probe_id)
+    }).collect();
+
+    assert!(
+        phyrexian_actions.is_empty(),
+        "Gitaxian Probe (sorcery) should NOT generate Phyrexian alt-cost action at instant speed"
+    );
+}
+
+#[test]
+fn test_gitaxian_probe_phyrexian_not_available_with_low_life() {
+    let (mut state, db) = setup_base();
+
+    let probe_id = add_to_hand(&mut state, 0, CardName::GitaxianProbe);
+    state.players[0].life = 2; // Exactly 2 life: life > 2 check fails
+
+    let actions = state.legal_actions(&db);
+    let phyrexian_actions: Vec<_> = actions.iter().filter(|a| {
+        matches!(a, Action::CastSpell {
+            card_id,
+            alt_cost: Some(AltCost::PhyrexianMana { .. }),
+            ..
+        } if *card_id == probe_id)
+    }).collect();
+
+    assert!(
+        phyrexian_actions.is_empty(),
+        "Gitaxian Probe Phyrexian cost should not be available when player has only 2 life (would be lethal)"
+    );
+}
+
+#[test]
+fn test_gitaxian_probe_phyrexian_deducts_2_life_and_draws() {
+    let (mut state, db) = setup_base();
+
+    let probe_id = add_to_hand(&mut state, 0, CardName::GitaxianProbe);
+    state.players[0].life = 10;
+    state.players[0].mana_pool = crate::mana::ManaPool::default();
+    // Give player 1 a card in library (to draw from)
+    let draw_card_id = state.new_object_id();
+    state.card_registry.push((draw_card_id, CardName::Island));
+    state.players[0].library.push(draw_card_id);
+
+    state.apply_action(
+        &Action::CastSpell {
+            card_id: probe_id,
+            targets: vec![],
+            x_value: 0,
+            from_graveyard: false,
+            alt_cost: Some(AltCost::PhyrexianMana {
+                life_paid: 2,
+                normal_cost: crate::mana::ManaCost::ZERO,
+            }),
+        },
+        &db,
+    );
+
+    // Life should be reduced by 2
+    assert_eq!(
+        state.players[0].life, 8,
+        "Player should have paid 2 life for Gitaxian Probe's Phyrexian cost"
+    );
+
+    // Probe should be on the stack
+    assert!(
+        state.stack.items().iter().any(|i| {
+            matches!(&i.kind, crate::stack::StackItemKind::Spell { card_id, .. } if *card_id == probe_id)
+        }),
+        "Gitaxian Probe should be on the stack"
+    );
+
+    // Probe should not be in hand
+    assert!(
+        !state.players[0].hand.contains(&probe_id),
+        "Gitaxian Probe should have left hand"
+    );
+
+    // Resolve the probe (both players pass)
+    state.pass_priority(&db); // P0 passes
+    state.pass_priority(&db); // P1 passes → probe resolves, draws a card
+
+    // Player 0 should have drawn a card
+    assert!(
+        state.players[0].hand.contains(&draw_card_id),
+        "Player 0 should have drawn a card from Gitaxian Probe resolving"
+    );
+}
+
+// ==========================================
+// Phyrexian Mana Tests — Mental Misstep
+// ==========================================
+
+#[test]
+fn test_mental_misstep_phyrexian_available_with_stack_spell() {
+    let (mut state, db) = setup_base();
+
+    let misstep_id = add_to_hand(&mut state, 0, CardName::MentalMisstep);
+    state.players[0].life = 10;
+    state.players[0].mana_pool = crate::mana::ManaPool::default();
+
+    push_spell_on_stack(&mut state, CardName::LightningBolt, 1);
+
+    let actions = state.legal_actions(&db);
+    let phyrexian_actions: Vec<_> = actions.iter().filter(|a| {
+        matches!(a, Action::CastSpell {
+            card_id,
+            alt_cost: Some(AltCost::PhyrexianMana { life_paid: 2, .. }),
+            ..
+        } if *card_id == misstep_id)
+    }).collect();
+
+    assert!(
+        !phyrexian_actions.is_empty(),
+        "Mental Misstep should generate a Phyrexian mana alt-cost action when stack is non-empty"
+    );
+}
+
+#[test]
+fn test_mental_misstep_phyrexian_not_available_with_empty_stack() {
+    let (mut state, db) = setup_base();
+
+    let misstep_id = add_to_hand(&mut state, 0, CardName::MentalMisstep);
+    state.players[0].life = 10;
+
+    // Stack is empty
+    let actions = state.legal_actions(&db);
+    let phyrexian_actions: Vec<_> = actions.iter().filter(|a| {
+        matches!(a, Action::CastSpell {
+            card_id,
+            alt_cost: Some(AltCost::PhyrexianMana { .. }),
+            ..
+        } if *card_id == misstep_id)
+    }).collect();
+
+    assert!(
+        phyrexian_actions.is_empty(),
+        "Mental Misstep Phyrexian cost should not be available when stack is empty (no target)"
+    );
+}
+
+#[test]
+fn test_mental_misstep_phyrexian_deducts_2_life() {
+    let (mut state, db) = setup_base();
+
+    let misstep_id = add_to_hand(&mut state, 0, CardName::MentalMisstep);
+    state.players[0].life = 10;
+    state.players[0].mana_pool = crate::mana::ManaPool::default();
+
+    let stack_item_id = push_spell_on_stack(&mut state, CardName::LightningBolt, 1);
+
+    state.apply_action(
+        &Action::CastSpell {
+            card_id: misstep_id,
+            targets: vec![Target::Object(stack_item_id)],
+            x_value: 0,
+            from_graveyard: false,
+            alt_cost: Some(AltCost::PhyrexianMana {
+                life_paid: 2,
+                normal_cost: crate::mana::ManaCost::ZERO,
+            }),
+        },
+        &db,
+    );
+
+    assert_eq!(
+        state.players[0].life, 8,
+        "Player should have paid 2 life for Mental Misstep's Phyrexian cost"
+    );
+    assert!(
+        state.stack.items().iter().any(|i| {
+            matches!(&i.kind, crate::stack::StackItemKind::Spell { card_id, .. } if *card_id == misstep_id)
+        }),
+        "Mental Misstep should be on the stack"
+    );
+}
+
+// ==========================================
+// Phyrexian Mana Tests — Dismember
+// ==========================================
+
+#[test]
+fn test_dismember_generates_phyrexian_half_life_option() {
+    let (mut state, db) = setup_base();
+
+    let dismember_id = add_to_hand(&mut state, 0, CardName::Dismember);
+    state.players[0].life = 20;
+    // Give player {1}{B} mana so they can pay the half-life variant
+    state.players[0].mana_pool = crate::mana::ManaPool {
+        black: 1,
+        colorless: 1,
+        ..Default::default()
+    };
+
+    // Add a creature to target
+    let target_id = state.new_object_id();
+    state.card_registry.push((target_id, CardName::GoblinGuide));
+    use crate::permanent::Permanent;
+    let perm = Permanent::new(
+        target_id, CardName::GoblinGuide, 1, 1, Some(2), Some(2), None,
+        crate::types::Keywords::empty(), &[CardType::Creature],
+    );
+    state.battlefield.push(perm);
+
+    let actions = state.legal_actions(&db);
+
+    // Should have life_paid=2 option ({1}{B} + 2 life)
+    let half_life_actions: Vec<_> = actions.iter().filter(|a| {
+        matches!(a, Action::CastSpell {
+            card_id,
+            alt_cost: Some(AltCost::PhyrexianMana { life_paid: 2, .. }),
+            ..
+        } if *card_id == dismember_id)
+    }).collect();
+
+    assert!(
+        !half_life_actions.is_empty(),
+        "Dismember should generate a Phyrexian action paying 2 life + {{1}}{{B}}"
+    );
+}
+
+#[test]
+fn test_dismember_generates_phyrexian_full_life_option() {
+    let (mut state, db) = setup_base();
+
+    let dismember_id = add_to_hand(&mut state, 0, CardName::Dismember);
+    state.players[0].life = 20;
+    // Give player {1} mana so they can pay the full-life variant
+    state.players[0].mana_pool = crate::mana::ManaPool {
+        colorless: 1,
+        ..Default::default()
+    };
+
+    // Add a creature to target
+    let target_id = state.new_object_id();
+    state.card_registry.push((target_id, CardName::GoblinGuide));
+    use crate::permanent::Permanent;
+    let perm = Permanent::new(
+        target_id, CardName::GoblinGuide, 1, 1, Some(2), Some(2), None,
+        crate::types::Keywords::empty(), &[CardType::Creature],
+    );
+    state.battlefield.push(perm);
+
+    let actions = state.legal_actions(&db);
+
+    // Should have life_paid=4 option ({1} + 4 life)
+    let full_life_actions: Vec<_> = actions.iter().filter(|a| {
+        matches!(a, Action::CastSpell {
+            card_id,
+            alt_cost: Some(AltCost::PhyrexianMana { life_paid: 4, .. }),
+            ..
+        } if *card_id == dismember_id)
+    }).collect();
+
+    assert!(
+        !full_life_actions.is_empty(),
+        "Dismember should generate a Phyrexian action paying 4 life + {{1}}"
+    );
+}
+
+#[test]
+fn test_dismember_phyrexian_deducts_life_and_mana() {
+    let (mut state, db) = setup_base();
+
+    let dismember_id = add_to_hand(&mut state, 0, CardName::Dismember);
+    state.players[0].life = 20;
+    state.players[0].mana_pool = crate::mana::ManaPool {
+        colorless: 1,
+        ..Default::default()
+    };
+
+    // Add a creature to target
+    let target_id = state.new_object_id();
+    state.card_registry.push((target_id, CardName::GoblinGuide));
+    use crate::permanent::Permanent;
+    let perm = Permanent::new(
+        target_id, CardName::GoblinGuide, 1, 1, Some(2), Some(2), None,
+        crate::types::Keywords::empty(), &[CardType::Creature],
+    );
+    state.battlefield.push(perm);
+
+    // Cast Dismember paying {1} + 4 life
+    state.apply_action(
+        &Action::CastSpell {
+            card_id: dismember_id,
+            targets: vec![Target::Object(target_id)],
+            x_value: 0,
+            from_graveyard: false,
+            alt_cost: Some(AltCost::PhyrexianMana {
+                life_paid: 4,
+                normal_cost: crate::mana::ManaCost { generic: 1, ..crate::mana::ManaCost::ZERO },
+            }),
+        },
+        &db,
+    );
+
+    // Should have paid 4 life
+    assert_eq!(
+        state.players[0].life, 16,
+        "Player should have paid 4 life for Dismember's full Phyrexian cost"
+    );
+
+    // Generic mana should be consumed
+    assert_eq!(
+        state.players[0].mana_pool.total(), 0,
+        "Player's mana pool should be empty after paying {{1}} for Dismember"
+    );
+
+    // Dismember should be on the stack
+    assert!(
+        state.stack.items().iter().any(|i| {
+            matches!(&i.kind, crate::stack::StackItemKind::Spell { card_id, .. } if *card_id == dismember_id)
+        }),
+        "Dismember should be on the stack"
+    );
+}
+
+#[test]
+fn test_dismember_phyrexian_no_actions_without_creature_targets() {
+    let (mut state, db) = setup_base();
+
+    let dismember_id = add_to_hand(&mut state, 0, CardName::Dismember);
+    state.players[0].life = 20;
+    state.players[0].mana_pool = crate::mana::ManaPool {
+        colorless: 1,
+        ..Default::default()
+    };
+
+    // No creatures on the battlefield
+
+    let actions = state.legal_actions(&db);
+    let phyrexian_actions: Vec<_> = actions.iter().filter(|a| {
+        matches!(a, Action::CastSpell {
+            card_id,
+            alt_cost: Some(AltCost::PhyrexianMana { .. }),
+            ..
+        } if *card_id == dismember_id)
+    }).collect();
+
+    assert!(
+        phyrexian_actions.is_empty(),
+        "Dismember Phyrexian cost should not be available when there are no creature targets"
+    );
+}
+
+// ==========================================
+// Phyrexian Mana Tests — Surgical Extraction
+// ==========================================
+
+#[test]
+fn test_surgical_extraction_phyrexian_available_with_graveyard_target() {
+    let (mut state, db) = setup_base();
+
+    let surgical_id = add_to_hand(&mut state, 0, CardName::SurgicalExtraction);
+    state.players[0].life = 10;
+    state.players[0].mana_pool = crate::mana::ManaPool::default();
+
+    // Put a card in opponent's graveyard
+    let graveyard_card_id = state.new_object_id();
+    state.card_registry.push((graveyard_card_id, CardName::LightningBolt));
+    state.players[1].graveyard.push(graveyard_card_id);
+
+    let actions = state.legal_actions(&db);
+    let phyrexian_actions: Vec<_> = actions.iter().filter(|a| {
+        matches!(a, Action::CastSpell {
+            card_id,
+            alt_cost: Some(AltCost::PhyrexianMana { life_paid: 2, .. }),
+            ..
+        } if *card_id == surgical_id)
+    }).collect();
+
+    assert!(
+        !phyrexian_actions.is_empty(),
+        "Surgical Extraction should generate a Phyrexian alt-cost action when graveyard has targets"
+    );
+}
+
+#[test]
+fn test_surgical_extraction_phyrexian_not_available_with_empty_graveyards() {
+    let (mut state, db) = setup_base();
+
+    let surgical_id = add_to_hand(&mut state, 0, CardName::SurgicalExtraction);
+    state.players[0].life = 10;
+
+    // Both graveyards are empty
+
+    let actions = state.legal_actions(&db);
+    let phyrexian_actions: Vec<_> = actions.iter().filter(|a| {
+        matches!(a, Action::CastSpell {
+            card_id,
+            alt_cost: Some(AltCost::PhyrexianMana { .. }),
+            ..
+        } if *card_id == surgical_id)
+    }).collect();
+
+    assert!(
+        phyrexian_actions.is_empty(),
+        "Surgical Extraction Phyrexian cost should not be available without graveyard targets"
+    );
+}
+
+#[test]
+fn test_surgical_extraction_phyrexian_deducts_2_life() {
+    let (mut state, db) = setup_base();
+
+    let surgical_id = add_to_hand(&mut state, 0, CardName::SurgicalExtraction);
+    state.players[0].life = 10;
+    state.players[0].mana_pool = crate::mana::ManaPool::default();
+
+    let graveyard_card_id = state.new_object_id();
+    state.card_registry.push((graveyard_card_id, CardName::LightningBolt));
+    state.players[1].graveyard.push(graveyard_card_id);
+
+    state.apply_action(
+        &Action::CastSpell {
+            card_id: surgical_id,
+            targets: vec![Target::Object(graveyard_card_id)],
+            x_value: 0,
+            from_graveyard: false,
+            alt_cost: Some(AltCost::PhyrexianMana {
+                life_paid: 2,
+                normal_cost: crate::mana::ManaCost::ZERO,
+            }),
+        },
+        &db,
+    );
+
+    assert_eq!(
+        state.players[0].life, 8,
+        "Player should have paid 2 life for Surgical Extraction's Phyrexian cost"
+    );
+    assert!(
+        state.stack.items().iter().any(|i| {
+            matches!(&i.kind, crate::stack::StackItemKind::Spell { card_id, .. } if *card_id == surgical_id)
+        }),
+        "Surgical Extraction should be on the stack after Phyrexian mana cast"
+    );
+    // Surgical Extraction not in hand anymore
+    assert!(
+        !state.players[0].hand.contains(&surgical_id),
+        "Surgical Extraction should have left hand"
+    );
+}

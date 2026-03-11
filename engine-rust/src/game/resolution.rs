@@ -529,6 +529,19 @@ impl GameState {
                 // Look at opponent's hand, draw a card
                 self.draw_cards(controller, 1);
             }
+            CardName::SurgicalExtraction => {
+                // Exile all copies of target card from all zones (simplified: exile target from graveyard)
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    for pid in 0..self.num_players as usize {
+                        if let Some(pos) = self.players[pid].graveyard.iter().position(|&id| id == *target_id) {
+                            let card = self.players[pid].graveyard.remove(pos);
+                            let card_name = self.card_name_for_id(card).unwrap_or(CardName::Plains);
+                            self.exile.push((card, card_name, pid as PlayerId));
+                            break;
+                        }
+                    }
+                }
+            }
             CardName::NoxiousRevival => {
                 // Put target card from graveyard on top of library
                 if let Some(Target::Object(target_id)) = targets.first() {

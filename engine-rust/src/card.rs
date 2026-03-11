@@ -409,6 +409,7 @@ pub enum CardName {
     Dismember,
     KozileksCommand,
     GitaxianProbe,
+    SurgicalExtraction,
 
     // === Colorless Artifacts ===
     ChaliceOfTheVoid,
@@ -1784,6 +1785,8 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Choose two: Target player draws two cards and loses 2 life. Create a 0/1 Eldrazi Spawn token with \"Sacrifice: Add {C}.\" Destroy target artifact or enchantment with mana value 3 or less. Target creature gets -3/-3 until end of turn.");
     card!(GitaxianProbe, "Gitaxian Probe", ManaCost::u(1), &[Sorcery], &[], None, None, None, kw(), &[Blue],
         "You may pay 2 life instead of {U}. Look at target player's hand. Draw a card.");
+    card!(SurgicalExtraction, "Surgical Extraction", ManaCost::b(1), &[Instant], &[], None, None, None, kw(), &[Black],
+        "You may pay 2 life instead of {B}. Choose target card in a graveyard other than a basic land. Search its owner's graveyard, hand, and library for any number of cards with the same name as that card and exile them. Then that player shuffles.");
 
     // === Colorless Artifacts ===
     // Chalice of the Void: {X}{X} — X appears twice

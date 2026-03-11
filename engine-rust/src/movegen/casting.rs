@@ -747,6 +747,21 @@ impl GameState {
                 self.exile.push((*exile_id, exile_name, player_id));
                 true
             }
+            AltCost::PhyrexianMana { life_paid, normal_cost } => {
+                // Pay `life_paid` life and `normal_cost` mana from the pool.
+                let player = &self.players[player_id as usize];
+                // Ensure player has enough life (must survive paying it: life > life_paid)
+                if player.life <= *life_paid as i32 {
+                    return false;
+                }
+                // Ensure player can pay the remaining mana cost
+                if !player.mana_pool.can_pay(normal_cost) {
+                    return false;
+                }
+                self.players[player_id as usize].life -= *life_paid as i32;
+                self.players[player_id as usize].mana_pool.pay(normal_cost);
+                true
+            }
         }
     }
 
