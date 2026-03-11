@@ -1668,6 +1668,48 @@ impl GameState {
                 });
             }
 
+            // Urza's Saga: a Saga enchantment land with 3 chapters.
+            // When it enters, add a lore counter and trigger Chapter I.
+            // At the beginning of each of the controller's subsequent precombat main phases,
+            // add another lore counter and trigger the corresponding chapter.
+            // After Chapter III resolves, the saga is sacrificed.
+            //
+            // Chapter I:   Urza's Saga gains "{T}: Add {C}." (this is a static ability —
+            //               the engine handles this implicitly via land activated abilities;
+            //               for chapter I we push an empty trigger to mark chapter resolution).
+            // Chapter II:  Create a 0/0 colorless Construct artifact creature token that gets
+            //               +1/+1 for each artifact you control. (We use a triggered effect.)
+            // Chapter III: Search your library for an artifact with MV 0 or 1, put it onto
+            //               the battlefield, then shuffle.
+            CardName::UrzasSaga => {
+                // Add the first lore counter immediately as it enters.
+                if let Some(perm) = self.find_permanent_mut(_card_id) {
+                    perm.counters.add(CounterType::Lore, 1);
+                }
+                // Push Chapter I trigger onto the stack.
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: _card_id,
+                        source_name: CardName::UrzasSaga,
+                        effect: TriggeredEffect::SagaChapter { saga_id: _card_id, chapter: 1 },
+                    },
+                    controller,
+                    vec![],
+                );
+                // Register a recurring precombat-main trigger to advance lore counters.
+                // It fires every precombat main phase for the saga's controller.
+                // The trigger adds a lore counter and fires the next chapter.
+                // The saga's sacrifice is handled inside resolve_triggered after Chapter III.
+                self.add_delayed_trigger(crate::types::DelayedTrigger {
+                    condition: crate::types::DelayedTriggerCondition::AtBeginningOfPreCombatMain {
+                        player: controller,
+                    },
+                    effect: TriggeredEffect::SagaChapter { saga_id: _card_id, chapter: 0 }, // 0 = advance
+                    controller,
+                    fires_once: false,
+                });
+            }
+
             _ => {}
         }
     }
@@ -2157,6 +2199,132 @@ impl GameState {
                             },
                         });
                     }
+                }
+            }
+
+            // Saga chapter advancement: `chapter == 0` is the recurring precombat-main trigger
+            // that adds a lore counter and pushes the appropriate chapter effect.
+            // Specific chapter numbers (1, 2, 3) are the actual chapter ability triggers.
+            TriggeredEffect::SagaChapter { saga_id, chapter } => {
+                match chapter {
+                    // chapter == 0: recurring trigger — add a lore counter, then fire next chapter
+                    0 => {
+                        // Only proceed if the saga is still on the battlefield and still controlled
+                        // by the same controller (it might have left since the trigger was registered).
+                        let still_there = self.find_permanent(saga_id)
+                            .map(|p| p.controller == controller)
+                            .unwrap_or(false);
+                        if !still_there {
+                            return;
+                        }
+                        // Add a lore counter.
+                        let new_lore = {
+                            let perm = self.find_permanent_mut(saga_id).unwrap();
+                            perm.counters.add(CounterType::Lore, 1);
+                            perm.counters.get(CounterType::Lore)
+                        };
+                        // Push the chapter trigger for this new lore count.
+                        let chapter_to_fire = new_lore as u8;
+                        self.stack.push(
+                            StackItemKind::TriggeredAbility {
+                                source_id: saga_id,
+                                source_name: CardName::UrzasSaga,
+                                effect: TriggeredEffect::SagaChapter { saga_id, chapter: chapter_to_fire },
+                            },
+                            controller,
+                            vec![],
+                        );
+                    }
+
+                    // Chapter I: Urza's Saga gains "{T}: Add {C}."
+                    // The mana ability is handled via mana generation in movegen; nothing to resolve here.
+                    1 => {
+                        // Chapter I is a static-ability gain — no immediate effect to resolve.
+                        // (The movegen already handles Urza's Saga producing colorless mana once it's on BF.)
+                    }
+
+                    // Chapter II: Create a 0/0 colorless Construct artifact creature token.
+                    // The token gets +1/+1 for each artifact you control.
+                    2 => {
+                        let artifact_count = self.battlefield.iter()
+                            .filter(|p| p.controller == controller && p.is_artifact())
+                            .count() as i16;
+                        let token_id = self.new_object_id();
+                        let mut token = Permanent::new(
+                            token_id,
+                            card_name_for_token(),
+                            controller,
+                            controller,
+                            Some(0),
+                            Some(0),
+                            None,
+                            Keywords::empty(),
+                            &[CardType::Artifact, CardType::Creature],
+                        );
+                        token.creature_types.push(CreatureType::Construct);
+                        // The +1/+1 per artifact is a static ability; we bake it in as a fixed bonus
+                        // at token creation time (sufficient for current search depth).
+                        token.power_mod += artifact_count;
+                        token.toughness_mod += artifact_count;
+                        token.is_token = true;
+                        self.battlefield.push(token);
+                    }
+
+                    // Chapter III: Search your library for an artifact card with MV 0 or 1,
+                    // put it onto the battlefield, then shuffle. After it resolves, sacrifice the saga.
+                    3 => {
+                        let options: Vec<ObjectId> = self.players[controller as usize]
+                            .library
+                            .iter()
+                            .copied()
+                            .filter(|&id| {
+                                self.card_name_for_id(id)
+                                    .and_then(|cn| find_card(db, cn))
+                                    .map(|def| {
+                                        def.card_types.contains(&CardType::Artifact)
+                                            && def.mana_cost.cmc() <= 1
+                                    })
+                                    .unwrap_or(false)
+                            })
+                            .collect();
+                        if !options.is_empty() {
+                            self.pending_choice = Some(PendingChoice {
+                                player: controller,
+                                kind: ChoiceKind::ChooseFromList {
+                                    options,
+                                    reason: ChoiceReason::UrzasSagaChapterIII,
+                                },
+                            });
+                        }
+                        // After chapter III resolves, sacrifice the saga.
+                        // We push the sacrifice trigger on the stack so it resolves after the
+                        // search choice resolves (LIFO — sacrifice fires after choice resolves).
+                        self.stack.push(
+                            StackItemKind::TriggeredAbility {
+                                source_id: saga_id,
+                                source_name: CardName::UrzasSaga,
+                                effect: TriggeredEffect::SagaSacrifice { saga_id },
+                            },
+                            controller,
+                            vec![],
+                        );
+                    }
+
+                    // Future chapters or unexpected values: no effect.
+                    _ => {}
+                }
+            }
+
+            // Saga sacrifice: the saga's last chapter has resolved; sacrifice it.
+            TriggeredEffect::SagaSacrifice { saga_id } => {
+                // Remove the recurring lore-counter delayed trigger for this saga so it doesn't
+                // fire again after the saga is gone.
+                self.delayed_triggers.retain(|dt| {
+                    !matches!(dt.effect, TriggeredEffect::SagaChapter { saga_id: sid, chapter: 0 } if sid == saga_id)
+                });
+                // Sacrifice the saga (send to graveyard).
+                if self.find_permanent(saga_id).is_some() {
+                    self.remove_permanent_to_zone(saga_id, DestinationZone::Graveyard);
                 }
             }
 

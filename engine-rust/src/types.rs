@@ -287,6 +287,8 @@ pub enum CounterType {
     Poison,
     /// Burden counters placed on The One Ring by its tap ability.
     Burden,
+    /// Lore counters placed on Saga enchantments to track chapter progression.
+    Lore,
 }
 
 /// Represents a target for a spell or ability.
@@ -318,6 +320,9 @@ pub enum DelayedTriggerCondition {
     AtBeginningOfNextEndStep,
     /// Fires at the beginning of the next upkeep for *any* player.
     AtBeginningOfNextUpkeep,
+    /// Fires at the beginning of the precombat main phase for the specified player.
+    /// Used by Sagas to add lore counters and trigger chapter abilities each turn.
+    AtBeginningOfPreCombatMain { player: PlayerId },
 }
 
 /// A delayed triggered ability that will fire at a later point in the game.

@@ -130,6 +130,13 @@ pub enum TriggeredEffect {
     /// Hideaway ETB: look at top N cards, choose one to exile face-down, put the rest on bottom.
     /// land_id is the hideaway land's ObjectId so we can record the hideaway link.
     HideawayETB { land_id: ObjectId, n: u8 },
+    /// Saga chapter trigger: a chapter ability fires when the saga reaches that lore count.
+    /// `saga_id` is the saga permanent's ObjectId.
+    /// `chapter` is the chapter number (1, 2, 3, …).
+    SagaChapter { saga_id: ObjectId, chapter: u8 },
+    /// Saga sacrifice: after the last chapter resolves, sacrifice the saga.
+    /// `saga_id` is the saga permanent's ObjectId.
+    SagaSacrifice { saga_id: ObjectId },
 }
 
 /// Activated ability effects.

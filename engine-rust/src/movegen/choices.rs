@@ -193,6 +193,35 @@ impl GameState {
                             self.hideaway_exiled.push((land_id, card_id));
                         }
                     }
+                    ChoiceReason::UrzasSagaChapterIII => {
+                        // Search library for an artifact with MV 0 or 1, put it onto the battlefield.
+                        // card_id == 0 means no valid target (shouldn't happen if options were non-empty).
+                        if card_id != 0 {
+                            let pid = choice.player as usize;
+                            if let Some(pos) = self.players[pid].library.iter().position(|&id| id == card_id) {
+                                self.players[pid].library.remove(pos);
+                                let card_name = self.card_name_for_id(card_id);
+                                if let Some(cn) = card_name {
+                                    if let Some(def) = find_card(db, cn) {
+                                        let mut perm = Permanent::new(
+                                            card_id, cn, choice.player, choice.player,
+                                            def.power, def.toughness, def.loyalty,
+                                            def.keywords, def.card_types,
+                                        );
+                                        if def.is_changeling {
+                                            perm.creature_types = crate::types::CreatureType::ALL.to_vec();
+                                        } else {
+                                            perm.creature_types = def.creature_types.to_vec();
+                                        }
+                                        perm.colors = def.color_identity.to_vec();
+                                        self.battlefield.push(perm);
+                                        self.handle_etb(cn, card_id, choice.player);
+                                    }
+                                }
+                            }
+                        }
+                        // Library is "shuffled" after search (no-op in this deterministic engine).
+                    }
                     ChoiceReason::CloneTarget { clone_id, is_metamorph } => {
                         // Copy the chosen permanent's characteristics onto the clone.
                         // Collect the data we need from the target before mutating.

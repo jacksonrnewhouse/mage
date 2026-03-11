@@ -217,6 +217,9 @@ pub enum ChoiceReason {
     /// Hideaway ETB: look at top N cards, choose one to exile face-down, put the rest on bottom.
     /// land_id is the hideaway land's ObjectId so we can record the hideaway link.
     HideawayExile { land_id: ObjectId },
+    /// Urza's Saga Chapter III: search your library for an artifact card with mana cost {0} or {1},
+    /// put it onto the battlefield, then shuffle.
+    UrzasSagaChapterIII,
     /// Dredge replacement: before a draw, the player may dredge a card instead.
     /// `dredge_card_id` is the ObjectId of the dredge card in the graveyard.
     /// `dredge_n` is the dredge value (number of cards to mill).
@@ -359,6 +362,7 @@ impl GameState {
             (Phase::Beginning, Some(Step::Draw)) => {
                 self.phase = Phase::PreCombatMain;
                 self.step = None;
+                self.check_delayed_triggers();
                 self.give_priority_to_active();
             }
             (Phase::PreCombatMain, _) => {
@@ -932,6 +936,9 @@ impl GameState {
                     }
                     DelayedTriggerCondition::AtBeginningOfNextUpkeep => {
                         phase == Phase::Beginning && step == Some(Step::Upkeep)
+                    }
+                    DelayedTriggerCondition::AtBeginningOfPreCombatMain { player } => {
+                        phase == Phase::PreCombatMain && step == None && active == player
                     }
                 }
             })
