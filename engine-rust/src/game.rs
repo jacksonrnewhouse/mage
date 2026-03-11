@@ -305,15 +305,20 @@ impl GameState {
         self.players[active].reset_for_turn();
 
         // Untap permanents
-        for perm in &mut self.battlefield {
-            if perm.controller == self.active_player {
-                // TODO: handle "doesn't untap" (Mana Vault, Grim Monolith)
-                perm.tapped = false;
-            }
-        }
+        self.untap_step();
 
         self.priority_player = self.active_player;
         self.action_context = ActionContext::Priority;
+    }
+
+    /// Untap all permanents controlled by the active player, skipping those
+    /// that have the `doesnt_untap` flag set (e.g. Mana Vault, Grim Monolith, Time Vault).
+    pub fn untap_step(&mut self) {
+        for perm in &mut self.battlefield {
+            if perm.controller == self.active_player && !perm.doesnt_untap {
+                perm.tapped = false;
+            }
+        }
     }
 
     fn give_priority_to_active(&mut self) {
@@ -1468,6 +1473,12 @@ impl GameState {
                     }
                 }
             }
+            // Mana Vault / Grim Monolith / Time Vault: set doesnt_untap flag
+            CardName::ManaVault | CardName::GrimMonolith | CardName::TimeVault => {
+                if let Some(perm) = self.find_permanent_mut(_card_id) {
+                    perm.doesnt_untap = true;
+                }
+            }
             // Loran of the Third Path: destroy artifact or enchantment
             CardName::LoranOfTheThirdPath => {
                 let targets: Vec<ObjectId> = self.battlefield.iter()
@@ -1728,6 +1739,7 @@ impl GameState {
                     counters: Counters::default(),
                     entered_this_turn: true,
                     attacked_this_turn: false,
+                    doesnt_untap: false,
                     loyalty: 0,
                     loyalty_activated_this_turn: false,
                     card_types: vec![CardType::Artifact],

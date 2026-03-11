@@ -29,6 +29,9 @@ pub struct Permanent {
     pub entered_this_turn: bool,
     /// Whether this permanent has attacked this turn
     pub attacked_this_turn: bool,
+    /// Whether this permanent doesn't untap during its controller's untap step
+    /// (e.g. Mana Vault, Grim Monolith, Time Vault)
+    pub doesnt_untap: bool,
     /// Loyalty for planeswalkers
     pub loyalty: i8,
     /// Whether loyalty ability has been activated this turn
@@ -97,6 +100,7 @@ impl Permanent {
             counters: Counters::default(),
             entered_this_turn: true,
             attacked_this_turn: false,
+            doesnt_untap: false,
             loyalty: loyalty.unwrap_or(0),
             loyalty_activated_this_turn: false,
             card_types: card_types.to_vec(),

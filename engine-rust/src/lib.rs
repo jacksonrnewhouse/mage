@@ -586,4 +586,86 @@ mod tests {
         let has_sol_ring = state.battlefield.iter().any(|p| p.card_name == CardName::SolRing);
         assert!(!has_sol_ring, "Sol Ring should have been destroyed by Abrupt Decay");
     }
+
+    #[test]
+    fn test_mana_vault_doesnt_untap() {
+        let db = build_card_db();
+        let mut state = GameState::new_two_player();
+
+        let vault_id = state.new_object_id();
+        state.card_registry.push((vault_id, CardName::ManaVault));
+        let def = find_card(&db, CardName::ManaVault).unwrap();
+        let mut perm = crate::permanent::Permanent::new(
+            vault_id, CardName::ManaVault, 0, 0,
+            def.power, def.toughness, None, def.keywords, def.card_types,
+        );
+        perm.tapped = true;
+        perm.doesnt_untap = true;
+        perm.entered_this_turn = false;
+        state.battlefield.push(perm);
+
+        // Run untap step as active player 0
+        state.phase = Phase::Beginning;
+        state.step = Some(Step::Untap);
+        state.active_player = 0;
+        state.untap_step();
+
+        // Mana Vault should still be tapped
+        let vault = state.find_permanent(vault_id).unwrap();
+        assert!(vault.tapped, "Mana Vault should NOT untap during untap step");
+    }
+
+    #[test]
+    fn test_normal_permanent_untaps() {
+        let db = build_card_db();
+        let mut state = GameState::new_two_player();
+
+        let sol_id = state.new_object_id();
+        state.card_registry.push((sol_id, CardName::SolRing));
+        let def = find_card(&db, CardName::SolRing).unwrap();
+        let mut perm = crate::permanent::Permanent::new(
+            sol_id, CardName::SolRing, 0, 0,
+            def.power, def.toughness, None, def.keywords, def.card_types,
+        );
+        perm.tapped = true;
+        perm.entered_this_turn = false;
+        state.battlefield.push(perm);
+
+        state.phase = Phase::Beginning;
+        state.step = Some(Step::Untap);
+        state.active_player = 0;
+        state.untap_step();
+
+        let sol = state.find_permanent(sol_id).unwrap();
+        assert!(!sol.tapped, "Sol Ring should untap normally during untap step");
+    }
+
+    #[test]
+    fn test_mana_vault_etb_sets_doesnt_untap() {
+        let db = build_card_db();
+        let mut state = GameState::new_two_player();
+
+        // Give player 0 a Mana Vault in hand and mana to cast it
+        let vault_id = state.new_object_id();
+        state.players[0].hand.push(vault_id);
+        state.card_registry.push((vault_id, CardName::ManaVault));
+        state.players[0].mana_pool.colorless += 1;
+
+        state.phase = Phase::PreCombatMain;
+        state.step = None;
+        state.active_player = 0;
+        state.priority_player = 0;
+        state.action_context = ActionContext::Priority;
+
+        // Cast Mana Vault
+        state.apply_action(&crate::action::Action::CastSpell { card_id: vault_id, targets: vec![] }, &db);
+
+        // Resolve it (pass priority twice)
+        state.pass_priority(&db);
+        state.pass_priority(&db);
+
+        // Check that it's on the battlefield with doesnt_untap set
+        let vault = state.find_permanent(vault_id).unwrap();
+        assert!(vault.doesnt_untap, "Mana Vault should have doesnt_untap set after ETB");
+    }
 }
