@@ -190,8 +190,15 @@ impl GameState {
         }
 
         // --- Activate mana abilities (tap lands/moxen for mana) ---
+        let artifact_lockdown = self.battlefield.iter().any(|p| {
+            matches!(p.card_name, CardName::CollectorOuphe | CardName::NullRod | CardName::StonySilence)
+        });
         for perm in self.permanents_controlled_by(player_id) {
             if perm.tapped {
+                continue;
+            }
+            // Collector Ouphe / Null Rod / Stony Silence: artifact activated abilities can't be activated
+            if artifact_lockdown && perm.is_artifact() {
                 continue;
             }
             let mana_options = self.mana_ability_options(perm);
@@ -547,12 +554,12 @@ impl GameState {
         let controller = perm.controller;
         let card_name = perm.card_name;
 
-        // Collector Ouphe: activated abilities of artifacts can't be activated
+        // Collector Ouphe / Null Rod / Stony Silence: activated abilities of artifacts can't be activated
         if perm.is_artifact() {
-            let ouphe_active = self.battlefield.iter().any(|p| {
-                p.card_name == CardName::CollectorOuphe
+            let artifact_lockdown = self.battlefield.iter().any(|p| {
+                matches!(p.card_name, CardName::CollectorOuphe | CardName::NullRod | CardName::StonySilence)
             });
-            if ouphe_active {
+            if artifact_lockdown {
                 return false;
             }
         }

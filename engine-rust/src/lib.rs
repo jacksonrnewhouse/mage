@@ -973,4 +973,74 @@ mod tests {
         let can_cast_second = actions.iter().any(|a| matches!(a, Action::CastSpell { card_id, .. } if *card_id == bolt2_id));
         assert!(!can_cast_second, "Archon of Emeria should prevent second spell this turn");
     }
+
+    #[test]
+    fn test_null_rod_prevents_artifact_abilities() {
+        let db = build_card_db();
+        let mut state = GameState::new_two_player();
+
+        let rod_id = state.new_object_id();
+        state.card_registry.push((rod_id, CardName::NullRod));
+        let def = find_card(&db, CardName::NullRod).unwrap();
+        let perm = crate::permanent::Permanent::new(
+            rod_id, CardName::NullRod, 0, 0,
+            def.power, def.toughness, None, def.keywords, def.card_types,
+        );
+        state.battlefield.push(perm);
+
+        let ring_id = state.new_object_id();
+        state.card_registry.push((ring_id, CardName::SolRing));
+        let def2 = find_card(&db, CardName::SolRing).unwrap();
+        let mut perm2 = crate::permanent::Permanent::new(
+            ring_id, CardName::SolRing, 0, 0,
+            def2.power, def2.toughness, None, def2.keywords, def2.card_types,
+        );
+        perm2.entered_this_turn = false;
+        state.battlefield.push(perm2);
+
+        state.turn_number = 1;
+        state.phase = Phase::PreCombatMain;
+        state.step = None;
+        state.active_player = 0;
+        state.priority_player = 0;
+
+        let actions = state.legal_actions(&db);
+        let can_tap_ring = actions.iter().any(|a| matches!(a, Action::ActivateManaAbility { permanent_id, .. } if *permanent_id == ring_id));
+        assert!(!can_tap_ring, "Null Rod should prevent Sol Ring activation");
+    }
+
+    #[test]
+    fn test_stony_silence_prevents_artifact_abilities() {
+        let db = build_card_db();
+        let mut state = GameState::new_two_player();
+
+        let silence_id = state.new_object_id();
+        state.card_registry.push((silence_id, CardName::StonySilence));
+        let def = find_card(&db, CardName::StonySilence).unwrap();
+        let perm = crate::permanent::Permanent::new(
+            silence_id, CardName::StonySilence, 0, 0,
+            def.power, def.toughness, None, def.keywords, def.card_types,
+        );
+        state.battlefield.push(perm);
+
+        let ring_id = state.new_object_id();
+        state.card_registry.push((ring_id, CardName::SolRing));
+        let def2 = find_card(&db, CardName::SolRing).unwrap();
+        let mut perm2 = crate::permanent::Permanent::new(
+            ring_id, CardName::SolRing, 0, 0,
+            def2.power, def2.toughness, None, def2.keywords, def2.card_types,
+        );
+        perm2.entered_this_turn = false;
+        state.battlefield.push(perm2);
+
+        state.turn_number = 1;
+        state.phase = Phase::PreCombatMain;
+        state.step = None;
+        state.active_player = 0;
+        state.priority_player = 0;
+
+        let actions = state.legal_actions(&db);
+        let can_tap_ring = actions.iter().any(|a| matches!(a, Action::ActivateManaAbility { permanent_id, .. } if *permanent_id == ring_id));
+        assert!(!can_tap_ring, "Stony Silence should prevent Sol Ring activation");
+    }
 }
