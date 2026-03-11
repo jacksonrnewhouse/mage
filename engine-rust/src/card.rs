@@ -465,6 +465,7 @@ pub enum CardName {
     PortalToPhyrexia,
     Batterskull,
     SkullClamp,
+    IsochronScepter,
 
     // === Azorius (WU) ===
     LaviniaAzoriusRenegade,
@@ -1188,6 +1189,9 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(SkullClamp, "Skullclamp", ManaCost::generic(1), &[Artifact], &[],
         None, None, None, kw(), &[],
         "Equipped creature gets +1/-1. When equipped creature dies, draw two cards. Equip {1}.");
+    card!(IsochronScepter, "Isochron Scepter", ManaCost::generic(2), &[Artifact], &[Legendary],
+        None, None, None, kw(), &[],
+        "Imprint - When Isochron Scepter enters, you may exile an instant card with mana value 2 or less from your hand. {2}, {T}: You may copy the exiled card. If you do, you may cast the copy without paying its mana cost.");
 
     // === Fetch Lands (simplified - they search for land types) ===
     card!(FloodedStrand, "Flooded Strand", c, &[Land], &[], None, None, None, kw(), &[White, Blue],

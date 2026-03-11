@@ -119,6 +119,10 @@ pub enum TriggeredEffect {
     TheOneRingETB { ring_id: ObjectId },
     /// The One Ring upkeep trigger: lose 1 life per burden counter, then add a burden counter.
     TheOneRingUpkeep { ring_id: ObjectId },
+    /// Chrome Mox ETB: imprint a nonartifact, nonland card from hand (exile it).
+    ChromeMoxETB { mox_id: ObjectId },
+    /// Isochron Scepter ETB: imprint an instant with MV <= 2 from hand (exile it).
+    IsochronScepterETB { scepter_id: ObjectId },
 }
 
 /// Activated ability effects.
@@ -202,6 +206,8 @@ pub enum ActivatedEffect {
     TezzeretUltimate,
     /// The One Ring {T}: put a burden counter on The One Ring, draw cards equal to burden counters.
     TheOneRingDraw { ring_id: ObjectId },
+    /// Isochron Scepter {2},{T}: copy and cast the imprinted instant without paying mana cost.
+    IsochronScepterActivated { scepter_id: ObjectId },
 }
 
 /// The game stack.

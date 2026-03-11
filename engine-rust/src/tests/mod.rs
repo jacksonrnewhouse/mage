@@ -30,6 +30,7 @@ mod surveil;
 mod triggers;
 mod tribal;
 mod one_ring;
+mod imprint;
 
 pub(crate) fn setup_simple_game() -> (GameState, Vec<CardDef>) {
     let db = build_card_db();

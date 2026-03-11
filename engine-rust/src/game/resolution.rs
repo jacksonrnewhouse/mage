@@ -1543,6 +1543,32 @@ impl GameState {
                 });
             }
 
+            // Chrome Mox: imprint a nonartifact, nonland card from hand on ETB
+            CardName::ChromeMox => {
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: _card_id,
+                        source_name: CardName::ChromeMox,
+                        effect: TriggeredEffect::ChromeMoxETB { mox_id: _card_id },
+                    },
+                    controller,
+                    vec![],
+                );
+            }
+
+            // Isochron Scepter: imprint an instant with MV <= 2 from hand on ETB
+            CardName::IsochronScepter => {
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: _card_id,
+                        source_name: CardName::IsochronScepter,
+                        effect: TriggeredEffect::IsochronScepterETB { scepter_id: _card_id },
+                    },
+                    controller,
+                    vec![],
+                );
+            }
+
             _ => {}
         }
     }
@@ -1929,6 +1955,62 @@ impl GameState {
                     }
                 }
             }
+            TriggeredEffect::ChromeMoxETB { mox_id } => {
+                // Imprint: the controller may exile a nonartifact, nonland card from their hand.
+                // Collect eligible cards from hand.
+                let options: Vec<ObjectId> = self.players[controller as usize]
+                    .hand
+                    .iter()
+                    .copied()
+                    .filter(|&id| {
+                        if let Some(cn) = self.card_name_for_id(id) {
+                            if let Some(def) = find_card(db, cn) {
+                                let is_artifact = def.card_types.contains(&crate::types::CardType::Artifact);
+                                let is_land = def.card_types.contains(&crate::types::CardType::Land);
+                                return !is_artifact && !is_land;
+                            }
+                        }
+                        false
+                    })
+                    .collect();
+                if !options.is_empty() {
+                    // Present choice to controller; ChooseCard(0) = decline to imprint.
+                    self.pending_choice = Some(PendingChoice {
+                        player: controller,
+                        kind: ChoiceKind::ChooseFromList {
+                            options,
+                            reason: ChoiceReason::ChromeMoxImprint { mox_id },
+                        },
+                    });
+                }
+            }
+            TriggeredEffect::IsochronScepterETB { scepter_id } => {
+                // Imprint: the controller may exile an instant card with MV <= 2 from their hand.
+                let options: Vec<ObjectId> = self.players[controller as usize]
+                    .hand
+                    .iter()
+                    .copied()
+                    .filter(|&id| {
+                        if let Some(cn) = self.card_name_for_id(id) {
+                            if let Some(def) = find_card(db, cn) {
+                                let is_instant = def.card_types.contains(&crate::types::CardType::Instant);
+                                let mv = def.mana_cost.cmc();
+                                return is_instant && mv <= 2;
+                            }
+                        }
+                        false
+                    })
+                    .collect();
+                if !options.is_empty() {
+                    self.pending_choice = Some(PendingChoice {
+                        player: controller,
+                        kind: ChoiceKind::ChooseFromList {
+                            options,
+                            reason: ChoiceReason::IsochronScepterImprint { scepter_id },
+                        },
+                    });
+                }
+            }
             _ => {}
         }
         let _ = db; // suppress unused warning when db not used in all arms
@@ -2311,6 +2393,27 @@ impl GameState {
                     .unwrap_or(0);
                 if burden > 0 {
                     self.draw_cards(controller, burden as usize);
+                }
+            }
+            // Isochron Scepter {2},{T}: copy and cast the imprinted instant for free.
+            ActivatedEffect::IsochronScepterActivated { scepter_id } => {
+                // Tap the scepter.
+                if let Some(perm) = self.find_permanent_mut(scepter_id) {
+                    perm.tapped = true;
+                }
+                // Find the imprinted card.
+                let imprinted_id = self.imprinted.iter()
+                    .find(|(perm_id, _)| *perm_id == scepter_id)
+                    .map(|(_, card_id)| *card_id);
+                if let Some(card_id) = imprinted_id {
+                    // Get the card name and cast the effect directly (copy = cast without paying cost).
+                    let card_name = self.card_name_for_id(card_id).unwrap_or(CardName::Plains);
+                    // Resolve the instant's effect directly (no mana cost).
+                    // Simplified: directly resolve the card effect with no targets (basic instants).
+                    // For targeted instants, we would need a pending choice; for now resolve inline.
+                    let targets: Vec<Target> = Vec::new();
+                    let modes: Vec<u8> = Vec::new();
+                    self.resolve_card_effect(card_name, controller, &targets, &modes, &[]);
                 }
             }
         }

@@ -94,6 +94,11 @@ pub struct GameState {
     /// When the exiling permanent leaves the battlefield, the exiled card returns.
     pub exile_linked: Vec<(ObjectId, ObjectId)>,
 
+    // --- Imprint ---
+    /// Maps (permanent_id, imprinted_card_id) for imprint effects (Chrome Mox, Isochron Scepter).
+    /// The imprinted card is exiled and referenced by the permanent for future abilities.
+    pub imprinted: Vec<(ObjectId, ObjectId)>,
+
     /// Maps (exiling_permanent_id, token_mv) for Skyclave Apparition.
     /// When Skyclave Apparition leaves, the opponent gets a token with MV equal to the exiled card's MV.
     pub skyclave_token_mv: Vec<(ObjectId, u32)>,
@@ -190,6 +195,14 @@ pub enum ChoiceReason {
     /// Passing (choosing no card) is represented by ChooseCard(0) — the engine
     /// uses object ID 0 as a sentinel for "no card".
     ShowAndTellChoose { next_player: Option<PlayerId> },
+    /// Chrome Mox imprint ETB: choose a nonartifact, nonland card from hand to exile.
+    /// mox_id is the Chrome Mox's ObjectId so we can record the imprint link.
+    /// Passing (choosing no card) is represented by ChooseCard(0).
+    ChromeMoxImprint { mox_id: ObjectId },
+    /// Isochron Scepter imprint ETB: choose an instant with MV <= 2 from hand to exile.
+    /// scepter_id is the Isochron Scepter's ObjectId so we can record the imprint link.
+    /// Passing (choosing no card) is represented by ChooseCard(0).
+    IsochronScepterImprint { scepter_id: ObjectId },
     /// Dredge replacement: before a draw, the player may dredge a card instead.
     /// `dredge_card_id` is the ObjectId of the dredge card in the graveyard.
     /// `dredge_n` is the dredge value (number of cards to mill).
@@ -228,6 +241,7 @@ impl GameState {
             temporary_effects: Vec::new(),
             snapcaster_flashback_cards: Vec::new(),
             exile_linked: Vec::new(),
+            imprinted: Vec::new(),
             skyclave_token_mv: Vec::new(),
             monarch: None,
             emblems: Vec::new(),

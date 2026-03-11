@@ -529,6 +529,25 @@ impl GameState {
                 }
             }
 
+            // Isochron Scepter: {2},{T} — copy and cast imprinted instant for free.
+            CardName::IsochronScepter if ability_index == 0 => {
+                // Pay {2} mana cost
+                let cost = crate::mana::ManaCost::generic(2);
+                if !self.players[controller as usize].mana_pool.pay(&cost) {
+                    return;
+                }
+                self.stack.push(
+                    StackItemKind::ActivatedAbility {
+                        source_id: permanent_id,
+                        source_name: card_name,
+                        effect: ActivatedEffect::IsochronScepterActivated { scepter_id: permanent_id },
+                    },
+                    controller,
+                    vec![],
+                );
+                self.reset_priority_passes();
+            }
+
             // The One Ring: {T}: Put a burden counter, then draw cards equal to burden counters.
             CardName::TheOneRing if ability_index == 0 => {
                 self.stack.push(

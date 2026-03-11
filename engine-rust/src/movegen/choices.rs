@@ -152,6 +152,34 @@ impl GameState {
                             });
                         }
                     }
+                    ChoiceReason::ChromeMoxImprint { mox_id } => {
+                        // card_id == 0 means the player declined to imprint anything.
+                        if card_id != 0 {
+                            let pid = choice.player as usize;
+                            // Remove the chosen card from hand and exile it.
+                            if let Some(pos) = self.players[pid].hand.iter().position(|&id| id == card_id) {
+                                self.players[pid].hand.remove(pos);
+                                let card_name = self.card_name_for_id(card_id).unwrap_or(crate::card::CardName::Plains);
+                                self.exile.push((card_id, card_name, choice.player));
+                                // Record the imprint link: (mox_id, card_id)
+                                self.imprinted.push((mox_id, card_id));
+                            }
+                        }
+                    }
+                    ChoiceReason::IsochronScepterImprint { scepter_id } => {
+                        // card_id == 0 means the player declined to imprint anything.
+                        if card_id != 0 {
+                            let pid = choice.player as usize;
+                            // Remove the chosen card from hand and exile it.
+                            if let Some(pos) = self.players[pid].hand.iter().position(|&id| id == card_id) {
+                                self.players[pid].hand.remove(pos);
+                                let card_name = self.card_name_for_id(card_id).unwrap_or(crate::card::CardName::Plains);
+                                self.exile.push((card_id, card_name, choice.player));
+                                // Record the imprint link: (scepter_id, card_id)
+                                self.imprinted.push((scepter_id, card_id));
+                            }
+                        }
+                    }
                     ChoiceReason::CloneTarget { clone_id, is_metamorph } => {
                         // Copy the chosen permanent's characteristics onto the clone.
                         // Collect the data we need from the target before mutating.
