@@ -16,6 +16,8 @@ pub struct Player {
     pub land_plays_remaining: u8,
     pub land_plays_per_turn: u8,
     pub has_drawn_this_turn: bool,
+    /// Number of cards drawn this turn (for draw-limiter statics like Spirit of the Labyrinth)
+    pub draws_this_turn: u8,
     pub poison_counters: u8,
     pub has_lost: bool,
     pub has_won: bool,
@@ -37,6 +39,7 @@ impl Player {
             land_plays_remaining: 1,
             land_plays_per_turn: 1,
             has_drawn_this_turn: false,
+            draws_this_turn: 0,
             poison_counters: 0,
             has_lost: false,
             has_won: false,
@@ -63,6 +66,7 @@ impl Player {
     pub fn reset_for_turn(&mut self) {
         self.land_plays_remaining = self.land_plays_per_turn;
         self.has_drawn_this_turn = false;
+        self.draws_this_turn = 0;
         self.spells_cast_this_turn = 0;
         self.mana_pool.empty();
     }

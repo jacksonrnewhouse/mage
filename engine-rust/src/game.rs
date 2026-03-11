@@ -1861,8 +1861,26 @@ impl GameState {
     pub fn draw_cards(&mut self, player: PlayerId, count: usize) {
         let pid = player as usize;
         for _ in 0..count {
+            // Check for draw-limiter statics before each individual draw.
+            // Spirit of the Labyrinth: each player can't draw more than one card per turn.
+            // Narset, Parter of Veils: opponents can't draw more than one card per turn.
+            // Leovold, Emissary of Trest: opponents can't draw more than one card per turn.
+            if self.players[pid].draws_this_turn >= 1 {
+                let limited = self.battlefield.iter().any(|p| {
+                    matches!(p.card_name, CardName::SpiritOfTheLabyrinth)
+                        || (matches!(p.card_name, CardName::NarsetParterOfVeils)
+                            && p.controller != player)
+                        || (matches!(p.card_name, CardName::LeovoldEmissaryOfTrest)
+                            && p.controller != player)
+                });
+                if limited {
+                    break;
+                }
+            }
             if let Some(id) = self.players[pid].library.pop() {
                 self.players[pid].hand.push(id);
+                self.players[pid].draws_this_turn += 1;
+                self.players[pid].has_drawn_this_turn = true;
             } else {
                 // Can't draw from empty library - player loses
                 self.players[pid].has_lost = true;

@@ -756,4 +756,78 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn test_spirit_of_the_labyrinth_limits_draws() {
+        let db = build_card_db();
+        let mut state = GameState::new_two_player();
+
+        let spirit_id = state.new_object_id();
+        state.card_registry.push((spirit_id, CardName::SpiritOfTheLabyrinth));
+        let def = find_card(&db, CardName::SpiritOfTheLabyrinth).unwrap();
+        let mut perm = crate::permanent::Permanent::new(
+            spirit_id, CardName::SpiritOfTheLabyrinth, 0, 0,
+            def.power, def.toughness, None, def.keywords, def.card_types,
+        );
+        perm.entered_this_turn = false;
+        state.battlefield.push(perm);
+
+        for _ in 0..10 {
+            let id = state.new_object_id();
+            state.card_registry.push((id, CardName::Island));
+            state.players[1].library.push(id);
+        }
+
+        // P1 draws first card (should work)
+        let hand_before = state.players[1].hand.len();
+        state.draw_cards(1, 1);
+        assert_eq!(state.players[1].hand.len(), hand_before + 1, "First draw should succeed");
+
+        // P1 tries to draw again (should be blocked)
+        let hand_after_first = state.players[1].hand.len();
+        state.draw_cards(1, 1);
+        assert_eq!(state.players[1].hand.len(), hand_after_first, "Second draw should be blocked by Spirit");
+    }
+
+    #[test]
+    fn test_narset_limits_opponent_draws() {
+        let db = build_card_db();
+        let mut state = GameState::new_two_player();
+
+        // P0 controls Narset
+        let narset_id = state.new_object_id();
+        state.card_registry.push((narset_id, CardName::NarsetParterOfVeils));
+        let def = find_card(&db, CardName::NarsetParterOfVeils).unwrap();
+        let mut perm = crate::permanent::Permanent::new(
+            narset_id, CardName::NarsetParterOfVeils, 0, 0,
+            def.power, def.toughness, None, def.keywords, def.card_types,
+        );
+        perm.controller = 0;
+        perm.entered_this_turn = false;
+        state.battlefield.push(perm);
+
+        for _ in 0..10 {
+            let id = state.new_object_id();
+            state.card_registry.push((id, CardName::Island));
+            state.players[1].library.push(id);
+            let id2 = state.new_object_id();
+            state.card_registry.push((id2, CardName::Island));
+            state.players[0].library.push(id2);
+        }
+
+        // P1 (opponent) draws first card (should work)
+        let hand_before = state.players[1].hand.len();
+        state.draw_cards(1, 1);
+        assert_eq!(state.players[1].hand.len(), hand_before + 1, "Opponent first draw should succeed");
+
+        // P1 tries to draw again (should be blocked by Narset)
+        let hand_after_first = state.players[1].hand.len();
+        state.draw_cards(1, 1);
+        assert_eq!(state.players[1].hand.len(), hand_after_first, "Opponent second draw should be blocked by Narset");
+
+        // P0 (Narset controller) can still draw multiple cards
+        let p0_hand_before = state.players[0].hand.len();
+        state.draw_cards(0, 2);
+        assert_eq!(state.players[0].hand.len(), p0_hand_before + 2, "Narset controller should still draw freely");
+    }
 }
