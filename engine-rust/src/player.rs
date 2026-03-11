@@ -23,6 +23,10 @@ pub struct Player {
     pub has_won: bool,
     /// Number of spells cast this turn (for storm count, etc.)
     pub spells_cast_this_turn: u16,
+    /// Number of nonartifact spells cast this turn (for Ethersworn Canonist)
+    pub nonartifact_spells_cast_this_turn: u16,
+    /// Number of noncreature spells cast this turn (for Deafening Silence)
+    pub noncreature_spells_cast_this_turn: u16,
     /// Extra turns queued
     pub extra_turns: u8,
 }
@@ -44,6 +48,8 @@ impl Player {
             has_lost: false,
             has_won: false,
             spells_cast_this_turn: 0,
+            nonartifact_spells_cast_this_turn: 0,
+            noncreature_spells_cast_this_turn: 0,
             extra_turns: 0,
         }
     }
@@ -68,6 +74,8 @@ impl Player {
         self.has_drawn_this_turn = false;
         self.draws_this_turn = 0;
         self.spells_cast_this_turn = 0;
+        self.nonartifact_spells_cast_this_turn = 0;
+        self.noncreature_spells_cast_this_turn = 0;
         self.mana_pool.empty();
     }
 

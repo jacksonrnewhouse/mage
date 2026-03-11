@@ -830,4 +830,147 @@ mod tests {
         state.draw_cards(0, 2);
         assert_eq!(state.players[0].hand.len(), p0_hand_before + 2, "Narset controller should still draw freely");
     }
+
+    #[test]
+    fn test_ethersworn_canonist_limits_nonartifact_spells() {
+        let db = build_card_db();
+        let mut state = GameState::new_two_player();
+
+        let canonist_id = state.new_object_id();
+        state.card_registry.push((canonist_id, CardName::EtherswornCanonist));
+        let def = find_card(&db, CardName::EtherswornCanonist).unwrap();
+        let mut perm = crate::permanent::Permanent::new(
+            canonist_id, CardName::EtherswornCanonist, 0, 0,
+            def.power, def.toughness, None, def.keywords, def.card_types,
+        );
+        perm.entered_this_turn = false;
+        state.battlefield.push(perm);
+
+        let bolt1_id = state.new_object_id();
+        let bolt2_id = state.new_object_id();
+        state.card_registry.push((bolt1_id, CardName::LightningBolt));
+        state.card_registry.push((bolt2_id, CardName::LightningBolt));
+        state.players[1].hand.push(bolt1_id);
+        state.players[1].hand.push(bolt2_id);
+
+        state.turn_number = 1;
+        state.phase = Phase::PreCombatMain;
+        state.step = None;
+        state.active_player = 1;
+        state.priority_player = 1;
+        state.players[1].mana_pool.red = 2;
+
+        // P1 casts first bolt (should work)
+        state.apply_action(
+            &Action::CastSpell {
+                card_id: bolt1_id,
+                targets: vec![Target::Player(0)],
+            },
+            &db,
+        );
+
+        // Resolve bolt
+        state.pass_priority(&db);
+        state.pass_priority(&db);
+
+        // P1 should NOT be able to cast second bolt
+        let actions = state.legal_actions(&db);
+        let can_cast_second = actions.iter().any(|a| matches!(a, Action::CastSpell { card_id, .. } if *card_id == bolt2_id));
+        assert!(!can_cast_second, "Canonist should prevent second nonartifact spell");
+    }
+
+    #[test]
+    fn test_deafening_silence_limits_noncreature_spells() {
+        let db = build_card_db();
+        let mut state = GameState::new_two_player();
+
+        let silence_id = state.new_object_id();
+        state.card_registry.push((silence_id, CardName::DeafeningSilence));
+        let def = find_card(&db, CardName::DeafeningSilence).unwrap();
+        let perm = crate::permanent::Permanent::new(
+            silence_id, CardName::DeafeningSilence, 0, 0,
+            def.power, def.toughness, None, def.keywords, def.card_types,
+        );
+        state.battlefield.push(perm);
+
+        let bolt1_id = state.new_object_id();
+        let bolt2_id = state.new_object_id();
+        state.card_registry.push((bolt1_id, CardName::LightningBolt));
+        state.card_registry.push((bolt2_id, CardName::LightningBolt));
+        state.players[1].hand.push(bolt1_id);
+        state.players[1].hand.push(bolt2_id);
+
+        state.turn_number = 1;
+        state.phase = Phase::PreCombatMain;
+        state.step = None;
+        state.active_player = 1;
+        state.priority_player = 1;
+        state.players[1].mana_pool.red = 2;
+
+        // P1 casts first bolt (noncreature) - should succeed
+        state.apply_action(
+            &Action::CastSpell {
+                card_id: bolt1_id,
+                targets: vec![Target::Player(0)],
+            },
+            &db,
+        );
+
+        // Resolve bolt
+        state.pass_priority(&db);
+        state.pass_priority(&db);
+
+        // P1 should NOT be able to cast second bolt (noncreature)
+        let actions = state.legal_actions(&db);
+        let can_cast_second = actions.iter().any(|a| matches!(a, Action::CastSpell { card_id, .. } if *card_id == bolt2_id));
+        assert!(!can_cast_second, "Deafening Silence should prevent second noncreature spell");
+    }
+
+    #[test]
+    fn test_archon_of_emeria_limits_one_spell_per_turn() {
+        let db = build_card_db();
+        let mut state = GameState::new_two_player();
+
+        let archon_id = state.new_object_id();
+        state.card_registry.push((archon_id, CardName::ArchonOfEmeria));
+        let def = find_card(&db, CardName::ArchonOfEmeria).unwrap();
+        let mut perm = crate::permanent::Permanent::new(
+            archon_id, CardName::ArchonOfEmeria, 0, 0,
+            def.power, def.toughness, None, def.keywords, def.card_types,
+        );
+        perm.entered_this_turn = false;
+        state.battlefield.push(perm);
+
+        let bolt1_id = state.new_object_id();
+        let bolt2_id = state.new_object_id();
+        state.card_registry.push((bolt1_id, CardName::LightningBolt));
+        state.card_registry.push((bolt2_id, CardName::LightningBolt));
+        state.players[1].hand.push(bolt1_id);
+        state.players[1].hand.push(bolt2_id);
+
+        state.turn_number = 1;
+        state.phase = Phase::PreCombatMain;
+        state.step = None;
+        state.active_player = 1;
+        state.priority_player = 1;
+        state.players[1].mana_pool.red = 2;
+
+        // P1 casts first bolt - should succeed
+        state.apply_action(
+            &Action::CastSpell {
+                card_id: bolt1_id,
+                targets: vec![Target::Player(0)],
+            },
+            &db,
+        );
+
+        // Resolve bolt
+        state.pass_priority(&db);
+        state.pass_priority(&db);
+
+        // P1 should NOT be able to cast second bolt
+        let actions = state.legal_actions(&db);
+        let can_cast_second = actions.iter().any(|a| matches!(a, Action::CastSpell { card_id, .. } if *card_id == bolt2_id));
+        assert!(!can_cast_second, "Archon of Emeria should prevent second spell this turn");
+    }
 }

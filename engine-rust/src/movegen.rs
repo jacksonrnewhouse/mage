@@ -105,6 +105,37 @@ impl GameState {
                         continue;
                     }
 
+                    // --- Cast-restriction statics ---
+                    // Archon of Emeria: each player can cast only one spell per turn
+                    let archon_active = self.battlefield.iter().any(|p| {
+                        p.card_name == CardName::ArchonOfEmeria
+                    });
+                    if archon_active && player.spells_cast_this_turn >= 1 {
+                        continue;
+                    }
+
+                    // Ethersworn Canonist: each player can cast only one nonartifact spell per turn
+                    let canonist_active = self.battlefield.iter().any(|p| {
+                        p.card_name == CardName::EtherswornCanonist
+                    });
+                    if canonist_active
+                        && !def.card_types.contains(&CardType::Artifact)
+                        && player.nonartifact_spells_cast_this_turn >= 1
+                    {
+                        continue;
+                    }
+
+                    // Deafening Silence: each player can cast only one noncreature spell per turn
+                    let deafening_silence_active = self.battlefield.iter().any(|p| {
+                        p.card_name == CardName::DeafeningSilence
+                    });
+                    if deafening_silence_active
+                        && !def.card_types.contains(&CardType::Creature)
+                        && player.noncreature_spells_cast_this_turn >= 1
+                    {
+                        continue;
+                    }
+
                     // Check mana cost (including Thalia tax, etc.)
                     let effective_cost = self.effective_cost(def, player_id);
                     if !player.mana_pool.can_pay(&effective_cost) {
@@ -1169,6 +1200,12 @@ impl GameState {
                                 uncounterable,
                             );
                             self.players[player_id as usize].spells_cast_this_turn += 1;
+                            if !def.card_types.contains(&CardType::Artifact) {
+                                self.players[player_id as usize].nonartifact_spells_cast_this_turn += 1;
+                            }
+                            if !def.card_types.contains(&CardType::Creature) {
+                                self.players[player_id as usize].noncreature_spells_cast_this_turn += 1;
+                            }
                             self.storm_count += 1;
                             self.reset_priority_passes();
                         }
