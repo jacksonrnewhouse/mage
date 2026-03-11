@@ -1434,16 +1434,168 @@ impl GameState {
 
     fn is_fetchable(&self, fetch: CardName, target: CardName) -> bool {
         match fetch {
-            CardName::FloodedStrand => matches!(target, CardName::Plains | CardName::Island | CardName::Tundra | CardName::Savannah | CardName::Scrubland | CardName::UndergroundSea | CardName::VolcanicIsland | CardName::TropicalIsland),
-            CardName::PollutedDelta => matches!(target, CardName::Island | CardName::Swamp | CardName::UndergroundSea | CardName::TropicalIsland | CardName::VolcanicIsland | CardName::Badlands | CardName::Bayou | CardName::Tundra),
-            CardName::BloodstainedMire => matches!(target, CardName::Swamp | CardName::Mountain | CardName::Badlands | CardName::UndergroundSea | CardName::Bayou | CardName::VolcanicIsland | CardName::Plateau | CardName::Taiga),
-            CardName::WoodedFoothills => matches!(target, CardName::Mountain | CardName::Forest | CardName::Taiga | CardName::VolcanicIsland | CardName::Plateau | CardName::Badlands | CardName::Bayou | CardName::Savannah | CardName::TropicalIsland),
-            CardName::WindsweptHeath => matches!(target, CardName::Forest | CardName::Plains | CardName::Savannah | CardName::TropicalIsland | CardName::Bayou | CardName::Taiga | CardName::Tundra | CardName::Plateau | CardName::Scrubland),
-            CardName::MistyRainforest => matches!(target, CardName::Forest | CardName::Island | CardName::TropicalIsland | CardName::Bayou | CardName::Savannah | CardName::Taiga | CardName::UndergroundSea | CardName::VolcanicIsland | CardName::Tundra),
-            CardName::ScaldingTarn => matches!(target, CardName::Island | CardName::Mountain | CardName::VolcanicIsland | CardName::UndergroundSea | CardName::TropicalIsland | CardName::Tundra | CardName::Badlands | CardName::Plateau | CardName::Taiga),
-            CardName::VerdantCatacombs => matches!(target, CardName::Swamp | CardName::Forest | CardName::Bayou | CardName::UndergroundSea | CardName::Badlands | CardName::TropicalIsland | CardName::Savannah | CardName::Taiga),
-            CardName::AridMesa => matches!(target, CardName::Mountain | CardName::Plains | CardName::Plateau | CardName::VolcanicIsland | CardName::Badlands | CardName::Taiga | CardName::Tundra | CardName::Savannah | CardName::Scrubland),
-            CardName::MarshFlats => matches!(target, CardName::Plains | CardName::Swamp | CardName::Scrubland | CardName::Tundra | CardName::Savannah | CardName::Plateau | CardName::UndergroundSea | CardName::Badlands | CardName::Bayou),
+            // FloodedStrand fetches Plains or Island lands
+            CardName::FloodedStrand => matches!(target,
+                // Basic lands
+                CardName::Plains | CardName::Island
+                // Dual lands (Alpha/Beta)
+                | CardName::Tundra | CardName::Savannah | CardName::Scrubland
+                | CardName::UndergroundSea | CardName::VolcanicIsland | CardName::TropicalIsland
+                // Shock lands with Plains subtype
+                | CardName::HallowedFountain | CardName::TempleGarden | CardName::GodlessShrine | CardName::SacredFoundry
+                // Shock lands with Island subtype
+                | CardName::WateryGrave | CardName::SteamVents | CardName::BreedingPool
+                // Survey lands with Plains subtype
+                | CardName::MeticulousArchive | CardName::HedgeMaze
+                // Survey lands with Island subtype
+                | CardName::UndercitySewers
+            ),
+            // PollutedDelta fetches Island or Swamp lands
+            CardName::PollutedDelta => matches!(target,
+                // Basic lands
+                CardName::Island | CardName::Swamp
+                // Dual lands
+                | CardName::UndergroundSea | CardName::TropicalIsland | CardName::VolcanicIsland
+                | CardName::Badlands | CardName::Bayou | CardName::Tundra
+                // Shock lands with Island subtype
+                | CardName::WateryGrave | CardName::SteamVents | CardName::BreedingPool
+                | CardName::HallowedFountain
+                // Shock lands with Swamp subtype
+                | CardName::BloodCrypt | CardName::OvergrownTomb | CardName::GodlessShrine
+                // Survey lands with Island subtype
+                | CardName::UndercitySewers | CardName::MeticulousArchive
+                // Survey lands with Swamp subtype (none currently)
+            ),
+            // BloodstainedMire fetches Swamp or Mountain lands
+            CardName::BloodstainedMire => matches!(target,
+                // Basic lands
+                CardName::Swamp | CardName::Mountain
+                // Dual lands
+                | CardName::Badlands | CardName::UndergroundSea | CardName::Bayou
+                | CardName::VolcanicIsland | CardName::Plateau | CardName::Taiga
+                // Shock lands with Swamp subtype
+                | CardName::BloodCrypt | CardName::OvergrownTomb | CardName::WateryGrave | CardName::GodlessShrine
+                // Shock lands with Mountain subtype
+                | CardName::StompingGround | CardName::SteamVents | CardName::SacredFoundry
+                // Survey lands with Swamp subtype (none currently)
+                // Survey lands with Mountain subtype
+                | CardName::ThunderingFalls
+                // Survey lands with Island subtype that also have Swamp (UndercitySewers = Island+Swamp)
+                | CardName::UndercitySewers
+            ),
+            // WoodedFoothills fetches Mountain or Forest lands
+            CardName::WoodedFoothills => matches!(target,
+                // Basic lands
+                CardName::Mountain | CardName::Forest
+                // Dual lands
+                | CardName::Taiga | CardName::VolcanicIsland | CardName::Plateau
+                | CardName::Badlands | CardName::Bayou | CardName::Savannah | CardName::TropicalIsland
+                // Shock lands with Mountain subtype
+                | CardName::StompingGround | CardName::SteamVents | CardName::SacredFoundry | CardName::BloodCrypt
+                // Shock lands with Forest subtype
+                | CardName::TempleGarden | CardName::OvergrownTomb | CardName::BreedingPool
+                // Survey lands with Mountain subtype
+                | CardName::ThunderingFalls
+                // Survey lands with Forest subtype
+                | CardName::HedgeMaze
+            ),
+            // WindsweptHeath fetches Forest or Plains lands
+            CardName::WindsweptHeath => matches!(target,
+                // Basic lands
+                CardName::Forest | CardName::Plains
+                // Dual lands
+                | CardName::Savannah | CardName::TropicalIsland | CardName::Bayou
+                | CardName::Taiga | CardName::Tundra | CardName::Plateau | CardName::Scrubland
+                // Shock lands with Forest subtype
+                | CardName::TempleGarden | CardName::OvergrownTomb | CardName::BreedingPool | CardName::StompingGround
+                // Shock lands with Plains subtype
+                | CardName::HallowedFountain | CardName::GodlessShrine | CardName::SacredFoundry
+                // Survey lands with Forest subtype
+                | CardName::HedgeMaze | CardName::ThunderingFalls
+                // Survey lands with Plains subtype
+                | CardName::MeticulousArchive
+            ),
+            // MistyRainforest fetches Forest or Island lands
+            CardName::MistyRainforest => matches!(target,
+                // Basic lands
+                CardName::Forest | CardName::Island
+                // Dual lands
+                | CardName::TropicalIsland | CardName::Bayou | CardName::Savannah
+                | CardName::Taiga | CardName::UndergroundSea | CardName::VolcanicIsland | CardName::Tundra
+                // Shock lands with Forest subtype
+                | CardName::BreedingPool | CardName::OvergrownTomb | CardName::TempleGarden
+                | CardName::StompingGround
+                // Shock lands with Island subtype
+                | CardName::HallowedFountain | CardName::WateryGrave | CardName::SteamVents
+                // Survey lands with Forest subtype
+                | CardName::HedgeMaze | CardName::ThunderingFalls
+                // Survey lands with Island subtype
+                | CardName::MeticulousArchive | CardName::UndercitySewers
+            ),
+            // ScaldingTarn fetches Island or Mountain lands
+            CardName::ScaldingTarn => matches!(target,
+                // Basic lands
+                CardName::Island | CardName::Mountain
+                // Dual lands
+                | CardName::VolcanicIsland | CardName::UndergroundSea | CardName::TropicalIsland
+                | CardName::Tundra | CardName::Badlands | CardName::Plateau | CardName::Taiga
+                // Shock lands with Island subtype
+                | CardName::SteamVents | CardName::HallowedFountain | CardName::WateryGrave | CardName::BreedingPool
+                // Shock lands with Mountain subtype
+                | CardName::StompingGround | CardName::SacredFoundry | CardName::BloodCrypt
+                // Survey lands with Island subtype
+                | CardName::MeticulousArchive | CardName::UndercitySewers
+                // Survey lands with Mountain subtype
+                | CardName::ThunderingFalls
+            ),
+            // VerdantCatacombs fetches Swamp or Forest lands
+            CardName::VerdantCatacombs => matches!(target,
+                // Basic lands
+                CardName::Swamp | CardName::Forest
+                // Dual lands
+                | CardName::Bayou | CardName::UndergroundSea | CardName::Badlands
+                | CardName::TropicalIsland | CardName::Savannah | CardName::Taiga
+                // Shock lands with Swamp subtype
+                | CardName::OvergrownTomb | CardName::BloodCrypt | CardName::WateryGrave | CardName::GodlessShrine
+                // Shock lands with Forest subtype
+                | CardName::TempleGarden | CardName::BreedingPool | CardName::StompingGround
+                // Survey lands with Swamp subtype (UndercitySewers = Island+Swamp)
+                | CardName::UndercitySewers
+                // Survey lands with Forest subtype
+                | CardName::HedgeMaze | CardName::ThunderingFalls
+            ),
+            // AridMesa fetches Mountain or Plains lands
+            CardName::AridMesa => matches!(target,
+                // Basic lands
+                CardName::Mountain | CardName::Plains
+                // Dual lands
+                | CardName::Plateau | CardName::VolcanicIsland | CardName::Badlands
+                | CardName::Taiga | CardName::Tundra | CardName::Savannah | CardName::Scrubland
+                // Shock lands with Mountain subtype
+                | CardName::SacredFoundry | CardName::StompingGround | CardName::SteamVents | CardName::BloodCrypt
+                // Shock lands with Plains subtype
+                | CardName::HallowedFountain | CardName::GodlessShrine | CardName::TempleGarden
+                // Survey lands with Mountain subtype
+                | CardName::ThunderingFalls
+                // Survey lands with Plains subtype
+                | CardName::MeticulousArchive | CardName::HedgeMaze
+            ),
+            // MarshFlats fetches Plains or Swamp lands
+            CardName::MarshFlats => matches!(target,
+                // Basic lands
+                CardName::Plains | CardName::Swamp
+                // Dual lands
+                | CardName::Scrubland | CardName::Tundra | CardName::Savannah
+                | CardName::Plateau | CardName::UndergroundSea | CardName::Badlands | CardName::Bayou
+                // Shock lands with Plains subtype
+                | CardName::GodlessShrine | CardName::HallowedFountain | CardName::TempleGarden | CardName::SacredFoundry
+                // Shock lands with Swamp subtype
+                | CardName::BloodCrypt | CardName::OvergrownTomb | CardName::WateryGrave
+                // Survey lands with Plains subtype
+                | CardName::MeticulousArchive | CardName::HedgeMaze
+                // Survey lands with Swamp subtype (UndercitySewers = Island+Swamp)
+                | CardName::UndercitySewers
+            ),
             _ => false,
         }
     }

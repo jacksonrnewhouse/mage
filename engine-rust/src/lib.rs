@@ -325,4 +325,133 @@ mod tests {
         let actions = state.legal_actions(&db);
         assert_eq!(count, actions.len() as u64);
     }
+
+    #[test]
+    fn test_fetch_finds_shock_lands() {
+        let db = build_card_db();
+        let mut state = GameState::new_two_player();
+
+        // Deck: Islands and Hallowed Fountain first (bottom of library), then Flooded Strand last
+        // (top of library, drawn first since library.pop() takes from end)
+        let deck: Vec<CardName> = std::iter::repeat(CardName::Island)
+            .take(32)
+            .chain(std::iter::once(CardName::HallowedFountain))
+            .chain(std::iter::repeat(CardName::Island).take(6))
+            .chain(std::iter::once(CardName::FloodedStrand))
+            .collect();
+        state.load_deck(0, &deck, &db);
+        state.load_deck(1, &(vec![CardName::Mountain; 40]), &db);
+        state.start_game();
+
+        state.phase = Phase::PreCombatMain;
+        state.step = None;
+
+        // Find and play Flooded Strand from hand
+        let strand_id = state.players[0]
+            .hand
+            .iter()
+            .find(|&&id| state.card_name_for_id(id) == Some(CardName::FloodedStrand))
+            .copied()
+            .expect("Flooded Strand should be in hand");
+        state.apply_action(&Action::PlayLand(strand_id), &db);
+
+        // Activate Flooded Strand
+        let perm_id = state
+            .permanents_controlled_by(0)
+            .find(|p| p.card_name == CardName::FloodedStrand)
+            .expect("Flooded Strand should be on battlefield")
+            .id;
+
+        let actions = state.legal_actions(&db);
+        let activate = actions.iter().find(|a| {
+            matches!(a, Action::ActivateAbility { permanent_id, .. } if *permanent_id == perm_id)
+        });
+        assert!(activate.is_some(), "Should be able to activate Flooded Strand");
+
+        state.apply_action(activate.unwrap(), &db);
+
+        // Now there should be a pending choice to search the library
+        assert!(
+            state.pending_choice.is_some(),
+            "Should have pending choice after activating fetch land"
+        );
+
+        // The searchable options should include Hallowed Fountain (Plains+Island)
+        if let Some(choice) = &state.pending_choice {
+            if let ChoiceKind::ChooseFromList { options, .. } = &choice.kind {
+                let found_fountain = options.iter().any(|&id| {
+                    state.card_name_for_id(id) == Some(CardName::HallowedFountain)
+                });
+                assert!(
+                    found_fountain,
+                    "Flooded Strand should be able to fetch Hallowed Fountain (Plains+Island)"
+                );
+            } else {
+                panic!("Expected ChooseFromList pending choice");
+            }
+        }
+    }
+
+    #[test]
+    fn test_fetch_finds_survey_lands() {
+        let db = build_card_db();
+        let mut state = GameState::new_two_player();
+
+        // Deck: Swamps and Undercity Sewers first (bottom), then Polluted Delta last (top, drawn first)
+        let deck: Vec<CardName> = std::iter::repeat(CardName::Swamp)
+            .take(32)
+            .chain(std::iter::once(CardName::UndercitySewers))
+            .chain(std::iter::repeat(CardName::Swamp).take(6))
+            .chain(std::iter::once(CardName::PollutedDelta))
+            .collect();
+        state.load_deck(0, &deck, &db);
+        state.load_deck(1, &(vec![CardName::Mountain; 40]), &db);
+        state.start_game();
+
+        state.phase = Phase::PreCombatMain;
+        state.step = None;
+
+        // Find and play Polluted Delta from hand
+        let delta_id = state.players[0]
+            .hand
+            .iter()
+            .find(|&&id| state.card_name_for_id(id) == Some(CardName::PollutedDelta))
+            .copied()
+            .expect("Polluted Delta should be in hand");
+        state.apply_action(&Action::PlayLand(delta_id), &db);
+
+        // Activate Polluted Delta
+        let perm_id = state
+            .permanents_controlled_by(0)
+            .find(|p| p.card_name == CardName::PollutedDelta)
+            .expect("Polluted Delta should be on battlefield")
+            .id;
+
+        let actions = state.legal_actions(&db);
+        let activate = actions.iter().find(|a| {
+            matches!(a, Action::ActivateAbility { permanent_id, .. } if *permanent_id == perm_id)
+        });
+        assert!(activate.is_some(), "Should be able to activate Polluted Delta");
+
+        state.apply_action(activate.unwrap(), &db);
+
+        assert!(
+            state.pending_choice.is_some(),
+            "Should have pending choice after activating fetch land"
+        );
+
+        if let Some(choice) = &state.pending_choice {
+            if let ChoiceKind::ChooseFromList { options, .. } = &choice.kind {
+                let found_sewers = options.iter().any(|&id| {
+                    state.card_name_for_id(id) == Some(CardName::UndercitySewers)
+                });
+                assert!(
+                    found_sewers,
+                    "Polluted Delta should be able to fetch Undercity Sewers (Island+Swamp)"
+                );
+            } else {
+                panic!("Expected ChooseFromList pending choice");
+            }
+        }
+    }
 }
