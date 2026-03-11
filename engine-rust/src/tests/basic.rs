@@ -128,6 +128,7 @@ fn test_cast_lightning_bolt() {
             targets: vec![Target::Player(1)],
             x_value: 0,
             from_graveyard: false,
+            alt_cost: None,
         },
         &db,
     );

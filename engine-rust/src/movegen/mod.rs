@@ -185,6 +185,7 @@ impl GameState {
                                 targets: vec![],
                                 x_value,
                                 from_graveyard: false,
+                                alt_cost: None,
                             });
                         } else {
                             for targets in &target_sets {
@@ -193,6 +194,7 @@ impl GameState {
                                     targets: targets.clone(),
                                     x_value,
                                     from_graveyard: false,
+                                    alt_cost: None,
                                 });
                             }
                         }
@@ -293,6 +295,7 @@ impl GameState {
                                 targets: vec![],
                                 x_value: 0,
                                 from_graveyard: true,
+                                alt_cost: None,
                             });
                         } else {
                             for targets in &target_sets {
@@ -301,6 +304,7 @@ impl GameState {
                                     targets: targets.clone(),
                                     x_value: 0,
                                     from_graveyard: true,
+                                    alt_cost: None,
                                 });
                             }
                         }
@@ -309,33 +313,10 @@ impl GameState {
             }
         }
 
-        // --- Force of Will alternate cost ---
-        for &card_id in &player.hand {
-            if let Some(card_name) = self.card_name_for_id(card_id) {
-                if card_name == CardName::ForceOfWill && !self.stack.is_empty() {
-                    // Check if player has another blue card in hand and 1 life
-                    let has_blue_card = player.hand.iter().any(|&other_id| {
-                        other_id != card_id
-                            && self
-                                .card_name_for_id(other_id)
-                                .and_then(|cn| find_card(db, cn))
-                                .map(|d| d.color_identity.contains(&Color::Blue))
-                                .unwrap_or(false)
-                    });
-                    if has_blue_card && player.life > 1 {
-                        // Target each spell on the stack
-                        for item in self.stack.items() {
-                            actions.push(Action::CastSpell {
-                                card_id,
-                                targets: vec![Target::Object(item.id)],
-                                x_value: 0,
-                                from_graveyard: false,
-                            });
-                        }
-                    }
-                }
-            }
-        }
+        // --- Alternate-cost spells ---
+        // Generate CastSpell actions for cards that can be cast by paying an alternate cost
+        // instead of their normal mana cost (Force cycle, evoke creatures, etc.).
+        self.generate_alt_cost_actions(player_id, db, &mut actions, sorcery_speed);
 
         // --- Activate mana abilities (tap lands/moxen for mana) ---
         let artifact_lockdown = self.battlefield.iter().any(|p| {
@@ -1526,6 +1507,286 @@ impl GameState {
 
             // No targets needed (tutors, cantrips, board wipes, etc.)
             _ => vec![],
+        }
+    }
+
+    /// Generate CastSpell actions for alternate-cost spells in hand.
+    /// These cards can be cast by exiling a card of a specific color from hand
+    /// (and paying life in the case of Force of Will), bypassing the normal mana cost.
+    fn generate_alt_cost_actions(
+        &self,
+        player_id: PlayerId,
+        db: &[CardDef],
+        actions: &mut Vec<Action>,
+        sorcery_speed: bool,
+    ) {
+        let player = &self.players[player_id as usize];
+        let is_opponent_turn = player_id != self.active_player;
+
+        for &card_id in &player.hand {
+            let card_name = match self.card_name_for_id(card_id) {
+                Some(cn) => cn,
+                None => continue,
+            };
+
+            match card_name {
+                // --- Force of Will: exile blue card + pay 1 life, instant speed, stack must be non-empty ---
+                CardName::ForceOfWill => {
+                    if self.stack.is_empty() {
+                        continue;
+                    }
+                    if player.life <= 1 {
+                        continue;
+                    }
+                    // Find all blue cards that can be exiled (must be different card from FoW itself)
+                    let blue_exile_candidates: Vec<ObjectId> = player.hand.iter()
+                        .copied()
+                        .filter(|&other_id| {
+                            other_id != card_id
+                                && self.card_name_for_id(other_id)
+                                    .and_then(|cn| find_card(db, cn))
+                                    .map(|d| d.color_identity.contains(&Color::Blue))
+                                    .unwrap_or(false)
+                        })
+                        .collect();
+                    for exile_id in blue_exile_candidates {
+                        let target_sets = self.generate_targets(card_name, player_id, db);
+                        if target_sets.is_empty() {
+                            // FoW targets spells on stack; generate one action per stack spell
+                            for item in self.stack.items() {
+                                actions.push(Action::CastSpell {
+                                    card_id,
+                                    targets: vec![Target::Object(item.id)],
+                                    x_value: 0,
+                                    from_graveyard: false,
+                                    alt_cost: Some(AltCost::ForceOfWill { exile_id }),
+                                });
+                            }
+                        } else {
+                            for targets in &target_sets {
+                                actions.push(Action::CastSpell {
+                                    card_id,
+                                    targets: targets.clone(),
+                                    x_value: 0,
+                                    from_graveyard: false,
+                                    alt_cost: Some(AltCost::ForceOfWill { exile_id }),
+                                });
+                            }
+                        }
+                    }
+                }
+
+                // --- Force of Negation: exile blue card, opponent's turn only ---
+                CardName::ForceOfNegation => {
+                    if !is_opponent_turn || self.stack.is_empty() {
+                        continue;
+                    }
+                    let blue_exile_candidates: Vec<ObjectId> = player.hand.iter()
+                        .copied()
+                        .filter(|&other_id| {
+                            other_id != card_id
+                                && self.card_name_for_id(other_id)
+                                    .and_then(|cn| find_card(db, cn))
+                                    .map(|d| d.color_identity.contains(&Color::Blue))
+                                    .unwrap_or(false)
+                        })
+                        .collect();
+                    for exile_id in blue_exile_candidates {
+                        let target_sets = self.generate_targets(card_name, player_id, db);
+                        if target_sets.is_empty() {
+                            for item in self.stack.items() {
+                                actions.push(Action::CastSpell {
+                                    card_id,
+                                    targets: vec![Target::Object(item.id)],
+                                    x_value: 0,
+                                    from_graveyard: false,
+                                    alt_cost: Some(AltCost::ForceOfNegation { exile_id }),
+                                });
+                            }
+                        } else {
+                            for targets in &target_sets {
+                                actions.push(Action::CastSpell {
+                                    card_id,
+                                    targets: targets.clone(),
+                                    x_value: 0,
+                                    from_graveyard: false,
+                                    alt_cost: Some(AltCost::ForceOfNegation { exile_id }),
+                                });
+                            }
+                        }
+                    }
+                }
+
+                // --- Misdirection: exile blue card, instant speed ---
+                CardName::Misdirection => {
+                    if self.stack.is_empty() {
+                        continue;
+                    }
+                    let blue_exile_candidates: Vec<ObjectId> = player.hand.iter()
+                        .copied()
+                        .filter(|&other_id| {
+                            other_id != card_id
+                                && self.card_name_for_id(other_id)
+                                    .and_then(|cn| find_card(db, cn))
+                                    .map(|d| d.color_identity.contains(&Color::Blue))
+                                    .unwrap_or(false)
+                        })
+                        .collect();
+                    for exile_id in blue_exile_candidates {
+                        let target_sets = self.generate_targets(card_name, player_id, db);
+                        if target_sets.is_empty() {
+                            for item in self.stack.items() {
+                                // Misdirection targets spells with a single target
+                                actions.push(Action::CastSpell {
+                                    card_id,
+                                    targets: vec![Target::Object(item.id)],
+                                    x_value: 0,
+                                    from_graveyard: false,
+                                    alt_cost: Some(AltCost::Misdirection { exile_id }),
+                                });
+                            }
+                        } else {
+                            for targets in &target_sets {
+                                actions.push(Action::CastSpell {
+                                    card_id,
+                                    targets: targets.clone(),
+                                    x_value: 0,
+                                    from_graveyard: false,
+                                    alt_cost: Some(AltCost::Misdirection { exile_id }),
+                                });
+                            }
+                        }
+                    }
+                }
+
+                // --- Commandeer: exile two blue cards, instant speed ---
+                CardName::Commandeer => {
+                    if self.stack.is_empty() {
+                        continue;
+                    }
+                    // Collect all pairs of distinct blue cards in hand
+                    let blue_cards: Vec<ObjectId> = player.hand.iter()
+                        .copied()
+                        .filter(|&other_id| {
+                            other_id != card_id
+                                && self.card_name_for_id(other_id)
+                                    .and_then(|cn| find_card(db, cn))
+                                    .map(|d| d.color_identity.contains(&Color::Blue))
+                                    .unwrap_or(false)
+                        })
+                        .collect();
+                    if blue_cards.len() < 2 {
+                        continue;
+                    }
+                    // Generate one representative pair (first two blue cards) to avoid
+                    // action space explosion. In practice, which pair is chosen rarely matters.
+                    let exile_id1 = blue_cards[0];
+                    let exile_id2 = blue_cards[1];
+                    let target_sets = self.generate_targets(card_name, player_id, db);
+                    if target_sets.is_empty() {
+                        for item in self.stack.items() {
+                            actions.push(Action::CastSpell {
+                                card_id,
+                                targets: vec![Target::Object(item.id)],
+                                x_value: 0,
+                                from_graveyard: false,
+                                alt_cost: Some(AltCost::Commandeer { exile_id1, exile_id2 }),
+                            });
+                        }
+                    } else {
+                        for targets in &target_sets {
+                            actions.push(Action::CastSpell {
+                                card_id,
+                                targets: targets.clone(),
+                                x_value: 0,
+                                from_graveyard: false,
+                                alt_cost: Some(AltCost::Commandeer { exile_id1, exile_id2 }),
+                            });
+                        }
+                    }
+                }
+
+                // --- Evoke creatures: exile a card of matching color from hand ---
+                // Solitude: exile a white card
+                CardName::Solitude => {
+                    self.generate_evoke_actions(card_id, card_name, Color::White, player_id, db, actions, sorcery_speed);
+                }
+                // Grief: exile a black card
+                CardName::Grief => {
+                    self.generate_evoke_actions(card_id, card_name, Color::Black, player_id, db, actions, sorcery_speed);
+                }
+                // Fury: exile a red card
+                CardName::Fury => {
+                    self.generate_evoke_actions(card_id, card_name, Color::Red, player_id, db, actions, sorcery_speed);
+                }
+                // Endurance: exile a green card
+                CardName::Endurance => {
+                    self.generate_evoke_actions(card_id, card_name, Color::Green, player_id, db, actions, sorcery_speed);
+                }
+
+                _ => {}
+            }
+        }
+    }
+
+    /// Generate evoke CastSpell actions for a creature with evoke (exile matching color card).
+    /// Evoke creatures can be cast at their normal timing (respecting instant/sorcery speed).
+    fn generate_evoke_actions(
+        &self,
+        card_id: ObjectId,
+        card_name: CardName,
+        evoke_color: Color,
+        player_id: PlayerId,
+        db: &[CardDef],
+        actions: &mut Vec<Action>,
+        sorcery_speed: bool,
+    ) {
+        let player = &self.players[player_id as usize];
+
+        // Evoke creatures are cast at sorcery speed (they're creatures) unless they have Flash
+        let def = match find_card(db, card_name) {
+            Some(d) => d,
+            None => return,
+        };
+        let can_cast_at_instant_speed = def.card_types.contains(&CardType::Instant)
+            || def.keywords.has(Keyword::Flash);
+        if !can_cast_at_instant_speed && !sorcery_speed {
+            return;
+        }
+
+        // Find exile candidates of the required color (must be different from the evoke creature itself)
+        let exile_candidates: Vec<ObjectId> = player.hand.iter()
+            .copied()
+            .filter(|&other_id| {
+                other_id != card_id
+                    && self.card_name_for_id(other_id)
+                        .and_then(|cn| find_card(db, cn))
+                        .map(|d| d.color_identity.contains(&evoke_color))
+                        .unwrap_or(false)
+            })
+            .collect();
+
+        for exile_id in exile_candidates {
+            let target_sets = self.generate_targets(card_name, player_id, db);
+            if target_sets.is_empty() {
+                actions.push(Action::CastSpell {
+                    card_id,
+                    targets: vec![],
+                    x_value: 0,
+                    from_graveyard: false,
+                    alt_cost: Some(AltCost::Evoke { exile_id }),
+                });
+            } else {
+                for targets in &target_sets {
+                    actions.push(Action::CastSpell {
+                        card_id,
+                        targets: targets.clone(),
+                        x_value: 0,
+                        from_graveyard: false,
+                        alt_cost: Some(AltCost::Evoke { exile_id }),
+                    });
+                }
+            }
         }
     }
 }

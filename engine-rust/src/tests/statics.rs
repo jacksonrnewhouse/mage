@@ -113,6 +113,7 @@ fn test_ethersworn_canonist_limits_nonartifact_spells() {
             targets: vec![Target::Player(0)],
             x_value: 0,
             from_graveyard: false,
+            alt_cost: None,
         },
         &db,
     );
@@ -162,6 +163,7 @@ fn test_deafening_silence_limits_noncreature_spells() {
             targets: vec![Target::Player(0)],
             x_value: 0,
             from_graveyard: false,
+            alt_cost: None,
         },
         &db,
     );
@@ -212,6 +214,7 @@ fn test_archon_of_emeria_limits_one_spell_per_turn() {
             targets: vec![Target::Player(0)],
             x_value: 0,
             from_graveyard: false,
+            alt_cost: None,
         },
         &db,
     );

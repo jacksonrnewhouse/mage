@@ -12,8 +12,8 @@ impl GameState {
     pub fn resolve_top(&mut self, db: &[CardDef]) {
         if let Some(item) = self.stack.pop() {
             match item.kind {
-                StackItemKind::Spell { card_name, card_id } => {
-                    self.resolve_spell(card_name, card_id, item.controller, &item.targets, item.x_value, item.cast_from_graveyard, db);
+                StackItemKind::Spell { card_name, card_id, cast_via_evoke } => {
+                    self.resolve_spell(card_name, card_id, item.controller, &item.targets, item.x_value, item.cast_from_graveyard, cast_via_evoke, db);
                 }
                 StackItemKind::TriggeredAbility { effect, .. } => {
                     self.resolve_triggered(effect, item.controller, &item.targets);
@@ -34,6 +34,7 @@ impl GameState {
         targets: &[Target],
         x_value: u8,
         cast_from_graveyard: bool,
+        cast_via_evoke: bool,
         db: &[CardDef],
     ) {
         let card_def = find_card(db, card_name);
@@ -65,6 +66,19 @@ impl GameState {
                 self.handle_etb_with_x(card_name, card_id, controller, x_value);
                 // Handle ETB effects that need the cast targets (e.g. Snapcaster Mage)
                 self.handle_etb_with_cast_targets(card_name, card_id, controller, targets);
+                // Evoke sacrifice trigger: when cast via evoke, the creature is sacrificed
+                // after ETB triggers resolve (goes on stack under ETB triggers, resolves last).
+                if cast_via_evoke {
+                    self.stack.push(
+                        StackItemKind::TriggeredAbility {
+                            source_id: card_id,
+                            source_name: card_name,
+                            effect: TriggeredEffect::EvokeSacrifice { permanent_id: card_id },
+                        },
+                        controller,
+                        vec![],
+                    );
+                }
             }
         } else {
             // Instant/sorcery: resolve effect, then place in appropriate zone.
@@ -1412,6 +1426,11 @@ impl GameState {
                     self.exchange_control(drake_id, *target_id);
                 }
             }
+            TriggeredEffect::EvokeSacrifice { permanent_id } => {
+                // Evoke sacrifice: sacrifice the evoked creature.
+                // The creature's card goes to the graveyard (owner's zone).
+                self.destroy_permanent(permanent_id);
+            }
             _ => {}
         }
     }
@@ -1738,7 +1757,7 @@ impl GameState {
     /// Spells cast from graveyard (flashback / Yawgmoth's Will) go to exile when countered.
     /// Other spells go to their owner's graveyard.
     pub(crate) fn route_countered_spell(&mut self, item: crate::stack::StackItem) {
-        if let crate::stack::StackItemKind::Spell { card_id, card_name } = item.kind {
+        if let crate::stack::StackItemKind::Spell { card_id, card_name, .. } = item.kind {
             if item.cast_from_graveyard {
                 // Flashback / Yawgmoth's Will: exile instead of graveyard
                 self.exile.push((card_id, card_name, item.controller));

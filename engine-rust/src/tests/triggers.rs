@@ -490,6 +490,7 @@ fn test_young_pyromancer_triggers_on_noncreature_spell() {
             targets: vec![Target::Player(1)],
             x_value: 0,
             from_graveyard: false,
+            alt_cost: None,
         },
         &db,
     );
@@ -552,6 +553,7 @@ fn test_young_pyromancer_does_not_trigger_on_creature_spell() {
             targets: vec![],
             x_value: 0,
             from_graveyard: false,
+            alt_cost: None,
         },
         &db,
     );
@@ -602,6 +604,7 @@ fn test_monastery_mentor_triggers_on_noncreature_spell() {
             targets: vec![Target::Player(1)],
             x_value: 0,
             from_graveyard: false,
+            alt_cost: None,
         },
         &db,
     );

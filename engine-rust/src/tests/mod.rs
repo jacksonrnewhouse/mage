@@ -2,6 +2,7 @@ use crate::card::*;
 use crate::game::*;
 use crate::types::*;
 
+mod alt_cost;
 mod basic;
 mod combat;
 mod cost_reduction;

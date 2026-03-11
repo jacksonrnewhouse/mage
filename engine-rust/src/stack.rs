@@ -26,6 +26,10 @@ pub enum StackItemKind {
     Spell {
         card_name: CardName,
         card_id: ObjectId,
+        /// True if this creature was cast via evoke (exile color card from hand).
+        /// When the evoke creature enters the battlefield, it gets an evoke trigger
+        /// that sacrifices it after the ETB effect resolves.
+        cast_via_evoke: bool,
     },
     /// A triggered ability
     TriggeredAbility {
@@ -60,6 +64,9 @@ pub enum TriggeredEffect {
     /// Grief/Solitude evoke ETB
     GriefETB,
     SolitudeETB,
+    /// Evoke sacrifice trigger: when a creature is cast via evoke, it's sacrificed
+    /// after its ETB trigger resolves.
+    EvokeSacrifice { permanent_id: ObjectId },
     /// Archon of Cruelty ETB/attack
     ArchonOfCrueltyTrigger,
     /// Orcish Bowmasters opponent draw trigger

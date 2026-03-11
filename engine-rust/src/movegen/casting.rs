@@ -46,34 +46,31 @@ impl GameState {
                 }
             }
 
-            Action::CastSpell { card_id, targets, x_value, from_graveyard } => {
+            Action::CastSpell { card_id, targets, x_value, from_graveyard, alt_cost } => {
                 let player_id = self.priority_player;
                 let card_name = self.card_name_for_id(*card_id);
                 if let Some(cn) = card_name {
                     if let Some(def) = find_card(db, cn) {
-                        // Determine cost: flashback cost if casting from graveyard, else normal cost.
-                        let base_cost = if *from_graveyard {
-                            // Use flashback cost if available, else normal cost (Yawgmoth's Will).
-                            def.flashback_cost.unwrap_or(def.mana_cost)
+                        // Determine whether we're paying an alternate cost or normal mana cost.
+                        let paid = if let Some(alt) = alt_cost {
+                            self.pay_alt_cost(player_id, *card_id, alt)
+                        } else if *from_graveyard {
+                            // Flashback / Yawgmoth's Will: pay the flashback cost.
+                            let base_cost = def.flashback_cost.unwrap_or(def.mana_cost);
+                            let taxed = self.effective_cost_with_base(def, player_id, base_cost);
+                            self.players[player_id as usize].mana_pool.pay(&taxed)
                         } else {
-                            def.mana_cost
+                            // Normal mana cost (with tax effects applied).
+                            let mut cost = self.effective_cost(def, player_id);
+                            // For X spells, add X * x_multiplier to the generic cost.
+                            if def.has_x_cost {
+                                let x_cost = (*x_value as u16) * (def.x_multiplier as u16);
+                                cost.generic = cost.generic.saturating_add(x_cost as u8);
+                            }
+                            self.players[player_id as usize].mana_pool.pay(&cost)
                         };
-                        let mut cost = if *from_graveyard {
-                            // Apply tax effects to flashback cost as well.
-                            // We reuse effective_cost logic by temporarily using a fake def.
-                            // Simpler: just apply the same tax calculation.
-                            let tax_only_def = def;
-                            let taxed = self.effective_cost_with_base(tax_only_def, player_id, base_cost);
-                            taxed
-                        } else {
-                            self.effective_cost(def, player_id)
-                        };
-                        // For X spells, add X * x_multiplier to the generic cost
-                        if def.has_x_cost {
-                            let x_cost = (*x_value as u16) * (def.x_multiplier as u16);
-                            cost.generic = cost.generic.saturating_add(x_cost as u8);
-                        }
-                        if self.players[player_id as usize].mana_pool.pay(&cost) {
+
+                        if paid {
                             // Remove the card from the appropriate zone.
                             if *from_graveyard {
                                 // Remove from graveyard
@@ -88,10 +85,13 @@ impl GameState {
                                 self.players[player_id as usize].remove_from_hand(*card_id);
                             }
                             let uncounterable = is_uncounterable(cn);
+                            // Mark evoke-cast spells so resolution can apply the sacrifice trigger.
+                            let is_evoke = matches!(alt_cost, Some(AltCost::Evoke { .. }));
                             self.stack.push_with_flags(
                                 StackItemKind::Spell {
                                     card_name: cn,
                                     card_id: *card_id,
+                                    cast_via_evoke: is_evoke,
                                 },
                                 player_id,
                                 targets.clone(),
@@ -671,6 +671,82 @@ impl GameState {
                 | CardName::UndercitySewers
             ),
             _ => false,
+        }
+    }
+
+    /// Pay an alternate cost for a spell being cast.
+    /// Returns true if the cost was paid successfully (all required resources were present and consumed).
+    /// On success, the exiled card(s) and any life payment are consumed from the player's resources.
+    /// On failure, no resources are consumed.
+    pub(crate) fn pay_alt_cost(&mut self, player_id: PlayerId, _spell_id: ObjectId, alt: &AltCost) -> bool {
+        match alt {
+            AltCost::ForceOfWill { exile_id } => {
+                // Cost: pay 1 life and exile a blue card from hand.
+                let player = &self.players[player_id as usize];
+                // Verify the exile card is in hand and is blue.
+                let exile_in_hand = player.hand.contains(exile_id);
+                if !exile_in_hand || player.life <= 1 {
+                    return false;
+                }
+                // Pay life and exile the card.
+                self.players[player_id as usize].life -= 1;
+                self.players[player_id as usize].remove_from_hand(*exile_id);
+                let exile_name = self.card_name_for_id(*exile_id).unwrap_or(CardName::Plains);
+                self.exile.push((*exile_id, exile_name, player_id));
+                true
+            }
+            AltCost::ForceOfNegation { exile_id } => {
+                // Cost: exile a blue card from hand (no life payment).
+                let player = &self.players[player_id as usize];
+                let exile_in_hand = player.hand.contains(exile_id);
+                if !exile_in_hand {
+                    return false;
+                }
+                self.players[player_id as usize].remove_from_hand(*exile_id);
+                let exile_name = self.card_name_for_id(*exile_id).unwrap_or(CardName::Plains);
+                self.exile.push((*exile_id, exile_name, player_id));
+                true
+            }
+            AltCost::Misdirection { exile_id } => {
+                // Cost: exile a blue card from hand.
+                let player = &self.players[player_id as usize];
+                let exile_in_hand = player.hand.contains(exile_id);
+                if !exile_in_hand {
+                    return false;
+                }
+                self.players[player_id as usize].remove_from_hand(*exile_id);
+                let exile_name = self.card_name_for_id(*exile_id).unwrap_or(CardName::Plains);
+                self.exile.push((*exile_id, exile_name, player_id));
+                true
+            }
+            AltCost::Commandeer { exile_id1, exile_id2 } => {
+                // Cost: exile two blue cards from hand.
+                let player = &self.players[player_id as usize];
+                let has_both = player.hand.contains(exile_id1) && player.hand.contains(exile_id2)
+                    && exile_id1 != exile_id2;
+                if !has_both {
+                    return false;
+                }
+                self.players[player_id as usize].remove_from_hand(*exile_id1);
+                self.players[player_id as usize].remove_from_hand(*exile_id2);
+                let name1 = self.card_name_for_id(*exile_id1).unwrap_or(CardName::Plains);
+                let name2 = self.card_name_for_id(*exile_id2).unwrap_or(CardName::Plains);
+                self.exile.push((*exile_id1, name1, player_id));
+                self.exile.push((*exile_id2, name2, player_id));
+                true
+            }
+            AltCost::Evoke { exile_id } => {
+                // Cost: exile a card of the matching color from hand.
+                let player = &self.players[player_id as usize];
+                let exile_in_hand = player.hand.contains(exile_id);
+                if !exile_in_hand {
+                    return false;
+                }
+                self.players[player_id as usize].remove_from_hand(*exile_id);
+                let exile_name = self.card_name_for_id(*exile_id).unwrap_or(CardName::Plains);
+                self.exile.push((*exile_id, exile_name, player_id));
+                true
+            }
         }
     }
 

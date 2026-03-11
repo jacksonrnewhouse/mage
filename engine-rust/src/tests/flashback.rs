@@ -147,6 +147,7 @@ fn test_flashback_spell_is_exiled_after_resolving() {
             targets: vec![Target::Object(sol_id)],
             x_value: 0,
             from_graveyard: true,
+            alt_cost: None,
         },
         &db,
     );
@@ -208,6 +209,7 @@ fn test_snapcaster_mage_grants_flashback() {
             targets: vec![Target::Object(bolt_id)],
             x_value: 0,
             from_graveyard: false,
+            alt_cost: None,
         },
         &db,
     );
@@ -304,6 +306,7 @@ fn test_yawgmoths_will_cast_exiles_on_resolution() {
             targets: vec![Target::Player(1)],
             x_value: 0,
             from_graveyard: true,
+            alt_cost: None,
         },
         &db,
     );

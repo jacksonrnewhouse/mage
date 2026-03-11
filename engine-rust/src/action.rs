@@ -3,6 +3,25 @@
 
 use crate::types::*;
 
+/// An alternate cost that can be paid instead of a spell's normal mana cost.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum AltCost {
+    /// Force of Will: exile a blue card from hand + pay 1 life.
+    /// `exile_id` is the ObjectId of the blue card being exiled from hand.
+    ForceOfWill { exile_id: ObjectId },
+    /// Force of Negation: exile a blue card from hand (opponent's turn only).
+    /// `exile_id` is the ObjectId of the blue card being exiled from hand.
+    ForceOfNegation { exile_id: ObjectId },
+    /// Misdirection: exile a blue card from hand.
+    Misdirection { exile_id: ObjectId },
+    /// Commandeer: exile two blue cards from hand.
+    Commandeer { exile_id1: ObjectId, exile_id2: ObjectId },
+    /// Evoke cost: exile a card of the matching color from hand.
+    /// `exile_id` is the ObjectId of the card being exiled.
+    /// When cast via evoke, the creature enters, ETB triggers, then is sacrificed.
+    Evoke { exile_id: ObjectId },
+}
+
 /// A game action that can be taken by the active/priority player.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Action {
@@ -13,11 +32,13 @@ pub enum Action {
     /// Cast a spell (from hand or graveyard). Includes target selection.
     /// For X spells, `x_value` is the chosen value of X (0 for non-X spells).
     /// `from_graveyard` is true when casting via flashback or Yawgmoth's Will.
+    /// `alt_cost` is Some when paying an alternative cost instead of the normal mana cost.
     CastSpell {
         card_id: ObjectId,
         targets: Vec<Target>,
         x_value: u8,
         from_graveyard: bool,
+        alt_cost: Option<AltCost>,
     },
     /// Activate an ability on a permanent.
     ActivateAbility {
