@@ -1144,6 +1144,29 @@ impl GameState {
                 // Create a Treasure token for Ragavan's controller
                 self.create_treasure_token(controller);
             }
+            TriggeredEffect::ScrawlingCrawlerCombatDamage => {
+                // Scrawling Crawler deals combat damage to a player: draw a card
+                self.draw_cards(controller, 1);
+            }
+            TriggeredEffect::PsychicFrogCombatDamage => {
+                // Psychic Frog deals combat damage to a player:
+                // you may exile a card from your graveyard; if you do, draw a card.
+                // Simplified: if the controller has a card in their graveyard, exile one and draw.
+                let pid = controller as usize;
+                if !self.players[pid].graveyard.is_empty() {
+                    let exiled_id = self.players[pid].graveyard.pop().unwrap();
+                    let exiled_name = self.card_name_for_id(exiled_id).unwrap_or(CardName::Plains);
+                    self.exile.push((exiled_id, exiled_name, controller));
+                    self.draw_cards(controller, 1);
+                }
+            }
+            TriggeredEffect::MaiCombatDamage => {
+                // Mai, Scornful Striker deals combat damage to a player:
+                // you may cast a creature card from a graveyard.
+                // Simplified: draw a card to represent the card advantage from the ability.
+                // Full implementation requires choosing from any graveyard; model as draw for now.
+                self.draw_cards(controller, 1);
+            }
             TriggeredEffect::OrcishBowmastersETB | TriggeredEffect::OrcishBowmastersOpponentDraw => {
                 // Deal 1 damage to any target and amass Orcs 1 (create 1/1 token)
                 if let Some(target) = targets.first() {

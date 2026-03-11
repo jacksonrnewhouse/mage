@@ -63,22 +63,25 @@ impl GameState {
                 damage_to_players.push((defending_player, attacker_power as i32));
 
                 // Fire combat-damage-to-player triggers for unblocked attackers
-                match attacker.card_name {
-                    CardName::RagavanNimblePilferer => {
-                        let attacker_id_copy = attacker_id;
-                        let attacker_name = attacker.card_name;
-                        let attacker_ctrl = attacker_controller;
-                        self.stack.push(
-                            StackItemKind::TriggeredAbility {
-                                source_id: attacker_id_copy,
-                                source_name: attacker_name,
-                                effect: TriggeredEffect::RagavanCombatDamage,
-                            },
-                            attacker_ctrl,
-                            vec![],
-                        );
-                    }
-                    _ => {}
+                let trigger_effect = match attacker.card_name {
+                    CardName::RagavanNimblePilferer => Some(TriggeredEffect::RagavanCombatDamage),
+                    CardName::ScrawlingCrawler => Some(TriggeredEffect::ScrawlingCrawlerCombatDamage),
+                    CardName::PsychicFrog => Some(TriggeredEffect::PsychicFrogCombatDamage),
+                    CardName::MaiScornfulStriker => Some(TriggeredEffect::MaiCombatDamage),
+                    _ => None,
+                };
+                if let Some(effect) = trigger_effect {
+                    let attacker_name = attacker.card_name;
+                    let attacker_ctrl = attacker_controller;
+                    self.stack.push(
+                        StackItemKind::TriggeredAbility {
+                            source_id: attacker_id,
+                            source_name: attacker_name,
+                            effect,
+                        },
+                        attacker_ctrl,
+                        vec![],
+                    );
                 }
             } else {
                 // Blocked - assign damage to blockers

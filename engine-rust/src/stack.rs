@@ -73,6 +73,12 @@ pub enum TriggeredEffect {
     CreateTreasures { count: u8 },
     /// Ragavan deals combat damage: create a Treasure token
     RagavanCombatDamage,
+    /// ScrawlingCrawler deals combat damage to a player: draw a card
+    ScrawlingCrawlerCombatDamage,
+    /// PsychicFrog deals combat damage to a player: you may exile a card from your graveyard; if you do, draw a card
+    PsychicFrogCombatDamage,
+    /// Mai, Scornful Striker deals combat damage to a player: you may cast a creature card from a graveyard
+    MaiCombatDamage,
     /// Gain control of target permanent (Agent of Treachery ETB, etc.)
     GainControlOfPermanent,
     /// Exchange control of this permanent and target creature (Gilded Drake ETB)
