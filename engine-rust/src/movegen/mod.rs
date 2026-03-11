@@ -330,8 +330,14 @@ impl GameState {
     }
 
     /// Get the effective mana cost of a card after tax effects (Thalia, Trinisphere, etc.)
+    /// and cost reduction effects (Foundry Inspector, affinity, etc.).
     fn effective_cost(&self, def: &CardDef, _controller: PlayerId) -> ManaCost {
         let mut cost = def.mana_cost;
+
+        // Accumulate total cost increase and decrease separately, then apply at the end.
+        // This avoids order-dependence bugs when combining taxes and reductions.
+        let mut generic_increase: u32 = 0;
+        let mut generic_reduction: u32 = 0;
 
         // Count tax effects from the battlefield
         for p in &self.battlefield {
@@ -339,7 +345,7 @@ impl GameState {
                 // Thalia: noncreature spells cost {1} more (opponent's)
                 CardName::ThaliaGuardianOfThraben if p.controller != _controller => {
                     if !def.card_types.contains(&CardType::Creature) {
-                        cost.generic += 1;
+                        generic_increase += 1;
                     }
                 }
                 // Archon of Emeria: each player can cast only 1 spell per turn
@@ -348,28 +354,28 @@ impl GameState {
                 // Lodestone Golem: nonartifact spells cost {1} more
                 CardName::LodestoneGolem if p.controller != _controller => {
                     if !def.card_types.contains(&CardType::Artifact) {
-                        cost.generic += 1;
+                        generic_increase += 1;
                     }
                 }
                 // Sphere of Resistance: each spell costs {1} more
                 CardName::SphereOfResistance => {
-                    cost.generic += 1;
+                    generic_increase += 1;
                 }
                 // Thorn of Amethyst: noncreature spells cost {1} more
                 CardName::ThornOfAmethyst => {
                     if !def.card_types.contains(&CardType::Creature) {
-                        cost.generic += 1;
+                        generic_increase += 1;
                     }
                 }
                 // Defense Grid: spells cast not during controller's turn cost {3} more
                 CardName::DefenseGrid if self.active_player != _controller => {
-                    cost.generic += 3;
+                    generic_increase += 3;
                 }
                 // Damping Sphere: each spell after the first costs {1} more per spell
                 CardName::DampingSphere => {
                     let spells_cast = self.players[_controller as usize].spells_cast_this_turn;
                     if spells_cast > 0 {
-                        cost.generic += spells_cast as u8;
+                        generic_increase += spells_cast as u32;
                     }
                 }
                 // Dovin, Hand of Control: artifacts/instants/sorceries cost {1} more (opponent's)
@@ -377,18 +383,36 @@ impl GameState {
                     if def.card_types.contains(&CardType::Artifact)
                         || def.card_types.contains(&CardType::Instant)
                         || def.card_types.contains(&CardType::Sorcery) {
-                        cost.generic += 1;
+                        generic_increase += 1;
                     }
                 }
-                // Foundry Inspector: artifact spells cost {1} less (own)
+                // Foundry Inspector: artifact spells cost {1} less to cast (own)
                 CardName::FoundryInspector if p.controller == _controller => {
-                    if def.card_types.contains(&CardType::Artifact) && cost.generic > 0 {
-                        cost.generic -= 1;
+                    if def.card_types.contains(&CardType::Artifact) {
+                        generic_reduction += 1;
                     }
                 }
                 _ => {}
             }
         }
+
+        // Affinity for artifacts: reduce cost by the number of artifacts the controller controls.
+        // Applies to ThoughtMonitor and Thoughtcast.
+        let has_affinity_for_artifacts = matches!(
+            def.name,
+            CardName::ThoughtMonitor | CardName::Thoughtcast
+        );
+        if has_affinity_for_artifacts {
+            let artifact_count = self.battlefield.iter()
+                .filter(|p| p.controller == _controller && p.is_artifact())
+                .count() as u32;
+            generic_reduction += artifact_count;
+        }
+
+        // Apply increases then reductions to generic, keeping it non-negative.
+        // Reductions can only reduce the generic portion (not colored mana requirements).
+        let generic_after_increase = cost.generic as u32 + generic_increase;
+        cost.generic = generic_after_increase.saturating_sub(generic_reduction).min(u8::MAX as u32) as u8;
 
         // Trinisphere: spells cost at least {3} (when untapped)
         let trinisphere_active = self.battlefield.iter().any(|p| {
