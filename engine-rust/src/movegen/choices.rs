@@ -262,6 +262,46 @@ impl GameState {
                             self.draw_cards(choice.player, 1);
                         }
                     }
+                    ChoiceReason::DredgeChoice { dredge_card_id, dredge_n, remaining_draws } => {
+                        // n == 0: draw normally (don't dredge)
+                        // n == 1: dredge — mill N cards, return the dredge card from graveyard to hand
+                        if n == 1 {
+                            // Dredge: mill dredge_n cards from the top of the library
+                            let pid = choice.player as usize;
+                            for _ in 0..dredge_n {
+                                if let Some(milled_id) = self.players[pid].library.pop() {
+                                    let milled_name = self.card_name_for_id(milled_id)
+                                        .unwrap_or(crate::card::CardName::Plains);
+                                    self.send_to_graveyard(milled_id, milled_name, choice.player);
+                                }
+                            }
+                            // Return the dredge card from graveyard to hand
+                            let pid = choice.player as usize;
+                            if let Some(pos) = self.players[pid].graveyard.iter().position(|&id| id == dredge_card_id) {
+                                self.players[pid].graveyard.remove(pos);
+                                self.players[pid].hand.push(dredge_card_id);
+                            }
+                            // Dredging replaces the draw, so draws_this_turn does NOT increment.
+                            // Continue with any remaining draws.
+                            if remaining_draws > 0 {
+                                self.draw_cards(choice.player, remaining_draws);
+                            }
+                        } else {
+                            // Draw normally (n == 0): perform the draw that was pending.
+                            let pid = choice.player as usize;
+                            if let Some(id) = self.players[pid].library.pop() {
+                                self.players[pid].hand.push(id);
+                                self.players[pid].draws_this_turn += 1;
+                                self.players[pid].has_drawn_this_turn = true;
+                            } else {
+                                self.players[pid].has_lost = true;
+                            }
+                            // Continue with any remaining draws.
+                            if remaining_draws > 0 {
+                                self.draw_cards(choice.player, remaining_draws);
+                            }
+                        }
+                    }
                     _ => {}
                 }
             }

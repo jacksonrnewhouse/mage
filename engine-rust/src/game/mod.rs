@@ -184,6 +184,16 @@ pub enum ChoiceReason {
     /// Passing (choosing no card) is represented by ChooseCard(0) — the engine
     /// uses object ID 0 as a sentinel for "no card".
     ShowAndTellChoose { next_player: Option<PlayerId> },
+    /// Dredge replacement: before a draw, the player may dredge a card instead.
+    /// `dredge_card_id` is the ObjectId of the dredge card in the graveyard.
+    /// `dredge_n` is the dredge value (number of cards to mill).
+    /// `remaining_draws` is how many more draws remain after this one.
+    /// Choose 0 = draw normally, 1 = dredge.
+    DredgeChoice {
+        dredge_card_id: ObjectId,
+        dredge_n: u8,
+        remaining_draws: usize,
+    },
 }
 impl GameState {
     /// Create a new two-player game.
@@ -875,9 +885,37 @@ impl GameState {
         let _ = top_id; // suppress unused warning; resolver reads it directly
     }
 
+    /// Returns the dredge value for a card name, or None if the card does not have dredge.
+    pub fn dredge_value(card_name: CardName) -> Option<u8> {
+        match card_name {
+            CardName::GolgariGraveTroll => Some(6),
+            CardName::StinkweedImp => Some(5),
+            CardName::LifeFromTheLoam => Some(3),
+            _ => None,
+        }
+    }
+
+    /// Find the first dredge card in a player's graveyard that can be dredged
+    /// (i.e., the player has at least `dredge_n` cards in their library).
+    /// Returns (card_id, dredge_n) for the first eligible dredge card, or None.
+    pub fn find_dredgeable(&self, player: PlayerId) -> Option<(ObjectId, u8)> {
+        let pid = player as usize;
+        let lib_size = self.players[pid].library.len();
+        for &card_id in &self.players[pid].graveyard {
+            if let Some(name) = self.card_name_for_id(card_id) {
+                if let Some(n) = Self::dredge_value(name) {
+                    if lib_size >= n as usize {
+                        return Some((card_id, n));
+                    }
+                }
+            }
+        }
+        None
+    }
+
     pub fn draw_cards(&mut self, player: PlayerId, count: usize) {
         let pid = player as usize;
-        for _ in 0..count {
+        for remaining in (0..count).rev() {
             // Check for draw-limiter statics before each individual draw.
             // Spirit of the Labyrinth: each player can't draw more than one card per turn.
             // Narset, Parter of Veils: opponents can't draw more than one card per turn.
@@ -893,6 +931,24 @@ impl GameState {
                 if limited {
                     break;
                 }
+            }
+            // Check for a dredge replacement: if the player has a dredgeable card in their
+            // graveyard, offer a pending choice before the draw.
+            if let Some((dredge_card_id, dredge_n)) = self.find_dredgeable(player) {
+                self.pending_choice = Some(PendingChoice {
+                    player,
+                    kind: ChoiceKind::ChooseNumber {
+                        min: 0,
+                        max: 1,
+                        reason: ChoiceReason::DredgeChoice {
+                            dredge_card_id,
+                            dredge_n,
+                            remaining_draws: remaining,
+                        },
+                    },
+                });
+                // Stop the draw loop; remaining draws will be continued after the choice is resolved.
+                return;
             }
             if let Some(id) = self.players[pid].library.pop() {
                 self.players[pid].hand.push(id);

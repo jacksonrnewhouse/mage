@@ -390,6 +390,8 @@ pub enum CardName {
     MasterOfDeath,
     HogaakArisenNecropolis,
     KishlaSkimmer,
+    GolgariGraveTroll,
+    StinkweedImp,
 
     // === Colorless Creatures ===
     StonecoilSerpent,
@@ -1796,6 +1798,12 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(KishlaSkimmer, "Kishla Skimmer", ManaCost { black: 1, green: 1, generic: 1, ..c }, &[Creature], &[],
         Some(3), Some(2), None, flying(), &[Black, Green],
         "Flying. When Kishla Skimmer enters, mill three cards.");
+    card!(GolgariGraveTroll, "Golgari Grave-Troll", ManaCost { green: 1, generic: 5, ..c }, &[Creature], &[],
+        Some(0), Some(0), None, trample(), &[Black, Green],
+        "Golgari Grave-Troll enters with a +1/+1 counter on it for each creature card in your graveyard. {1}, Remove a +1/+1 counter from Golgari Grave-Troll: Regenerate Golgari Grave-Troll. Dredge 6.");
+    card!(StinkweedImp, "Stinkweed Imp", ManaCost { black: 1, generic: 2, ..c }, &[Creature], &[],
+        Some(1), Some(2), None, flying(), &[Black],
+        "Flying. Whenever Stinkweed Imp deals combat damage to a creature, destroy that creature. Dredge 5.");
 
     // === Colorless Creatures ===
     // Stonecoil Serpent: {X} — X appears once, pays 1 per X

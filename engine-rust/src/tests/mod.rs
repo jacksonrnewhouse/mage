@@ -5,6 +5,7 @@ use crate::types::*;
 mod alt_cost;
 mod annihilator_extra_turn;
 mod basic;
+mod dredge;
 mod emblem;
 mod clone;
 mod protection;
