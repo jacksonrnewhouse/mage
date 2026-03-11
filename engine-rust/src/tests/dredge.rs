@@ -62,7 +62,7 @@ fn test_dredge_values() {
 
 #[test]
 fn test_find_dredgeable_with_sufficient_library() {
-    let (mut state, _db) = make_main_phase_state();
+    let (mut state, db) = make_main_phase_state();
     let troll_id = put_in_graveyard(&mut state, CardName::GolgariGraveTroll, 0);
     fill_library(&mut state, 0, 6);
 
@@ -75,7 +75,7 @@ fn test_find_dredgeable_with_sufficient_library() {
 
 #[test]
 fn test_find_dredgeable_insufficient_library() {
-    let (mut state, _db) = make_main_phase_state();
+    let (mut state, db) = make_main_phase_state();
     put_in_graveyard(&mut state, CardName::GolgariGraveTroll, 0);
     fill_library(&mut state, 0, 5); // only 5 cards, need 6
 
@@ -85,7 +85,7 @@ fn test_find_dredgeable_insufficient_library() {
 
 #[test]
 fn test_find_dredgeable_empty_graveyard() {
-    let (mut state, _db) = make_main_phase_state();
+    let (mut state, db) = make_main_phase_state();
     fill_library(&mut state, 0, 10);
 
     let result = state.find_dredgeable(0);
@@ -96,7 +96,7 @@ fn test_find_dredgeable_empty_graveyard() {
 
 #[test]
 fn test_draw_cards_sets_dredge_choice_when_eligible() {
-    let (mut state, _db) = make_main_phase_state();
+    let (mut state, db) = make_main_phase_state();
     put_in_graveyard(&mut state, CardName::StinkweedImp, 0);
     fill_library(&mut state, 0, 10);
 
@@ -123,7 +123,7 @@ fn test_draw_cards_sets_dredge_choice_when_eligible() {
 
 #[test]
 fn test_draw_cards_no_dredge_choice_without_eligible_card() {
-    let (mut state, _db) = make_main_phase_state();
+    let (mut state, db) = make_main_phase_state();
     fill_library(&mut state, 0, 5);
     push_library_top(&mut state, CardName::LightningBolt, 0);
 
@@ -139,7 +139,7 @@ fn test_draw_cards_no_dredge_choice_without_eligible_card() {
 /// When choosing to dredge (n=1): mill N cards, return dredge card from graveyard to hand.
 #[test]
 fn test_dredge_mills_and_returns_card() {
-    let (mut state, _db) = make_main_phase_state();
+    let (mut state, db) = make_main_phase_state();
     let troll_id = put_in_graveyard(&mut state, CardName::GolgariGraveTroll, 0);
     // Fill library with exactly 6 cards (the dredge amount).
     fill_library(&mut state, 0, 6);
@@ -150,7 +150,7 @@ fn test_dredge_mills_and_returns_card() {
 
     let choice = state.pending_choice.take().unwrap();
     // Choose to dredge (n=1).
-    state.resolve_number_choice(choice, 1);
+    state.resolve_number_choice(choice, 1, &db);
 
     // The 6 library cards should now be in the graveyard (milled).
     assert_eq!(
@@ -184,7 +184,7 @@ fn test_dredge_mills_and_returns_card() {
 /// When choosing NOT to dredge (n=0): draw normally.
 #[test]
 fn test_dredge_choice_decline_draws_normally() {
-    let (mut state, _db) = make_main_phase_state();
+    let (mut state, db) = make_main_phase_state();
     put_in_graveyard(&mut state, CardName::LifeFromTheLoam, 0);
     // Fill library first, then push the Island on top so it's the top card.
     fill_library(&mut state, 0, 2); // extra cards
@@ -196,7 +196,7 @@ fn test_dredge_choice_decline_draws_normally() {
 
     let choice = state.pending_choice.take().unwrap();
     // Decline to dredge (n=0): draw normally.
-    state.resolve_number_choice(choice, 0);
+    state.resolve_number_choice(choice, 0, &db);
 
     // top_id (Island) should be drawn.
     assert!(
@@ -220,7 +220,7 @@ fn test_dredge_choice_decline_draws_normally() {
 /// Can't dredge when library has fewer cards than dredge N.
 #[test]
 fn test_cant_dredge_with_insufficient_library() {
-    let (mut state, _db) = make_main_phase_state();
+    let (mut state, db) = make_main_phase_state();
     put_in_graveyard(&mut state, CardName::GolgariGraveTroll, 0); // dredge 6
     fill_library(&mut state, 0, 3); // only 3 cards, need 6
     push_library_top(&mut state, CardName::Forest, 0);
@@ -238,7 +238,7 @@ fn test_cant_dredge_with_insufficient_library() {
 /// Stinkweed Imp dredge 5: verify the correct number of cards are milled.
 #[test]
 fn test_stinkweed_imp_dredge_5() {
-    let (mut state, _db) = make_main_phase_state();
+    let (mut state, db) = make_main_phase_state();
     let imp_id = put_in_graveyard(&mut state, CardName::StinkweedImp, 0);
     fill_library(&mut state, 0, 10);
 
@@ -253,7 +253,7 @@ fn test_stinkweed_imp_dredge_5() {
         );
     }
 
-    state.resolve_number_choice(choice, 1);
+    state.resolve_number_choice(choice, 1, &db);
 
     // 5 cards milled, library has 5 remaining.
     assert_eq!(state.players[0].library.len(), 5, "Library should have 5 cards remaining after dredge 5");
@@ -266,13 +266,13 @@ fn test_stinkweed_imp_dredge_5() {
 /// Life from the Loam dredge 3: verify the correct number of cards are milled.
 #[test]
 fn test_life_from_the_loam_dredge_3() {
-    let (mut state, _db) = make_main_phase_state();
+    let (mut state, db) = make_main_phase_state();
     let loam_id = put_in_graveyard(&mut state, CardName::LifeFromTheLoam, 0);
     fill_library(&mut state, 0, 5);
 
     state.draw_cards(0, 1);
     let choice = state.pending_choice.take().unwrap();
-    state.resolve_number_choice(choice, 1);
+    state.resolve_number_choice(choice, 1, &db);
 
     // 3 cards milled, library has 2 remaining.
     assert_eq!(state.players[0].library.len(), 2, "Library should have 2 cards remaining after dredge 3");
@@ -283,7 +283,7 @@ fn test_life_from_the_loam_dredge_3() {
 /// Drawing multiple cards: dredge intercepts the first draw and remaining_draws is set correctly.
 #[test]
 fn test_dredge_with_multiple_draws_then_normal() {
-    let (mut state, _db) = make_main_phase_state();
+    let (mut state, db) = make_main_phase_state();
     let troll_id = put_in_graveyard(&mut state, CardName::GolgariGraveTroll, 0);
     fill_library(&mut state, 0, 8); // library has 8 cards
     // We need a known "second draw" card.
@@ -305,7 +305,7 @@ fn test_dredge_with_multiple_draws_then_normal() {
 
     let choice = state.pending_choice.take().unwrap();
     // Choose to dredge (n=1): mills 6 cards from library (leaving 3: top + fill - 6 = 9-6=3).
-    state.resolve_number_choice(choice, 1);
+    state.resolve_number_choice(choice, 1, &db);
 
     // After dredge, the remaining draw should fire. But with the troll now in graveyard gone,
     // we might get another dredge choice OR draw normally depending on what's in graveyard.
@@ -328,7 +328,7 @@ fn test_dredge_with_multiple_draws_then_normal() {
 /// Dredge with empty graveyard after dredge: second draw goes normally.
 #[test]
 fn test_dredge_then_normal_draw_no_second_dredge() {
-    let (mut state, _db) = make_main_phase_state();
+    let (mut state, db) = make_main_phase_state();
     let loam_id = put_in_graveyard(&mut state, CardName::LifeFromTheLoam, 0);
     fill_library(&mut state, 0, 5);
 
@@ -342,7 +342,7 @@ fn test_dredge_then_normal_draw_no_second_dredge() {
     }
 
     // Choose to dredge.
-    state.resolve_number_choice(choice, 1);
+    state.resolve_number_choice(choice, 1, &db);
 
     // Loam is now in hand, 3 cards milled, library has 2.
     // No more dredge cards in graveyard (unless milled ones have dredge — but we filled with Forest).

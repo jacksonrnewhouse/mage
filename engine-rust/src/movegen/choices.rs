@@ -36,11 +36,11 @@ impl GameState {
                         }
                     }
                     ChoiceReason::ThoughtseizeDiscard => {
-                        // Discard chosen card from opponent's hand
-                        let target_player = self.opponent(choice.player) as usize;
-                        if let Some(pos) = self.players[target_player].hand.iter().position(|&id| id == card_id) {
-                            self.players[target_player].hand.remove(pos);
-                            self.players[target_player].graveyard.push(card_id);
+                        // Discard chosen card from opponent's hand (triggers madness)
+                        let target_player = self.opponent(choice.player);
+                        if let Some(pos) = self.players[target_player as usize].hand.iter().position(|&id| id == card_id) {
+                            self.players[target_player as usize].hand.remove(pos);
+                            self.discard_card(card_id, target_player, db);
                         }
                     }
                     ChoiceReason::GenericSearch => {
@@ -226,7 +226,7 @@ impl GameState {
         }
     }
 
-    pub(crate) fn resolve_number_choice(&mut self, choice: PendingChoice, n: u32) {
+    pub(crate) fn resolve_number_choice(&mut self, choice: PendingChoice, n: u32, db: &[CardDef]) {
         match choice.kind {
             ChoiceKind::ChooseNumber { reason, .. } => {
                 match reason {
@@ -295,6 +295,70 @@ impl GameState {
                         // 1 = tails: lose the flip — Mana Crypt deals 3 damage to the controller.
                         if n == 1 {
                             self.players[choice.player as usize].life -= 3;
+                        }
+                    }
+                    ChoiceReason::MadnessCast { card_id, madness_cost } => {
+                        // n == 0: cast the card for its madness cost.
+                        // n == 1: decline — move the card from exile to graveyard.
+
+                        // Remove from exile and madness_exiled tracking regardless.
+                        let owner_opt = if let Some(pos) = self.exile.iter().position(|(id, _, _)| *id == card_id) {
+                            let (_, _cn, owner) = self.exile.swap_remove(pos);
+                            Some(owner)
+                        } else {
+                            None
+                        };
+                        if let Some(mp) = self.madness_exiled.iter().position(|(id, _)| *id == card_id) {
+                            self.madness_exiled.swap_remove(mp);
+                        }
+
+                        let owner = owner_opt.unwrap_or(choice.player);
+
+                        if n == 1 {
+                            // Declined: put in graveyard.
+                            self.players[owner as usize].graveyard.push(card_id);
+                        } else {
+                            // n == 0: cast for the madness cost.
+                            // Attempt to pay the madness cost.
+                            let paid = self.players[owner as usize].mana_pool.pay(&madness_cost);
+                            if paid {
+                                // Get the card name and def for stack push.
+                                let card_name = self.card_name_for_id(card_id)
+                                    .unwrap_or(crate::card::CardName::Plains);
+                                // Push spell onto the stack. Use cast_from_graveyard=true so that
+                                // after resolution the card is exiled (as per madness rules).
+                                use crate::stack::StackItemKind;
+                                let uncounterable = crate::movegen::is_uncounterable(card_name);
+                                self.stack.push_with_flags(
+                                    StackItemKind::Spell {
+                                        card_name,
+                                        card_id,
+                                        cast_via_evoke: false,
+                                    },
+                                    owner,
+                                    vec![],
+                                    uncounterable,
+                                    0,
+                                    true, // cast_from_graveyard: exile after resolution
+                                    vec![],
+                                );
+                                self.players[owner as usize].spells_cast_this_turn += 1;
+                                if let Some(def) = self.card_name_for_id(card_id)
+                                    .and_then(|cn| crate::card::find_card(db, cn))
+                                {
+                                    if !def.card_types.contains(&crate::types::CardType::Artifact) {
+                                        self.players[owner as usize].nonartifact_spells_cast_this_turn += 1;
+                                    }
+                                    if !def.card_types.contains(&crate::types::CardType::Creature) {
+                                        self.players[owner as usize].noncreature_spells_cast_this_turn += 1;
+                                    }
+                                }
+                                self.storm_count += 1;
+                                self.reset_priority_passes();
+                            } else {
+                                // Can't afford madness cost — put in graveyard instead.
+                                self.players[owner as usize].graveyard.push(card_id);
+                            }
                         }
                     }
                     ChoiceReason::DredgeChoice { dredge_card_id, dredge_n, remaining_draws } => {

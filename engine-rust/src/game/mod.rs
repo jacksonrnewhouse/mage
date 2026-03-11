@@ -89,6 +89,12 @@ pub struct GameState {
     /// Cards in graveyards that have been granted flashback by Snapcaster Mage (cleared at end of turn).
     pub snapcaster_flashback_cards: Vec<ObjectId>,
 
+    // --- Madness ---
+    /// Cards currently exiled due to madness (waiting for the player to decide to cast or not).
+    /// Each entry is (card_id, owner). When the pending choice resolves, the card is either
+    /// cast from exile or moved to the graveyard.
+    pub madness_exiled: Vec<(ObjectId, PlayerId)>,
+
     // --- Exile-linked permanents ---
     /// Maps (exiling_permanent_id, exiled_card_id) for "exile until leaves" effects.
     /// When the exiling permanent leaves the battlefield, the exiled card returns.
@@ -220,6 +226,14 @@ pub enum ChoiceReason {
     /// This models randomness as a two-branch decision node so search can
     /// explore both outcomes (MCTS handles variance correctly this way).
     CoinFlip,
+    /// Madness: this card was discarded and exiled due to madness.
+    /// The player may cast it for `madness_cost` (0) or put it in the graveyard (1).
+    /// `card_id` is the ObjectId of the exiled card.
+    /// `madness_cost` is the alternate cost to cast it.
+    MadnessCast {
+        card_id: ObjectId,
+        madness_cost: crate::mana::ManaCost,
+    },
 }
 impl GameState {
     /// Create a new two-player game.
@@ -247,6 +261,7 @@ impl GameState {
             card_registry: Vec::with_capacity(120),
             temporary_effects: Vec::new(),
             snapcaster_flashback_cards: Vec::new(),
+            madness_exiled: Vec::new(),
             exile_linked: Vec::new(),
             imprinted: Vec::new(),
             skyclave_token_mv: Vec::new(),
@@ -779,6 +794,46 @@ impl GameState {
             }
         }
         dest
+    }
+
+    /// Discard a card from a player's hand to the graveyard (or exile if madness applies).
+    /// Handles the madness replacement effect: if the card has madness, it goes to exile instead
+    /// and a pending choice is created (cast for madness cost or put in graveyard).
+    /// Also increments `cards_discarded_this_turn` for the player.
+    /// `db` is the card database for madness cost lookup.
+    pub fn discard_card(&mut self, card_id: ObjectId, owner: PlayerId, db: &[crate::card::CardDef]) {
+        // Track discard count for Hollow One cost reduction.
+        self.players[owner as usize].cards_discarded_this_turn += 1;
+
+        // Check for madness: look up the card's madness cost.
+        let madness = if let Some(cn) = self.card_name_for_id(card_id) {
+            crate::card::find_card(db, cn)
+                .and_then(|def| def.madness_cost)
+                .map(|mc| mc)
+        } else {
+            None
+        };
+
+        if let Some(madness_cost) = madness {
+            // Madness replacement: card goes to exile instead of graveyard.
+            let card_name = self.card_name_for_id(card_id).unwrap_or(CardName::Plains);
+            self.exile.push((card_id, card_name, owner));
+            self.madness_exiled.push((card_id, owner));
+
+            // Queue a pending choice: 0 = cast for madness cost, 1 = put in graveyard.
+            self.pending_choice = Some(PendingChoice {
+                player: owner,
+                kind: ChoiceKind::ChooseNumber {
+                    min: 0,
+                    max: 1,
+                    reason: ChoiceReason::MadnessCast { card_id, madness_cost },
+                },
+            });
+        } else {
+            // Normal discard: apply graveyard replacement effects (Rest in Peace, etc.)
+            let card_name = self.card_name_for_id(card_id).unwrap_or(CardName::Plains);
+            self.send_to_graveyard(card_id, card_name, owner);
+        }
     }
 
     /// Trigger annihilator N for the given defending player: they must sacrifice N permanents.

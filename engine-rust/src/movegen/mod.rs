@@ -737,6 +737,12 @@ impl GameState {
             }
         }
 
+        // Hollow One: costs {2} less for each card cycled or discarded this turn.
+        if def.name == CardName::HollowOne {
+            let discards = self.players[_controller as usize].cards_discarded_this_turn as u32;
+            generic_reduction += discards * 2;
+        }
+
         // Affinity for artifacts: reduce cost by the number of artifacts the controller controls.
         // Applies to ThoughtMonitor and Thoughtcast.
         let has_affinity_for_artifacts = matches!(

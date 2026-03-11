@@ -31,6 +31,8 @@ pub struct Player {
     pub extra_turns: u8,
     /// Yawgmoth's Will: until end of turn, you may play cards from your graveyard.
     pub yawgmoth_will_active: bool,
+    /// Number of cards discarded or cycled this turn (for Hollow One cost reduction).
+    pub cards_discarded_this_turn: u16,
     /// The One Ring ETB: until your next turn, you have protection from everything
     /// (all damage dealt to you is prevented).
     pub protection_from_everything: bool,
@@ -58,6 +60,7 @@ impl Player {
             extra_turns: 0,
             yawgmoth_will_active: false,
             protection_from_everything: false,
+            cards_discarded_this_turn: 0,
         }
     }
 
@@ -86,6 +89,7 @@ impl Player {
         self.mana_pool.empty();
         self.yawgmoth_will_active = false;
         self.protection_from_everything = false;
+        self.cards_discarded_this_turn = 0;
     }
 
     pub fn has_card_in_hand(&self, id: ObjectId) -> bool {

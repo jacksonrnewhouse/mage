@@ -555,6 +555,9 @@ pub struct CardDef {
     /// Flashback cost: if Some, this card can be cast from the graveyard for this alternate cost.
     /// When cast via flashback (or countered), the card is exiled instead of going to graveyard.
     pub flashback_cost: Option<ManaCost>,
+    /// Madness cost: if Some, when this card is discarded it goes to exile instead, and the
+    /// controller may cast it for this alternate cost. If declined, it moves to the graveyard.
+    pub madness_cost: Option<ManaCost>,
     /// Creature subtypes for tribal interactions. Empty for non-creatures.
     pub creature_types: &'static [CreatureType],
     /// True if this card is a changeling (has all creature types).
@@ -699,6 +702,7 @@ pub fn build_card_db() -> Vec<CardDef> {
                 color_identity: $colors,
                 oracle_text: $text,
                 flashback_cost: None,
+                madness_cost: None,
                 creature_types: &[],
                 is_changeling: false,
             });
@@ -721,6 +725,7 @@ pub fn build_card_db() -> Vec<CardDef> {
                 color_identity: $colors,
                 oracle_text: $text,
                 flashback_cost: None,
+                madness_cost: None,
                 creature_types: $ct,
                 is_changeling: false,
             });
@@ -743,6 +748,7 @@ pub fn build_card_db() -> Vec<CardDef> {
                 color_identity: $colors,
                 oracle_text: $text,
                 flashback_cost: None,
+                madness_cost: None,
                 creature_types: &[],
                 is_changeling: true,
             });
@@ -765,6 +771,7 @@ pub fn build_card_db() -> Vec<CardDef> {
                 color_identity: $colors,
                 oracle_text: $text,
                 flashback_cost: None,
+                madness_cost: None,
                 creature_types: &[],
                 is_changeling: false,
             });
@@ -787,6 +794,30 @@ pub fn build_card_db() -> Vec<CardDef> {
                 color_identity: $colors,
                 oracle_text: $text,
                 flashback_cost: Some($fb),
+                madness_cost: None,
+                creature_types: &[],
+                is_changeling: false,
+            });
+        };
+        // Variant with madness cost
+        (MADNESS($mc:expr) $name:expr, $display:expr, $cost:expr, $types:expr, $supers:expr,
+         $pow:expr, $tou:expr, $loy:expr, $kw:expr, $colors:expr, $text:expr) => {
+            db.push(CardDef {
+                name: $name,
+                display_name: $display,
+                mana_cost: $cost,
+                has_x_cost: false,
+                x_multiplier: 0,
+                card_types: $types,
+                supertypes: $supers,
+                power: $pow,
+                toughness: $tou,
+                loyalty: $loy,
+                keywords: $kw,
+                color_identity: $colors,
+                oracle_text: $text,
+                flashback_cost: None,
+                madness_cost: Some($mc),
                 creature_types: &[],
                 is_changeling: false,
             });
@@ -1717,10 +1748,10 @@ pub fn build_card_db() -> Vec<CardDef> {
         "You may look at the top card of your library any time. You may cast spells from the top of your library. You can't cast spells from your hand. {3}{R}: Destroy Experimental Frenzy.");
 
     // === Red/Green Madness/Pitch Creatures ===
-    card!(BaskingRootwalla, "Basking Rootwalla", ManaCost::g(1), &[Creature], &[],
+    card!(MADNESS(ManaCost::ZERO) BaskingRootwalla, "Basking Rootwalla", ManaCost::g(1), &[Creature], &[],
         Some(1), Some(1), None, kw(), &[Green],
         "{1}{G}: Basking Rootwalla gets +2/+2 until end of turn. Activate only once each turn. Madness {0}.");
-    card!(BlazingRootwalla, "Blazing Rootwalla", ManaCost::r(1), &[Creature], &[],
+    card!(MADNESS(ManaCost::ZERO) BlazingRootwalla, "Blazing Rootwalla", ManaCost::r(1), &[Creature], &[],
         Some(1), Some(1), None, kw(), &[Red],
         "{R}{R}: Blazing Rootwalla gets +2/+0 until end of turn. Activate only once each turn. Madness {0}.");
     card!(CT(&[CreatureType::Goblin]) SqueeGoblinNabob, "Squee, Goblin Nabob", ManaCost { red: 1, generic: 2, ..c }, &[Creature], &[Legendary],

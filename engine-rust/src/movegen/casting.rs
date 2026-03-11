@@ -308,7 +308,7 @@ impl GameState {
 
             Action::ChooseNumber(n) => {
                 if let Some(choice) = self.pending_choice.take() {
-                    self.resolve_number_choice(choice, *n);
+                    self.resolve_number_choice(choice, *n, db);
                 }
             }
 
@@ -349,11 +349,12 @@ impl GameState {
                             return;
                         }
                     }
-                    // Discard the card
+                    // Discard the card (cycling counts as a discard for Hollow One)
                     if !self.players[player_id as usize].remove_from_hand(card_id) {
                         return; // Card not in hand
                     }
                     self.players[player_id as usize].graveyard.push(card_id);
+                    self.players[player_id as usize].cards_discarded_this_turn += 1;
 
                     // Push cycling effect to stack
                     let effect = match cycling_kind {

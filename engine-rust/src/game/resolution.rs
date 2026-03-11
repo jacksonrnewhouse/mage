@@ -19,7 +19,7 @@ impl GameState {
                     self.resolve_triggered(effect, item.controller, &item.targets, db);
                 }
                 StackItemKind::ActivatedAbility { effect, .. } => {
-                    self.resolve_activated(effect, item.controller, &item.targets);
+                    self.resolve_activated(effect, item.controller, &item.targets, db);
                 }
             }
             self.check_state_based_actions(db);
@@ -441,8 +441,7 @@ impl GameState {
                         }
                     }
                     for id in discarded {
-                        let cn = self.card_name_for_id(id).unwrap_or(CardName::Plains);
-                        self.send_to_graveyard(id, cn, owner);
+                        self.discard_card(id, owner, db);
                     }
                 }
             }
@@ -502,10 +501,14 @@ impl GameState {
                 // Discard 2 - simplified: discard last 2
                 let pid = controller as usize;
                 let count = 2.min(self.players[pid].hand.len());
+                let mut to_discard = Vec::with_capacity(count);
                 for _ in 0..count {
                     if let Some(id) = self.players[pid].hand.pop() {
-                        self.players[pid].graveyard.push(id);
+                        to_discard.push(id);
                     }
+                }
+                for id in to_discard {
+                    self.discard_card(id, controller, db);
                 }
             }
             CardName::TreasureCruise | CardName::StockUp | CardName::LorienRevealed => {
@@ -1082,10 +1085,9 @@ impl GameState {
                         1 => {
                             // Target player discards a card (simplified: discard last)
                             if let Some(Target::Player(p)) = targets.get(target_idx) {
-                                let pid = *p as usize;
-                                if let Some(id) = self.players[pid].hand.pop() {
-                                    let cn = self.card_name_for_id(id).unwrap_or(CardName::Plains);
-                                    self.send_to_graveyard(id, cn, *p);
+                                let discard_player = *p;
+                                if let Some(id) = self.players[discard_player as usize].hand.pop() {
+                                    self.discard_card(id, discard_player, db);
                                 }
                             }
                             target_idx += 1;
@@ -2038,7 +2040,7 @@ impl GameState {
         let _ = db; // suppress unused warning when db not used in all arms
     }
 
-    fn resolve_activated(&mut self, effect: ActivatedEffect, controller: PlayerId, targets: &[Target]) {
+    fn resolve_activated(&mut self, effect: ActivatedEffect, controller: PlayerId, targets: &[Target], db: &[CardDef]) {
         match effect {
             ActivatedEffect::SacrificeForMana { amount: _ } => {
                 // Handled at activation time (mana already added, permanent already sacrificed)
@@ -2076,10 +2078,15 @@ impl GameState {
                 // Draw 2, discard 3
                 self.draw_cards(controller, 2);
                 let pid = controller as usize;
-                for _ in 0..3 {
+                let count = 3.min(self.players[pid].hand.len());
+                let mut to_discard = Vec::with_capacity(count);
+                for _ in 0..count {
                     if let Some(id) = self.players[pid].hand.pop() {
-                        self.players[pid].graveyard.push(id);
+                        to_discard.push(id);
                     }
+                }
+                for id in to_discard {
+                    self.discard_card(id, controller, db);
                 }
             }
             ActivatedEffect::TopLook => {
@@ -2308,23 +2315,21 @@ impl GameState {
             // === Dack Fayden ===
             ActivatedEffect::DackDraw => {
                 // +1: Target player draws 2 cards, then discards 2.
-                if let Some(Target::Player(pid)) = targets.first() {
-                    let pid = *pid;
-                    self.draw_cards(pid, 2);
-                    let player = &mut self.players[pid as usize];
-                    for _ in 0..2 {
-                        if let Some(id) = player.hand.pop() {
-                            player.graveyard.push(id);
-                        }
-                    }
+                let discard_player = if let Some(Target::Player(pid)) = targets.first() {
+                    *pid
                 } else {
-                    self.draw_cards(controller, 2);
-                    let player = &mut self.players[controller as usize];
-                    for _ in 0..2 {
-                        if let Some(id) = player.hand.pop() {
-                            player.graveyard.push(id);
-                        }
+                    controller
+                };
+                self.draw_cards(discard_player, 2);
+                let count = 2.min(self.players[discard_player as usize].hand.len());
+                let mut to_discard = Vec::with_capacity(count);
+                for _ in 0..count {
+                    if let Some(id) = self.players[discard_player as usize].hand.pop() {
+                        to_discard.push(id);
                     }
+                }
+                for id in to_discard {
+                    self.discard_card(id, discard_player, db);
                 }
             }
             ActivatedEffect::DackSteal => {
