@@ -1850,6 +1850,25 @@ impl GameState {
                 }
             }
 
+            // Ghost Quarter: {T}, Sacrifice: Destroy target land. Its controller may search for a basic land. (ability_index 1)
+            CardName::GhostQuarter if ability_index == 1 => {
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.tapped = true;
+                }
+                // Sacrifice Ghost Quarter
+                self.destroy_permanent(permanent_id);
+                self.stack.push(
+                    StackItemKind::ActivatedAbility {
+                        source_id: permanent_id,
+                        source_name: card_name,
+                        effect: ActivatedEffect::GhostQuarterDestroy,
+                    },
+                    controller,
+                    targets.to_vec(),
+                );
+                self.reset_priority_passes();
+            }
+
             // Engineered Explosives: {2}, Sacrifice: Destroy each nonland permanent with MV equal to charge counters (ability_index 0)
             CardName::EngineeredExplosives if ability_index == 0 => {
                 let cost = crate::mana::ManaCost::generic(2);

@@ -4307,10 +4307,35 @@ impl GameState {
                 }
             }
             ActivatedEffect::GhostQuarterDestroy => {
-                // Destroy target land (opponent may search for basic)
-                // Simplified: just destroy the land
+                // Destroy target land. Its controller may search their library for a basic land card,
+                // put it onto the battlefield, then shuffle.
                 if let Some(Target::Object(target_id)) = targets.first() {
+                    let land_controller = self.find_permanent(*target_id).map(|p| p.controller);
                     self.destroy_permanent(*target_id);
+                    // The destroyed land's controller may search for a basic land
+                    if let Some(land_owner) = land_controller {
+                        if !self.library_search_restricted(land_owner) {
+                            let searchable: Vec<ObjectId> = self.players[land_owner as usize]
+                                .library
+                                .iter()
+                                .filter(|&&id| {
+                                    self.card_name_for_id(id)
+                                        .map(|cn| crate::card::is_basic_land_card(cn))
+                                        .unwrap_or(false)
+                                })
+                                .copied()
+                                .collect();
+                            if !searchable.is_empty() {
+                                self.pending_choice = Some(PendingChoice {
+                                    player: land_owner,
+                                    kind: ChoiceKind::ChooseFromList {
+                                        options: searchable,
+                                        reason: ChoiceReason::GenericSearch,
+                                    },
+                                });
+                            }
+                        }
+                    }
                 }
             }
             ActivatedEffect::NarsetMinus => {
