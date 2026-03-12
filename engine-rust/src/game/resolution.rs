@@ -2095,6 +2095,7 @@ impl GameState {
                     effect: TriggeredEffect::DarkConfidantUpkeep,
                     controller,
                     fires_once: false,
+                    source_id: Some(_card_id),
                 });
             }
             // Portable Hole: exile target nonland permanent an opponent controls with MV 2 or less
@@ -2128,6 +2129,7 @@ impl GameState {
                     effect: TriggeredEffect::ArgentumMasticoreUpkeep { masticore_id: _card_id },
                     controller,
                     fires_once: false,
+                    source_id: None,
                 });
             }
             // The Mightstone and Weakstone: ETB modal (draw 2 or -5/-5)
@@ -2277,6 +2279,7 @@ impl GameState {
                     effect: TriggeredEffect::MasterOfDeathUpkeep { owner: controller },
                     controller,
                     fires_once: false,
+                    source_id: None,
                 });
             }
             // Kishla Skimmer: flying is handled via keywords.
@@ -2588,6 +2591,7 @@ impl GameState {
                     effect: TriggeredEffect::TheOneRingUpkeep { ring_id: _card_id },
                     controller,
                     fires_once: false,
+                    source_id: None,
                 });
             }
 
@@ -2663,6 +2667,7 @@ impl GameState {
                     effect: TriggeredEffect::ManaCryptUpkeep,
                     controller,
                     fires_once: false,
+                    source_id: None,
                 });
             }
 
@@ -2676,6 +2681,7 @@ impl GameState {
                     effect: TriggeredEffect::EmperorOfBonesExile { emperor_id: _card_id },
                     controller,
                     fires_once: false,
+                    source_id: None,
                 });
             }
 
@@ -2718,6 +2724,7 @@ impl GameState {
                     effect: TriggeredEffect::SagaChapter { saga_id: _card_id, chapter: 0 }, // 0 = advance
                     controller,
                     fires_once: false,
+                    source_id: None,
                 });
             }
 
@@ -2749,6 +2756,7 @@ impl GameState {
                     effect: TriggeredEffect::SagaChapter { saga_id: _card_id, chapter: 0 },
                     controller,
                     fires_once: false,
+                    source_id: None,
                 });
             }
 
@@ -2763,6 +2771,7 @@ impl GameState {
                     effect: TriggeredEffect::DelverUpkeep { delver_id: _card_id },
                     controller,
                     fires_once: false,
+                    source_id: None,
                 });
             }
 
@@ -2865,6 +2874,7 @@ impl GameState {
                     effect: TriggeredEffect::DressDownSacrifice { permanent_id: _card_id },
                     controller,
                     fires_once: true,
+                    source_id: None,
                 });
             }
 
@@ -2890,6 +2900,7 @@ impl GameState {
                     effect: TriggeredEffect::RoilingVortexUpkeep,
                     controller,
                     fires_once: false,
+                    source_id: None,
                 });
             }
 
@@ -4147,6 +4158,7 @@ impl GameState {
                             effect: TriggeredEffect::SacrificeTarget { permanent_id: card_id },
                             controller,
                             fires_once: true,
+                            source_id: None,
                         });
                     }
                 }

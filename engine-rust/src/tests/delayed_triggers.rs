@@ -45,6 +45,7 @@ fn test_delayed_trigger_fires_at_end_step() {
         effect: TriggeredEffect::DrawCards(1),
         controller: 0,
         fires_once: true,
+        source_id: None,
     });
 
     assert_eq!(state.delayed_triggers.len(), 1);
@@ -91,6 +92,7 @@ fn test_one_shot_trigger_removed_after_firing() {
         effect: TriggeredEffect::DrawCards(1),
         controller: 0,
         fires_once: true,
+        source_id: None,
     });
 
     // Advance to end step (fires the trigger)
@@ -121,6 +123,7 @@ fn test_repeating_trigger_stays_after_firing() {
         effect: TriggeredEffect::GainLife(1),
         controller: 0,
         fires_once: false,
+        source_id: None,
     });
 
     state.active_player = 0;
@@ -153,6 +156,7 @@ fn test_end_step_trigger_does_not_fire_at_upkeep() {
         effect: TriggeredEffect::DrawCards(1),
         controller: 0,
         fires_once: true,
+        source_id: None,
     });
 
     // Advance to upkeep (should NOT fire the end step trigger)
@@ -187,6 +191,7 @@ fn test_delayed_trigger_fires_at_upkeep() {
         effect: TriggeredEffect::DrawCards(3),
         controller: 0,
         fires_once: true,
+        source_id: None,
     });
 
     // Advance to upkeep
@@ -234,6 +239,7 @@ fn test_upkeep_trigger_only_fires_for_specified_player() {
         effect: TriggeredEffect::DrawCards(1),
         controller: 1,
         fires_once: false,
+        source_id: None,
     });
 
     // Advance to player 0's upkeep — should NOT fire
@@ -266,6 +272,7 @@ fn test_sneak_attack_sacrifice_pattern() {
         effect: TriggeredEffect::SacrificeTarget { permanent_id: creature_id },
         controller: 0,
         fires_once: true,
+        source_id: None,
     });
 
     // The creature should be on the battlefield before end step
@@ -320,12 +327,14 @@ fn test_multiple_delayed_triggers_same_step() {
         effect: TriggeredEffect::GainLife(2),
         controller: 0,
         fires_once: true,
+        source_id: None,
     });
     state.add_delayed_trigger(DelayedTrigger {
         condition: DelayedTriggerCondition::AtBeginningOfNextEndStep,
         effect: TriggeredEffect::DrawCards(1),
         controller: 0,
         fires_once: true,
+        source_id: None,
     });
 
     state.active_player = 0;

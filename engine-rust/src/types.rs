@@ -367,6 +367,10 @@ pub struct DelayedTrigger {
     pub controller: PlayerId,
     /// If true, this trigger is removed after it fires once.
     pub fires_once: bool,
+    /// If set, the trigger only fires while this permanent is on the battlefield.
+    /// Used for abilities like Dark Confidant's upkeep trigger that should stop
+    /// when the source creature leaves play.
+    pub source_id: Option<ObjectId>,
 }
 
 /// A temporary effect that lasts until end of turn.

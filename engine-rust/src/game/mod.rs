@@ -1132,6 +1132,16 @@ impl GameState {
         let step = self.step;
         let phase = self.phase;
 
+        // Remove triggers whose source permanent is no longer on the battlefield.
+        // This handles cases like Dark Confidant being killed — its upkeep trigger
+        // should stop firing once the creature leaves play.
+        self.delayed_triggers.retain(|dt| {
+            match dt.source_id {
+                Some(id) => self.battlefield.iter().any(|p| p.id == id),
+                None => true,
+            }
+        });
+
         // Collect indices of triggers that should fire
         let firing: Vec<usize> = self.delayed_triggers
             .iter()
