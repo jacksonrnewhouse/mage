@@ -77,6 +77,8 @@ impl GameState {
                                     }
                                 }
                             }
+                            // Note: In a real game, library would be shuffled after searching.
+                            // For game tree search, the search algorithm handles randomization.
                         }
                     }
                     ChoiceReason::MyrRetrieverReturn => {

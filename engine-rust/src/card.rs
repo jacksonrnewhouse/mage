@@ -337,7 +337,6 @@ pub enum CardName {
     RedirectLightning,
     Abrade,
     ShrapnelBlast,
-    UntimellyMalfunction,
     Crash,
     Meltdown,
     ShatteringSpree,
@@ -1168,7 +1167,7 @@ pub fn build_card_db() -> Vec<CardDef> {
 
     // === Black Creatures ===
     card!(CT(&[CreatureType::Phyrexian, CreatureType::Praetor]) SheoldredTheApocalypse, "Sheoldred, the Apocalypse", ManaCost { black: 2, generic: 2, ..c }, &[Creature], &[Legendary],
-        Some(4), Some(5), None, kw(), &[Black],
+        Some(4), Some(5), None, deathtouch(), &[Black],
         "Deathtouch. Whenever you draw a card, you gain 2 life. Whenever an opponent draws a card, they lose 2 life.");
     card!(CT(&[CreatureType::Human, CreatureType::Wizard]) DarkConfidant, "Dark Confidant", ManaCost { black: 1, generic: 1, ..c }, &[Creature], &[],
         Some(2), Some(1), None, kw(), &[Black],
@@ -1230,7 +1229,13 @@ pub fn build_card_db() -> Vec<CardDef> {
         }, &[White],
         "Prowess. Whenever you cast a noncreature spell, create a 1/1 white Monk creature token with prowess.");
     card!(CT(&[CreatureType::Elemental]) Solitude, "Solitude", ManaCost { white: 2, generic: 3, ..c }, &[Creature], &[],
-        Some(3), Some(2), None, flash_flying(), &[White],
+        Some(3), Some(2), None, {
+            let mut k = Keywords::empty();
+            k.add(Keyword::Flash);
+            k.add(Keyword::Flying);
+            k.add(Keyword::Lifelink);
+            k
+        }, &[White],
         "Flash. Flying. Lifelink. When Solitude enters, exile up to one other target creature. That creature's controller gains life equal to its power. Evoke - Exile a white card from your hand.");
     card!(CT(&[CreatureType::Spirit]) SkyclaveApparition, "Skyclave Apparition", ManaCost { white: 2, generic: 1, ..c }, &[Creature], &[],
         Some(2), Some(2), None, flying(), &[White],
@@ -1266,7 +1271,7 @@ pub fn build_card_db() -> Vec<CardDef> {
         Some(2), Some(2), None, kw(), &[Green],
         "Activated abilities of artifacts can't be activated.");
     card!(Endurance, "Endurance", ManaCost { green: 2, generic: 1, ..c }, &[Creature], &[],
-        Some(3), Some(4), None, flash(), &[Green],
+        Some(3), Some(4), None, flash_reach(), &[Green],
         "Flash. Reach. When Endurance enters, up to one target player puts all the cards from their graveyard on the bottom of their library in a random order.");
     card!(QuirionRanger, "Quirion Ranger", ManaCost::g(1), &[Creature], &[],
         Some(1), Some(1), None, kw(), &[Green],
@@ -1441,8 +1446,8 @@ pub fn build_card_db() -> Vec<CardDef> {
         Some(2), Some(2), None, kw(), &[White],
         "{W}, {T}, Sacrifice an artifact: Search your library for an artifact card with mana value equal to 1 plus the sacrificed artifact's mana value, put it onto the battlefield, then shuffle.");
     card!(CT(&[CreatureType::Dog]) PheliaExuberantShepherd, "Phelia, Exuberant Shepherd", ManaCost { white: 1, generic: 1, ..c }, &[Creature], &[Legendary],
-        Some(2), Some(2), None, flash(), &[White],
-        "Flash. Whenever Phelia attacks, exile up to one target nonland permanent. If it was a token, it won't return. Otherwise, return it at the beginning of the next end step with a +1/+1 counter on it if it's a creature.");
+        Some(2), Some(2), None, kw(), &[White],
+        "Whenever Phelia attacks, exile up to one target nonland permanent. If it was a token, it won't return. Otherwise, return it at the beginning of the next end step with a +1/+1 counter on it if it's a creature.");
     card!(CT(&[CreatureType::Halfling]) SamwiseTheStouthearted, "Samwise the Stouthearted", ManaCost { white: 1, generic: 1, ..c }, &[Creature], &[Legendary],
         Some(2), Some(1), None, flash(), &[White],
         "Flash. When Samwise enters, choose up to one target permanent card in your graveyard that was put there from the battlefield this turn. Return it to your hand.");
@@ -1699,13 +1704,13 @@ pub fn build_card_db() -> Vec<CardDef> {
         Some(0), None, None, kw(), &[Black],
         "Nethergoyf's power is equal to the number of card types among cards in your graveyard and its toughness is equal to that number plus 1. Escape - {2}{B}, exile any number of other cards from your graveyard with four or more card types among them.");
     card!(DauthiVoidwalker, "Dauthi Voidwalker", ManaCost { black: 2, ..c }, &[Creature], &[],
-        Some(3), Some(2), None, kw(), &[Black],
+        Some(3), Some(2), None, haste(), &[Black],
         "Shadow. If a card would be put into an opponent's graveyard from anywhere, instead exile it with a void counter on it. {T}, Sacrifice Dauthi Voidwalker: Choose an exiled card an opponent owns with a void counter on it. You may play it this turn without paying its mana cost.");
     card!(EmperorOfBones, "Emperor of Bones", ManaCost { black: 1, generic: 1, ..c }, &[Creature], &[],
         Some(1), Some(2), None, kw(), &[Black],
         "At the beginning of combat on your turn, you may exile target creature card from your graveyard. If you do, create a tapped and attacking token that's a copy of that card. Exile that token at end of combat. Adapt 2.");
     card!(MaiScornfulStriker, "Mai, Scornful Striker", ManaCost { black: 1, generic: 1, ..c }, &[Creature], &[Legendary],
-        Some(2), Some(1), None, kw(), &[Black],
+        Some(2), Some(1), None, deathtouch(), &[Black],
         "When Mai enters, each player mills two cards. Deathtouch. Whenever Mai deals combat damage to a player, you may cast a creature card from a graveyard.");
     card!(OrcishBowmasters, "Orcish Bowmasters", ManaCost { black: 1, generic: 1, ..c }, &[Creature], &[],
         Some(1), Some(1), None, flash(), &[Black],
@@ -1720,7 +1725,7 @@ pub fn build_card_db() -> Vec<CardDef> {
         Some(3), Some(4), None, kw(), &[Black],
         "Swampwalk. Cycling - Pay 2 life.");
     card!(TrollOfKhazadDum, "Troll of Khazad-dum", ManaCost { black: 2, generic: 4, ..c }, &[Creature], &[],
-        Some(6), Some(5), None, kw(), &[Black],
+        Some(6), Some(5), None, trample(), &[Black],
         "Trample. Swamp cycling {1}.");
     card!(CT(&[CreatureType::Archon]) ArchonOfCruelty, "Archon of Cruelty", ManaCost { black: 2, generic: 6, ..c }, &[Creature], &[],
         Some(6), Some(6), None, flying(), &[Black],
@@ -1852,8 +1857,7 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Choose one: Abrade deals 3 damage to target creature. Destroy target artifact.");
     card!(ShrapnelBlast, "Shrapnel Blast", ManaCost { red: 1, generic: 1, ..c }, &[Instant], &[], None, None, None, kw(), &[Red],
         "As an additional cost, sacrifice an artifact. Shrapnel Blast deals 5 damage to any target.");
-    card!(UntimellyMalfunction, "Untimely Malfunction", ManaCost { red: 1, generic: 1, ..c }, &[Instant], &[], None, None, None, kw(), &[Red],
-        "Choose one: Destroy target artifact. Counter target artifact spell.");
+    // Note: Untimely Malfunction is blue ({1}{U} Sorcery), defined above in blue section.
     card!(Crash, "Crash", ManaCost { red: 1, generic: 2, ..c }, &[Instant], &[], None, None, None, kw(), &[Red],
         "You may sacrifice a Mountain rather than pay this spell's mana cost. Destroy target artifact.");
     card!(Meltdown, "Meltdown", ManaCost { red: 1, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Red],

@@ -824,8 +824,8 @@ impl GameState {
         // Count tax effects from the battlefield
         for p in &self.battlefield {
             match p.card_name {
-                // Thalia: noncreature spells cost {1} more (opponent's)
-                CardName::ThaliaGuardianOfThraben if p.controller != _controller => {
+                // Thalia: noncreature spells cost {1} more (all players including controller)
+                CardName::ThaliaGuardianOfThraben => {
                     if !def.card_types.contains(&CardType::Creature) {
                         generic_increase += 1;
                     }
@@ -913,9 +913,9 @@ impl GameState {
         cost
     }
 
-    /// Check if Blood Moon is on the battlefield (makes nonbasic lands into Mountains).
+    /// Check if Blood Moon or Magus of the Moon is on the battlefield (makes nonbasic lands into Mountains).
     fn blood_moon_active(&self) -> bool {
-        self.battlefield.iter().any(|p| p.card_name == CardName::BloodMoon)
+        self.battlefield.iter().any(|p| p.card_name == CardName::BloodMoon || p.card_name == CardName::MagusOfTheMoon)
     }
 
     /// Check if Urborg, Tomb of Yawgmoth is on the battlefield (all lands also tap for B).

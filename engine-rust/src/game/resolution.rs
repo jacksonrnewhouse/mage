@@ -299,8 +299,15 @@ impl GameState {
                 if let Some(target) = targets.first() {
                     match target {
                         Target::Object(id) => {
-                            // Either deal 3 to creature OR destroy artifact
-                            self.destroy_permanent(*id);
+                            // Check if target is an artifact - if so, destroy; otherwise deal 3 damage
+                            let is_artifact = self.find_permanent(*id)
+                                .map(|p| p.card_types.contains(&CardType::Artifact))
+                                .unwrap_or(false);
+                            if is_artifact {
+                                self.destroy_permanent(*id);
+                            } else {
+                                self.deal_damage_to_target(Target::Object(*id), 3, controller);
+                            }
                         }
                         _ => {}
                     }
@@ -317,7 +324,9 @@ impl GameState {
             }
             CardName::RedirectLightning => {
                 if let Some(target) = targets.first() {
-                    self.deal_damage_to_target(*target, 4, controller);
+                    let controls_artifact = self.battlefield.iter().any(|p| p.controller == controller && p.card_types.contains(&CardType::Artifact));
+                    let damage = if controls_artifact { 5 } else { 4 };
+                    self.deal_damage_to_target(*target, damage, controller);
                 }
             }
 
@@ -894,9 +903,14 @@ impl GameState {
                 }
             }
             CardName::Meltdown => {
-                // Destroy artifacts with MV <= X - simplified: destroy all
+                // Destroy each noncreature artifact with MV <= X
                 let to_destroy: Vec<ObjectId> = self.battlefield.iter()
-                    .filter(|p| p.is_artifact() && !p.is_creature())
+                    .filter(|p| {
+                        p.is_artifact() && !p.is_creature() && {
+                            let cmc = find_card(db, p.card_name).map(|d| d.mana_cost.cmc()).unwrap_or(0);
+                            cmc <= x_value
+                        }
+                    })
                     .map(|p| p.id)
                     .collect();
                 for id in to_destroy {
@@ -1115,15 +1129,20 @@ impl GameState {
                                     // Grafdigger's Cage / Containment Priest: exile the card instead
                                     self.exile.push((card_id, cn, pid as PlayerId));
                                 } else {
-                                    // TODO: look up proper stats from db
+                                    let card_def = find_card(db, cn);
+                                    let (power, toughness, loyalty, keywords, card_types) = if let Some(def) = card_def {
+                                        (def.power, def.toughness, def.loyalty, def.keywords, def.card_types)
+                                    } else {
+                                        (Some(0), Some(0), None, Keywords::empty(), &[CardType::Creature][..])
+                                    };
                                     let perm = Permanent::new(
                                         card_id, cn, controller, pid as PlayerId,
-                                        Some(0), Some(0), None, Keywords::empty(), &[CardType::Creature],
+                                        power, toughness, loyalty, keywords, card_types,
                                     );
                                     self.battlefield.push(perm);
                                     self.handle_etb(cn, card_id, controller);
                                     // Lose life equal to mana value
-                                    let mana_value = find_card(db, cn).map(|d| d.mana_cost.cmc()).unwrap_or(0) as i32;
+                                    let mana_value = card_def.map(|d| d.mana_cost.cmc()).unwrap_or(0) as i32;
                                     self.players[controller as usize].life -= mana_value;
                                 }
                             }
@@ -1258,11 +1277,18 @@ impl GameState {
                         let card_id = self.players[pid].graveyard.remove(pos);
                         let card_name = self.card_name_for_id(card_id);
                         if let Some(cn) = card_name {
+                            let card_def = find_card(db, cn);
+                            let (power, toughness, loyalty, keywords, card_types) = if let Some(def) = card_def {
+                                (def.power, def.toughness, def.loyalty, def.keywords, def.card_types)
+                            } else {
+                                (Some(0), Some(0), None, Keywords::empty(), &[CardType::Creature][..])
+                            };
                             let perm = Permanent::new(
                                 card_id, cn, pid as PlayerId, pid as PlayerId,
-                                Some(0), Some(0), None, Keywords::empty(), &[CardType::Creature],
+                                power, toughness, loyalty, keywords, card_types,
                             );
                             self.battlefield.push(perm);
+                            self.handle_etb(cn, card_id, pid as PlayerId);
                         }
                     }
                 }
