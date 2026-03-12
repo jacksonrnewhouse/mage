@@ -613,7 +613,35 @@ impl GameState {
             }
 
             // === More Tutors ===
-            CardName::EnlightenedTutor | CardName::ImperialSeal | CardName::MerchantScroll => {
+            CardName::EnlightenedTutor => {
+                // Search library for an artifact or enchantment card, put on top
+                if !self.library_search_restricted(controller) {
+                    let options: Vec<ObjectId> = self.players[controller as usize]
+                        .library
+                        .iter()
+                        .filter(|&&id| {
+                            self.card_name_for_id(id)
+                                .and_then(|cn| find_card(db, cn))
+                                .map(|def| {
+                                    def.card_types.contains(&CardType::Artifact)
+                                        || def.card_types.contains(&CardType::Enchantment)
+                                })
+                                .unwrap_or(false)
+                        })
+                        .copied()
+                        .collect();
+                    if !options.is_empty() {
+                        self.pending_choice = Some(PendingChoice {
+                            player: controller,
+                            kind: ChoiceKind::ChooseFromList {
+                                options,
+                                reason: ChoiceReason::MysticalTutorSearch,
+                            },
+                        });
+                    }
+                }
+            }
+            CardName::ImperialSeal | CardName::MerchantScroll => {
                 if card_name == CardName::ImperialSeal {
                     self.players[controller as usize].life -= 2;
                 }
@@ -1076,9 +1104,16 @@ impl GameState {
                 }
             }
             CardName::WrathOfTheSkies => {
-                // Destroy each creature and non-Aura enchantment with MV <= X
+                // "You get X {E}, then you may pay any amount of {E}. Destroy each artifact,
+                // creature, and enchantment with mana value less than or equal to the amount
+                // of {E} paid this way." Simplified: treat X as the amount of energy paid.
                 let to_destroy: Vec<ObjectId> = self.battlefield.iter()
-                    .filter(|p| p.is_creature() || p.is_enchantment())
+                    .filter(|p| {
+                        (p.is_creature() || p.is_enchantment() || p.is_artifact()) && {
+                            let cmc = find_card(db, p.card_name).map(|d| d.mana_cost.cmc()).unwrap_or(0);
+                            cmc <= x_value
+                        }
+                    })
                     .map(|p| p.id)
                     .collect();
                 for id in to_destroy {
@@ -1141,7 +1176,18 @@ impl GameState {
                     None
                 };
                 if let Some(Target::Object(target_id)) = targets.first() {
-                    self.destroy_permanent(*target_id);
+                    // Fragmentize: only destroy if MV <= 4
+                    if card_name == CardName::Fragmentize {
+                        let mv_ok = self.find_permanent(*target_id)
+                            .and_then(|p| find_card(db, p.card_name))
+                            .map(|d| d.mana_cost.cmc() <= 4)
+                            .unwrap_or(false);
+                        if mv_ok {
+                            self.destroy_permanent(*target_id);
+                        }
+                    } else {
+                        self.destroy_permanent(*target_id);
+                    }
                 }
                 if let Some(tc) = target_controller {
                     self.players[tc as usize].life += 4;
@@ -3695,8 +3741,14 @@ impl GameState {
             TriggeredEffect::PortableHoleETB { hole_id } => {
                 // Exile target nonland permanent an opponent controls with MV <= 2.
                 if let Some(Target::Object(target_id)) = targets.first() {
-                    self.exile_linked.push((hole_id, *target_id));
-                    self.remove_permanent_to_zone(*target_id, DestinationZone::Exile);
+                    let mv_ok = self.find_permanent(*target_id)
+                        .and_then(|p| find_card(db, p.card_name))
+                        .map(|d| d.mana_cost.cmc() <= 2)
+                        .unwrap_or(false);
+                    if mv_ok {
+                        self.exile_linked.push((hole_id, *target_id));
+                        self.remove_permanent_to_zone(*target_id, DestinationZone::Exile);
+                    }
                 }
             }
 

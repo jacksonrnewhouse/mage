@@ -2623,13 +2623,27 @@ impl GameState {
             }
 
             // Target artifact or enchantment
-            CardName::Disenchant | CardName::NaturesClaim | CardName::Fragmentize
+            CardName::Disenchant | CardName::NaturesClaim
             | CardName::AncientGrudge | CardName::ShatteringSpree | CardName::Vandalblast
             | CardName::Suplex | CardName::UntimelyMalfunction | CardName::Crash
             | CardName::SunderingEruption => {
                 self.battlefield
                     .iter()
                     .filter(|p| p.is_artifact() || p.is_enchantment())
+                    .map(|p| vec![Target::Object(p.id)])
+                    .collect()
+            }
+
+            // Fragmentize: target artifact or enchantment with mana value 4 or less
+            CardName::Fragmentize => {
+                self.battlefield
+                    .iter()
+                    .filter(|p| {
+                        (p.is_artifact() || p.is_enchantment())
+                            && find_card(db, p.card_name)
+                                .map(|d| d.mana_cost.cmc() <= 4)
+                                .unwrap_or(false)
+                    })
                     .map(|p| vec![Target::Object(p.id)])
                     .collect()
             }
