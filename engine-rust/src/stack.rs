@@ -214,6 +214,10 @@ pub enum TriggeredEffect {
     /// Emperor of Bones: whenever +1/+1 counters are put on it, put a creature card exiled
     /// with it onto the battlefield with haste. Sacrifice it at beginning of next end step.
     EmperorOfBonesReanimate { emperor_id: ObjectId },
+    /// Master of Death upkeep: if in graveyard, pay 1 life and return to hand.
+    MasterOfDeathUpkeep { owner: PlayerId },
+    /// Kishla Skimmer: whenever a card leaves your graveyard during your turn, draw a card (once per turn).
+    KishlaSkimmerLeavesGraveyard,
 }
 
 /// Activated ability effects.

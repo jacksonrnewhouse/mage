@@ -158,6 +158,11 @@ pub struct GameState {
     /// Tracks whether each player has used Lurrus's once-per-turn graveyard cast this turn.
     /// Indexed by PlayerId. Reset at end of turn.
     pub lurrus_cast_used: [bool; 2],
+
+    // --- Kishla Skimmer tracking ---
+    /// Tracks whether each player's Kishla Skimmer has triggered this turn (once per turn).
+    /// Indexed by PlayerId. Reset at end of turn.
+    pub kishla_skimmer_triggered: [bool; 2],
 }
 
 /// When the game needs a player to make a choice (tutor, discard, etc.)
@@ -319,6 +324,7 @@ impl GameState {
             delayed_triggers: Vec::new(),
             nadu_triggers_this_turn: Vec::new(),
             lurrus_cast_used: [false; 2],
+            kishla_skimmer_triggered: [false; 2],
         }
     }
 
@@ -541,6 +547,30 @@ impl GameState {
         self.emry_castable_artifacts.clear();
         // Clear Lurrus once-per-turn graveyard cast tracking
         self.lurrus_cast_used = [false; 2];
+        // Clear Kishla Skimmer once-per-turn trigger tracking
+        self.kishla_skimmer_triggered = [false; 2];
+    }
+
+    /// Check if a Kishla Skimmer trigger should fire when a card leaves a player's graveyard.
+    /// This should be called whenever a card is removed from a graveyard during its controller's turn.
+    /// The trigger fires at most once per turn per player.
+    pub fn check_kishla_skimmer_trigger(&mut self, graveyard_owner: PlayerId) {
+        // Only triggers during the graveyard owner's turn
+        if self.active_player != graveyard_owner {
+            return;
+        }
+        let pid = graveyard_owner as usize;
+        if self.kishla_skimmer_triggered[pid] {
+            return;
+        }
+        // Check if this player controls a Kishla Skimmer on the battlefield
+        let has_skimmer = self.battlefield.iter().any(|p| {
+            p.card_name == CardName::KishlaSkimmer && p.controller == graveyard_owner
+        });
+        if has_skimmer {
+            self.kishla_skimmer_triggered[pid] = true;
+            self.draw_cards(graveyard_owner, 1);
+        }
     }
 
     /// Apply a temporary effect immediately to the target permanent,

@@ -1331,6 +1331,7 @@ impl GameState {
                     for pid in 0..self.num_players as usize {
                         if let Some(pos) = self.players[pid].graveyard.iter().position(|&id| id == *target_id) {
                             let card_id = self.players[pid].graveyard.remove(pos);
+                            self.check_kishla_skimmer_trigger(pid as PlayerId);
                             let card_name = self.card_name_for_id(card_id);
                             if let Some(cn) = card_name {
                                 if cage_active || priest_active {
@@ -2195,6 +2196,21 @@ impl GameState {
                     }
                 }
             }
+            // Master of Death: ETB surveil 2, register recurring upkeep trigger
+            CardName::MasterOfDeath => {
+                self.surveil(controller, 2, false);
+                self.add_delayed_trigger(crate::types::DelayedTrigger {
+                    condition: crate::types::DelayedTriggerCondition::AtBeginningOfUpkeep {
+                        player: controller,
+                    },
+                    effect: TriggeredEffect::MasterOfDeathUpkeep { owner: controller },
+                    controller,
+                    fires_once: false,
+                });
+            }
+            // Kishla Skimmer: flying is handled via keywords.
+            // The "leaves graveyard" trigger is tracked via kishla_skimmer_triggered_this_turn.
+            CardName::KishlaSkimmer => {}
             // Snapcaster Mage: ETB handled separately in handle_etb_with_cast_targets
             // because it needs the targets from the CastSpell action.
             CardName::SnapcasterMage => {}
@@ -2875,6 +2891,24 @@ impl GameState {
                         .unwrap_or(0);
                     self.players[controller as usize].life -= life_loss;
                 }
+            }
+            TriggeredEffect::MasterOfDeathUpkeep { owner } => {
+                // At the beginning of your upkeep, if Master of Death is in your graveyard,
+                // pay 1 life and return it to your hand.
+                // For game tree search simplicity, we always pay the life if it's in the graveyard.
+                let pid = owner as usize;
+                if let Some(pos) = self.players[pid].graveyard.iter().position(|&id| {
+                    self.card_name_for_id(id) == Some(CardName::MasterOfDeath)
+                }) {
+                    let card_id = self.players[pid].graveyard.remove(pos);
+                    self.players[pid].hand.push(card_id);
+                    self.players[pid].life -= 1;
+                    self.check_kishla_skimmer_trigger(owner);
+                }
+            }
+            TriggeredEffect::KishlaSkimmerLeavesGraveyard => {
+                // Draw a card when a card leaves your graveyard during your turn.
+                self.draw_cards(controller, 1);
             }
             TriggeredEffect::YoungPyromancerCast | TriggeredEffect::MonasteryMentorCast => {
                 // Create 1/1 token
@@ -3840,6 +3874,7 @@ impl GameState {
                     if let Some(pos) = self.players[pid].graveyard.iter().position(|&id| id == *target_id) {
                         let card_id = self.players[pid].graveyard.remove(pos);
                         self.players[pid].hand.push(card_id);
+                        self.check_kishla_skimmer_trigger(controller);
                     }
                 }
             }
@@ -4209,6 +4244,7 @@ impl GameState {
                     if let Some(pos) = self.players[pid].graveyard.iter().position(|&id| id == *target_id) {
                         let id = self.players[pid].graveyard.remove(pos);
                         self.players[pid].hand.push(id);
+                        self.check_kishla_skimmer_trigger(controller);
                     }
                 }
             }

@@ -2072,13 +2072,13 @@ pub fn build_card_db() -> Vec<CardDef> {
     // === Green/Black Creatures ===
     card!(MasterOfDeath, "Master of Death", ManaCost { blue: 1, black: 1, generic: 1, ..c }, &[Creature], &[],
         Some(3), Some(1), None, kw(), &[Blue, Black],
-        "When Master of Death enters or dies, you draw a card and you lose 1 life. At the beginning of your upkeep, you may pay 1 life. If you do, return Master of Death from your graveyard to your hand.");
+        "When this creature enters, surveil 2. At the beginning of your upkeep, if this card is in your graveyard, you may pay 1 life. If you do, return it to your hand.");
     card!(HogaakArisenNecropolis, "Hogaak, Arisen Necropolis", ManaCost { black: 1, green: 1, generic: 5, ..c }, &[Creature], &[Legendary],
         Some(8), Some(8), None, trample(), &[Black, Green],
         "You can't spend mana to cast this spell. Convoke, delve. Trample. You may cast Hogaak from your graveyard.");
-    card!(KishlaSkimmer, "Kishla Skimmer", ManaCost { black: 1, green: 1, generic: 1, ..c }, &[Creature], &[],
-        Some(3), Some(2), None, flying(), &[Black, Green],
-        "Flying. When Kishla Skimmer enters, mill three cards.");
+    card!(KishlaSkimmer, "Kishla Skimmer", ManaCost { green: 1, blue: 1, ..c }, &[Creature], &[],
+        Some(2), Some(2), None, flying(), &[Green, Blue],
+        "Flying. Whenever a card leaves your graveyard during your turn, draw a card. This ability triggers only once each turn.");
     card!(GolgariGraveTroll, "Golgari Grave-Troll", ManaCost { green: 1, generic: 5, ..c }, &[Creature], &[],
         Some(0), Some(0), None, trample(), &[Black, Green],
         "Golgari Grave-Troll enters with a +1/+1 counter on it for each creature card in your graveyard. {1}, Remove a +1/+1 counter from Golgari Grave-Troll: Regenerate Golgari Grave-Troll. Dredge 6.");

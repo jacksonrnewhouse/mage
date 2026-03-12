@@ -479,6 +479,7 @@ impl GameState {
                             if let Some(pos) = self.players[pid].graveyard.iter().position(|&id| id == dredge_card_id) {
                                 self.players[pid].graveyard.remove(pos);
                                 self.players[pid].hand.push(dredge_card_id);
+                                self.check_kishla_skimmer_trigger(choice.player);
                             }
                             // Dredging replaces the draw, so draws_this_turn does NOT increment.
                             // Continue with any remaining draws.
