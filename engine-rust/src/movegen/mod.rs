@@ -2718,7 +2718,7 @@ impl GameState {
             // Target artifact or enchantment
             CardName::Disenchant | CardName::NaturesClaim
             | CardName::AncientGrudge | CardName::ShatteringSpree | CardName::Vandalblast
-            | CardName::Suplex | CardName::UntimelyMalfunction | CardName::Crash
+            | CardName::UntimelyMalfunction | CardName::Crash
             | CardName::SunderingEruption => {
                 self.battlefield
                     .iter()
@@ -3793,6 +3793,50 @@ impl GameState {
                 result
             }
 
+            CardName::Suplex => {
+                // Choose one:
+                //   Mode 0: Deal 3 damage to target creature (exile if it would die)
+                //   Mode 1: Exile target artifact
+                let spell_colors = find_card(db, card_name)
+                    .map(|d| d.color_identity.to_vec())
+                    .unwrap_or_default();
+                let creatures: Vec<Target> = self.battlefield.iter()
+                    .filter(|p| p.is_creature() && self.can_be_targeted(p, player_id, &spell_colors))
+                    .map(|p| Target::Object(p.id))
+                    .collect();
+                let artifacts: Vec<Target> = self.battlefield.iter()
+                    .filter(|p| p.is_artifact() && self.can_be_targeted(p, player_id, &spell_colors))
+                    .map(|p| Target::Object(p.id))
+                    .collect();
+
+                let mut result = Vec::new();
+                // Mode 0: deal 3 damage to target creature
+                for &t in &creatures {
+                    result.push(Action::CastSpell {
+                        card_id,
+                        targets: vec![t],
+                        x_value: 0,
+                        from_graveyard: false,
+                        from_library_top: false,
+                        alt_cost: None,
+                        modes: vec![0],
+                    });
+                }
+                // Mode 1: exile target artifact
+                for &t in &artifacts {
+                    result.push(Action::CastSpell {
+                        card_id,
+                        targets: vec![t],
+                        x_value: 0,
+                        from_graveyard: false,
+                        from_library_top: false,
+                        alt_cost: None,
+                        modes: vec![1],
+                    });
+                }
+                result
+            }
+
             _ => vec![],
         }
     }
@@ -3859,5 +3903,5 @@ pub fn requires_sacrifice_cost(name: CardName) -> bool {
 
 /// Returns true if this card is a modal spell (choose N of M modes).
 pub fn is_modal_spell(name: CardName) -> bool {
-    matches!(name, CardName::KolaghanCommand | CardName::KozileksCommand | CardName::PestControl)
+    matches!(name, CardName::KolaghanCommand | CardName::KozileksCommand | CardName::PestControl | CardName::Suplex)
 }

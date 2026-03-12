@@ -1162,7 +1162,7 @@ impl GameState {
 
             CardName::Disenchant | CardName::NaturesClaim | CardName::Fragmentize
             | CardName::AbruptDecay | CardName::AncientGrudge | CardName::ShatteringSpree
-            | CardName::Vandalblast | CardName::Suplex
+            | CardName::Vandalblast
             | CardName::MoltenCollapse | CardName::FatalPush
             | CardName::BitterTriumph | CardName::SnuffOut
             | CardName::UntimelyMalfunction | CardName::Crash | CardName::CouncilsJudgment
@@ -1913,6 +1913,32 @@ impl GameState {
                             token.creature_types = vec![CreatureType::Pest];
                             token.colors = vec![Color::Black, Color::Green];
                             self.battlefield.push(token);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            CardName::Suplex => {
+                // Choose one:
+                //   Mode 0: Deal 3 damage to target creature. If it would die this turn, exile instead.
+                //   Mode 1: Exile target artifact.
+                match modes.first().copied().unwrap_or(0) {
+                    0 => {
+                        if let Some(Target::Object(target_id)) = targets.first() {
+                            self.deal_damage_to_target(Target::Object(*target_id), 3, controller);
+                            // Check if the creature has lethal damage and exile it instead of letting it die
+                            let should_exile = self.find_permanent(*target_id)
+                                .map(|p| p.has_lethal_damage())
+                                .unwrap_or(false);
+                            if should_exile {
+                                self.remove_permanent_to_zone(*target_id, DestinationZone::Exile);
+                            }
+                        }
+                    }
+                    1 => {
+                        if let Some(Target::Object(target_id)) = targets.first() {
+                            self.remove_permanent_to_zone(*target_id, DestinationZone::Exile);
                         }
                     }
                     _ => {}

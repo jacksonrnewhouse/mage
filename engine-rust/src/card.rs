@@ -1935,7 +1935,7 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(Vandalblast, "Vandalblast", ManaCost::r(1), &[Sorcery], &[], None, None, None, kw(), &[Red],
         "Destroy target artifact you don't control. Overload {4}{R}.");
     card!(Suplex, "Suplex", ManaCost { red: 1, generic: 1, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Red],
-        "This spell costs {1} less if target artifact or creature is tapped. Destroy target artifact or creature.");
+        "Choose one — Suplex deals 3 damage to target creature. If that creature would die this turn, exile it instead. / Exile target artifact.");
     card!(BrotherhoodsEnd, "Brotherhood's End", ManaCost { red: 2, generic: 1, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Red],
         "Choose one: Brotherhood's End deals 3 damage to each creature and each planeswalker. Destroy all artifacts with mana value 3 or less.");
 
