@@ -2269,7 +2269,8 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(MakdeeAndItlaSkysnarers, "Makdee and Itla, Skysnarers", ManaCost { white: 1, generic: 1, ..c }, &[Creature], &[Legendary],
         Some(2), Some(2), None, flying(), &[White, Blue],
         "Flying. Venom Blast — Artifacts and creatures your opponents control enter tapped.");
-    card!(DovinHandOfControl, "Dovin, Hand of Control", ManaCost { generic: 2, white: 1, ..c }, &[Planeswalker], &[Legendary],
+    // Actual cost {2}{W/U} — hybrid {W/U} approximated as {1} generic since ManaCost lacks hybrid support
+    card!(DovinHandOfControl, "Dovin, Hand of Control", ManaCost { generic: 3, ..c }, &[Planeswalker], &[Legendary],
         None, None, Some(5), kw(), &[White, Blue],
         "Artifact, instant, and sorcery spells your opponents cast cost {1} more to cast. -1: Until your next turn, prevent all damage that would be dealt to and dealt by target permanent.");
 
@@ -2342,6 +2343,7 @@ pub fn build_card_db() -> Vec<CardDef> {
         "+1: Create Boo, a legendary 1/1 red Hamster creature token with trample and haste. -2: Target creature you control gets +X/+0 and gains trample and haste until end of turn, where X is its power. -6: You may sacrifice any number of creatures. When you sacrifice one or more creatures this way, Minsc & Boo deals X damage to any target, where X is the total power of those creatures, and you draw X cards.");
 
     // === Selesnya (GW) ===
+    // Actual cost {G/W} — hybrid approximated as {1} generic since ManaCost lacks hybrid support
     card!(CT(&[CreatureType::Dryad, CreatureType::Soldier]) DryadMilitant, "Dryad Militant", ManaCost { generic: 1, ..c }, &[Creature], &[],
         Some(2), Some(1), None, kw(), &[Green, White],
         "If an instant or sorcery card would be put into a graveyard from anywhere, exile it instead.");
@@ -2370,6 +2372,7 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Exile the top card of your library. Until end of turn, you may play that card. Storm.");
 
     // === Golgari (BG) ===
+    // Actual cost {B/G} — hybrid approximated as {1} generic since ManaCost lacks hybrid support
     card!(CT(&[CreatureType::Elf, CreatureType::Shaman]) DeathriteShaman, "Deathrite Shaman", ManaCost { generic: 1, ..c }, &[Creature], &[],
         Some(1), Some(2), None, kw(), &[Black, Green],
         "{T}: Exile target land card from a graveyard. Add one mana of any color. {B}, {T}: Exile target instant or sorcery card from a graveyard. Each opponent loses 2 life. {G}, {T}: Exile target creature card from a graveyard. You gain 2 life.");

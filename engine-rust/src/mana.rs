@@ -294,7 +294,10 @@ pub fn parse_mana_cost(s: &str) -> ManaCost {
                 "G" => cost.green += 1,
                 "C" => cost.colorless += 1,
                 n => {
-                    if let Ok(v) = n.parse::<u8>() {
+                    if n.contains('/') {
+                        // Hybrid mana (e.g. "B/G", "W/U") — approximate as {1} generic
+                        cost.generic += 1;
+                    } else if let Ok(v) = n.parse::<u8>() {
                         cost.generic += v;
                     }
                 }
@@ -350,6 +353,19 @@ mod tests {
         assert_eq!(cost.generic, 2);
         assert_eq!(cost.blue, 2);
         assert_eq!(cost.cmc(), 4);
+    }
+
+    #[test]
+    fn test_parse_hybrid_mana_cost() {
+        // {B/G} — single hybrid symbol becomes 1 generic
+        let cost = parse_mana_cost("{B/G}");
+        assert_eq!(cost.generic, 1);
+        assert_eq!(cost.cmc(), 1);
+
+        // {2}{W/U} — 2 generic + 1 hybrid = 3 generic total
+        let cost = parse_mana_cost("{2}{W/U}");
+        assert_eq!(cost.generic, 3);
+        assert_eq!(cost.cmc(), 3);
     }
 
     #[test]
