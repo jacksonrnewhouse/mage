@@ -1505,6 +1505,24 @@ impl GameState {
                 );
             }
 
+            // Emperor of Bones: {1}{B}: Adapt 2 (ability_index 0)
+            CardName::EmperorOfBones if ability_index == 0 => {
+                let cost = crate::mana::ManaCost { black: 1, generic: 1, ..crate::mana::ManaCost::ZERO };
+                if !self.players[controller as usize].mana_pool.pay(&cost) {
+                    return;
+                }
+                self.stack.push(
+                    StackItemKind::ActivatedAbility {
+                        source_id: permanent_id,
+                        source_name: card_name,
+                        effect: ActivatedEffect::EmperorOfBonesAdapt { emperor_id: permanent_id },
+                    },
+                    controller,
+                    vec![],
+                );
+                self.reset_priority_passes();
+            }
+
             // Walking Ballista: {4}: Put a +1/+1 counter on Walking Ballista (ability_index 0)
             CardName::WalkingBallista if ability_index == 0 => {
                 let cost = crate::mana::ManaCost::generic(4);

@@ -1771,8 +1771,8 @@ pub fn build_card_db() -> Vec<CardDef> {
         Some(3), Some(2), None, shadow(), &[Black],
         "Shadow. If a card would be put into an opponent's graveyard from anywhere, instead exile it with a void counter on it. {T}, Sacrifice Dauthi Voidwalker: Choose an exiled card an opponent owns with a void counter on it. You may play it this turn without paying its mana cost.");
     card!(EmperorOfBones, "Emperor of Bones", ManaCost { black: 1, generic: 1, ..c }, &[Creature], &[],
-        Some(1), Some(2), None, kw(), &[Black],
-        "At the beginning of combat on your turn, you may exile target creature card from your graveyard. If you do, create a tapped and attacking token that's a copy of that card. Exile that token at end of combat. Adapt 2.");
+        Some(2), Some(2), None, kw(), &[Black],
+        "At the beginning of combat on your turn, exile up to one target card from a graveyard. {1}{B}: Adapt 2. Whenever one or more +1/+1 counters are put on this creature, put a creature card exiled with this creature onto the battlefield under your control with a finality counter on it. It gains haste. Sacrifice it at the beginning of the next end step.");
     card!(MaiScornfulStriker, "Mai, Scornful Striker", ManaCost { black: 1, generic: 1, ..c }, &[Creature], &[Legendary],
         Some(2), Some(1), None, deathtouch(), &[Black],
         "When Mai enters, each player mills two cards. Deathtouch. Whenever Mai deals combat damage to a player, you may cast a creature card from a graveyard.");

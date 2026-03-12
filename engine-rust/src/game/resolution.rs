@@ -2560,6 +2560,19 @@ impl GameState {
                 });
             }
 
+            // Emperor of Bones: register a recurring "at the beginning of combat on your turn"
+            // trigger that exiles a card from a graveyard (simplified: auto-exile best creature).
+            CardName::EmperorOfBones => {
+                self.add_delayed_trigger(crate::types::DelayedTrigger {
+                    condition: crate::types::DelayedTriggerCondition::AtBeginningOfCombat {
+                        player: controller,
+                    },
+                    effect: TriggeredEffect::EmperorOfBonesExile { emperor_id: _card_id },
+                    controller,
+                    fires_once: false,
+                });
+            }
+
             // Urza's Saga: a Saga enchantment land with 3 chapters.
             // When it enters, add a lore counter and trigger Chapter I.
             // At the beginning of each of the controller's subsequent precombat main phases,
@@ -3878,6 +3891,102 @@ impl GameState {
                 self.players[controller as usize].life += 2;
             }
 
+            TriggeredEffect::EmperorOfBonesExile { emperor_id } => {
+                // Emperor of Bones: exile up to one target card from a graveyard.
+                // Verify emperor is still on the battlefield.
+                if self.find_permanent(emperor_id).is_none() {
+                    return;
+                }
+                // Simplified: find the best creature card in any graveyard and exile it.
+                // In a real implementation this would be a player choice.
+                let db_local = crate::card::build_card_db();
+                let mut best_card_id: Option<ObjectId> = None;
+                let mut best_pid: Option<usize> = None;
+                for pid in 0..self.num_players as usize {
+                    for &gid in &self.players[pid].graveyard {
+                        if let Some(cn) = self.card_name_for_id(gid) {
+                            if let Some(def) = find_card(&db_local, cn) {
+                                if def.card_types.iter().any(|&t| t == CardType::Creature) {
+                                    best_card_id = Some(gid);
+                                    best_pid = Some(pid);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if best_card_id.is_some() { break; }
+                }
+                if let (Some(card_id), Some(pid)) = (best_card_id, best_pid) {
+                    if let Some(pos) = self.players[pid].graveyard.iter().position(|&id| id == card_id) {
+                        self.players[pid].graveyard.remove(pos);
+                        let cn = self.card_name_for_id(card_id).unwrap_or(CardName::Plains);
+                        self.exile.push((card_id, cn, pid as PlayerId));
+                        // Track that this card was exiled by this Emperor of Bones
+                        self.exile_linked.push((emperor_id, card_id));
+                    }
+                }
+            }
+
+            TriggeredEffect::EmperorOfBonesReanimate { emperor_id } => {
+                // Emperor of Bones: put a creature card exiled with this creature onto the
+                // battlefield under your control with haste. Sacrifice it at beginning of
+                // next end step.
+                // Find a creature card exiled by this Emperor.
+                let db_local = crate::card::build_card_db();
+                let mut reanimate_card_id: Option<ObjectId> = None;
+                let mut reanimate_card_name: Option<CardName> = None;
+                let mut reanimate_owner: Option<PlayerId> = None;
+                // Search exile_linked for cards linked to this emperor
+                for &(source_id, exiled_id) in &self.exile_linked {
+                    if source_id == emperor_id {
+                        // Check if the card is still in exile and is a creature
+                        if let Some(pos) = self.exile.iter().position(|&(id, _, _)| id == exiled_id) {
+                            let (_, cn, owner) = self.exile[pos];
+                            if let Some(def) = find_card(&db_local, cn) {
+                                if def.card_types.iter().any(|&t| t == CardType::Creature) {
+                                    reanimate_card_id = Some(exiled_id);
+                                    reanimate_card_name = Some(cn);
+                                    reanimate_owner = Some(owner);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                if let (Some(card_id), Some(cn), Some(owner)) = (reanimate_card_id, reanimate_card_name, reanimate_owner) {
+                    let cage_active = self.grafdiggers_cage_active();
+                    let priest_active = self.containment_priest_active();
+                    // Remove from exile
+                    if let Some(pos) = self.exile.iter().position(|&(id, _, _)| id == card_id) {
+                        self.exile.remove(pos);
+                    }
+                    // Remove the exile_linked entry
+                    self.exile_linked.retain(|&(src, exiled)| !(src == emperor_id && exiled == card_id));
+                    if cage_active || priest_active {
+                        // Can't enter from exile — stays exiled
+                        self.exile.push((card_id, cn, owner));
+                    } else if let Some(def) = find_card(&db_local, cn) {
+                        let mut perm = Permanent::new(
+                            card_id, cn, controller, owner,
+                            def.power, def.toughness, def.loyalty, def.keywords, def.card_types,
+                        );
+                        // Grant haste
+                        perm.keywords.add(Keyword::Haste);
+                        perm.creature_types = def.creature_types.to_vec();
+                        perm.colors = def.color_identity.to_vec();
+                        self.battlefield.push(perm);
+                        self.handle_etb(cn, card_id, controller);
+                        // Set up delayed sacrifice at beginning of next end step
+                        self.add_delayed_trigger(crate::types::DelayedTrigger {
+                            condition: crate::types::DelayedTriggerCondition::AtBeginningOfNextEndStep,
+                            effect: TriggeredEffect::SacrificeTarget { permanent_id: card_id },
+                            controller,
+                            fires_once: true,
+                        });
+                    }
+                }
+            }
+
             _ => {}
         }
         let _ = db; // suppress unused warning when db not used in all arms
@@ -4694,6 +4803,26 @@ impl GameState {
                         target: *target_id,
                         keyword: Keyword::Shroud,
                     });
+                }
+            }
+
+            // === Emperor of Bones Adapt 2 ===
+            ActivatedEffect::EmperorOfBonesAdapt { emperor_id } => {
+                // Adapt 2: if no +1/+1 counters, put two +1/+1 counters on it.
+                if let Some(perm) = self.find_permanent_mut(emperor_id) {
+                    if perm.counters.get(CounterType::PlusOnePlusOne) == 0 {
+                        perm.counters.add(CounterType::PlusOnePlusOne, 2);
+                        // Whenever +1/+1 counters are put on Emperor of Bones, trigger reanimate.
+                        self.stack.push(
+                            StackItemKind::TriggeredAbility {
+                                source_id: emperor_id,
+                                source_name: CardName::EmperorOfBones,
+                                effect: TriggeredEffect::EmperorOfBonesReanimate { emperor_id },
+                            },
+                            controller,
+                            vec![],
+                        );
+                    }
                 }
             }
         }

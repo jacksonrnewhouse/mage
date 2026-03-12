@@ -1845,6 +1845,16 @@ impl GameState {
             }
         }
 
+        // Emperor of Bones: {1}{B}: Adapt 2 (ability_index 0)
+        // Only available if it has no +1/+1 counters (adapt restriction).
+        if perm.card_name == CardName::EmperorOfBones {
+            let player = &self.players[perm.controller as usize];
+            let cost = crate::mana::ManaCost { black: 1, generic: 1, ..crate::mana::ManaCost::ZERO };
+            if perm.counters.get(CounterType::PlusOnePlusOne) == 0 && player.mana_pool.can_pay(&cost) {
+                abilities.push((0, vec![]));
+            }
+        }
+
         // Walking Ballista: {4}: Put a +1/+1 counter on Walking Ballista (ability_index 0)
         if perm.card_name == CardName::WalkingBallista {
             let player = &self.players[perm.controller as usize];

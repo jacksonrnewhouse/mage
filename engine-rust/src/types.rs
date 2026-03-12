@@ -348,6 +348,9 @@ pub enum DelayedTriggerCondition {
     /// Fires at the beginning of the precombat main phase for the specified player.
     /// Used by Sagas to add lore counters and trigger chapter abilities each turn.
     AtBeginningOfPreCombatMain { player: PlayerId },
+    /// Fires at the beginning of combat on the specified player's turn.
+    /// Used by Emperor of Bones to exile a card from a graveyard.
+    AtBeginningOfCombat { player: PlayerId },
 }
 
 /// A delayed triggered ability that will fire at a later point in the game.

@@ -206,6 +206,12 @@ pub enum TriggeredEffect {
     SatyrWayfinderETB,
     /// Haywire Mite dies: gain 2 life.
     HaywireMiteDeath,
+    /// Emperor of Bones: at the beginning of combat, exile up to one target card from a graveyard.
+    /// The exiled card is tracked so the +1/+1 counter trigger can reanimate it.
+    EmperorOfBonesExile { emperor_id: ObjectId },
+    /// Emperor of Bones: whenever +1/+1 counters are put on it, put a creature card exiled
+    /// with it onto the battlefield with haste. Sacrifice it at beginning of next end step.
+    EmperorOfBonesReanimate { emperor_id: ObjectId },
 }
 
 /// Activated ability effects.
@@ -349,6 +355,8 @@ pub enum ActivatedEffect {
     HermitDruidReveal,
     /// Sylvan Safekeeper: Sacrifice a land: Target creature you control gains shroud until end of turn.
     SylvanSafekeeperShroud,
+    /// Emperor of Bones: {1}{B}: Adapt 2. Put two +1/+1 counters on it if it has none.
+    EmperorOfBonesAdapt { emperor_id: ObjectId },
 }
 
 /// The game stack.

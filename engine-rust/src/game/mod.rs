@@ -422,6 +422,7 @@ impl GameState {
             (Phase::PreCombatMain, _) => {
                 self.phase = Phase::Combat;
                 self.step = Some(Step::BeginCombat);
+                self.check_delayed_triggers();
                 self.give_priority_to_active();
             }
             (Phase::Combat, Some(Step::BeginCombat)) => {
@@ -1093,6 +1094,9 @@ impl GameState {
                     }
                     DelayedTriggerCondition::AtBeginningOfPreCombatMain { player } => {
                         phase == Phase::PreCombatMain && step == None && active == player
+                    }
+                    DelayedTriggerCondition::AtBeginningOfCombat { player } => {
+                        phase == Phase::Combat && step == Some(Step::BeginCombat) && active == player
                     }
                 }
             })
