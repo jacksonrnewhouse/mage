@@ -1316,7 +1316,7 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(CT(&[CreatureType::Ouphe]) CollectorOuphe, "Collector Ouphe", ManaCost { green: 1, generic: 1, ..c }, &[Creature], &[],
         Some(2), Some(2), None, kw(), &[Green],
         "Activated abilities of artifacts can't be activated.");
-    card!(Endurance, "Endurance", ManaCost { green: 2, generic: 1, ..c }, &[Creature], &[],
+    card!(CT(&[CreatureType::Elemental, CreatureType::Incarnation]) Endurance, "Endurance", ManaCost { green: 2, generic: 1, ..c }, &[Creature], &[],
         Some(3), Some(4), None, flash_reach(), &[Green],
         "Flash. Reach. When Endurance enters, up to one target player puts all the cards from their graveyard on the bottom of their library in a random order.");
     card!(QuirionRanger, "Quirion Ranger", ManaCost::g(1), &[Creature], &[],
@@ -1996,10 +1996,10 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(CT(&[CreatureType::Halfling]) DelightedHalfling, "Delighted Halfling", ManaCost::g(1), &[Creature], &[Legendary],
         Some(1), Some(2), None, kw(), &[Green],
         "{T}: Add {C}. {T}: Add one mana of any color. Spend this mana only to cast a legendary spell, and that spell can't be countered.");
-    card!(HaywireMite, "Haywire Mite", ManaCost::generic(1), &[Artifact, Creature], &[],
+    card!(CT(&[CreatureType::Insect]) HaywireMite, "Haywire Mite", ManaCost::generic(1), &[Artifact, Creature], &[],
         Some(1), Some(1), None, kw(), &[Green],
         "When Haywire Mite dies, you gain 2 life. {G}, Sacrifice Haywire Mite: Exile target noncreature artifact or noncreature enchantment.");
-    card!(Hexdrinker, "Hexdrinker", ManaCost::g(1), &[Creature], &[],
+    card!(CT(&[CreatureType::Snake]) Hexdrinker, "Hexdrinker", ManaCost::g(1), &[Creature], &[],
         Some(2), Some(1), None, kw(), &[Green],
         "Level up {1}. Level 3-7: 4/4 with protection from instants. Level 8+: 6/6 with protection from everything.");
     card!(SylvanSafekeeper, "Sylvan Safekeeper", ManaCost::g(1), &[Creature], &[Legendary],
@@ -2014,7 +2014,7 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(SatyrWayfinder, "Satyr Wayfinder", ManaCost { green: 1, generic: 1, ..c }, &[Creature], &[],
         Some(1), Some(1), None, kw(), &[Green],
         "When Satyr Wayfinder enters, reveal the top four cards of your library. You may put a land card from among them into your hand. Put the rest into your graveyard.");
-    card!(Tarmogoyf, "Tarmogoyf", ManaCost { green: 1, generic: 1, ..c }, &[Creature], &[],
+    card!(CT(&[CreatureType::Lhurgoyf]) Tarmogoyf, "Tarmogoyf", ManaCost { green: 1, generic: 1, ..c }, &[Creature], &[],
         Some(0), Some(1), None, kw(), &[Green],
         "Tarmogoyf's power is equal to the number of card types among cards in all graveyards and its toughness is that number plus 1.");
     card!(TownGreeter, "Town Greeter", ManaCost { green: 1, generic: 1, ..c }, &[Creature], &[],
@@ -2023,7 +2023,7 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(CT(&[CreatureType::Elf, CreatureType::Spirit]) ElvishSpiritGuide, "Elvish Spirit Guide", ManaCost { green: 1, generic: 2, ..c }, &[Creature], &[],
         Some(2), Some(2), None, kw(), &[Green],
         "Exile Elvish Spirit Guide from your hand: Add {G}.");
-    card!(Manglehorn, "Manglehorn", ManaCost { green: 1, generic: 2, ..c }, &[Creature], &[],
+    card!(CT(&[CreatureType::Beast]) Manglehorn, "Manglehorn", ManaCost { green: 1, generic: 2, ..c }, &[Creature], &[],
         Some(2), Some(2), None, kw(), &[Green],
         "When Manglehorn enters, you may destroy target artifact. Artifacts your opponents control enter tapped.");
     card!(IcetillExplorer, "Icetill Explorer", ManaCost { green: 1, generic: 3, ..c }, &[Creature], &[],
@@ -2032,7 +2032,7 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(UndermountainAdventurer, "Undermountain Adventurer", ManaCost { green: 1, generic: 3, ..c }, &[Creature], &[],
         Some(3), Some(4), None, vigilance(), &[Green],
         "Vigilance. When Undermountain Adventurer enters, you take the initiative. {T}: Add {G}{G}.");
-    card!(Vengevine, "Vengevine", ManaCost { green: 2, generic: 2, ..c }, &[Creature], &[],
+    card!(CT(&[CreatureType::Elemental]) Vengevine, "Vengevine", ManaCost { green: 2, generic: 2, ..c }, &[Creature], &[],
         Some(4), Some(3), None, haste(), &[Green],
         "Haste. Whenever you cast two creature spells in a turn, you may return Vengevine from your graveyard to the battlefield.");
     card!(CT(&[CreatureType::Golem]) HollowOne, "Hollow One", ManaCost::generic(5), &[Artifact, Creature], &[],

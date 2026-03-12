@@ -218,6 +218,8 @@ pub enum CreatureType {
     Archon,
     Dryad,
     Hamster,
+    Incarnation,
+    Lhurgoyf,
 }
 
 impl CreatureType {
@@ -285,6 +287,8 @@ impl CreatureType {
         CreatureType::Archon,
         CreatureType::Dryad,
         CreatureType::Hamster,
+        CreatureType::Incarnation,
+        CreatureType::Lhurgoyf,
     ];
 }
 
