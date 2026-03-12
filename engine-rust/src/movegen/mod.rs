@@ -3401,6 +3401,20 @@ impl GameState {
         }
         false
     }
+
+    /// Check if a Delighted Halfling controlled by `player_id` makes a legendary spell uncounterable.
+    /// Simplified: if the player controls an untapped Delighted Halfling and the spell is legendary,
+    /// treat it as uncounterable (approximation — in real rules, Halfling's colored mana must be spent).
+    pub fn halfling_makes_uncounterable(&self, player_id: PlayerId, def: &crate::card::CardDef) -> bool {
+        if !def.supertypes.contains(&crate::types::SuperType::Legendary) {
+            return false;
+        }
+        self.battlefield.iter().any(|perm| {
+            perm.card_name == CardName::DelightedHalfling
+                && perm.controller == player_id
+                && !perm.tapped
+        })
+    }
 }
 
 pub fn is_uncounterable(name: CardName) -> bool {

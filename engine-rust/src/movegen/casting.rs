@@ -231,6 +231,10 @@ impl GameState {
                             if !uncounterable && def.card_types.contains(&CardType::Creature) {
                                 uncounterable = self.cavern_makes_uncounterable(player_id, def, cn);
                             }
+                            // Delighted Halfling: legendary spells can't be countered.
+                            if !uncounterable {
+                                uncounterable = self.halfling_makes_uncounterable(player_id, def);
+                            }
                             // Mark evoke-cast spells so resolution can apply the sacrifice trigger.
                             let is_evoke = matches!(alt_cost, Some(AltCost::Evoke { .. }));
                             let spell_id = self.stack.push_with_flags(
