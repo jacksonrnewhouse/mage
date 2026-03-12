@@ -1216,8 +1216,16 @@ impl GameState {
             | CardName::UrzasSaga => vec![None],
 
             // Talon Gates of Madara: {T}: {C}, or {1}{T}: any color
-            CardName::TalonGatesOfMadara => vec![None, Some(Color::White), Some(Color::Blue), Some(Color::Black),
-                Some(Color::Red), Some(Color::Green)],
+            CardName::TalonGatesOfMadara => {
+                // Colored mana requires {1} generic to activate
+                let can_pay_one = self.players[perm.controller as usize].mana_pool.total() >= 1;
+                if can_pay_one {
+                    vec![None, Some(Color::White), Some(Color::Blue), Some(Color::Black),
+                         Some(Color::Red), Some(Color::Green)]
+                } else {
+                    vec![None]
+                }
+            }
 
             // Spire of Industry: {T} for {C}, or {T} + pay 1 life for any color (if you control an artifact)
             CardName::SpireOfIndustry => {
@@ -1645,8 +1653,11 @@ impl GameState {
                     perm.tapped = true;
                 }
                 if let Some(color) = color_choice {
-                    // For colored mana, simplified: just add 1 colored mana
-                    // (ideally costs {1} extra, but mana payment is complex)
+                    // Colored mana costs {1} generic in addition to {T}
+                    let paid = self.players[controller as usize].mana_pool.pay_generic(1);
+                    if !paid {
+                        return false;
+                    }
                     self.players[controller as usize].mana_pool.add(Some(color), 1);
                 } else {
                     self.players[controller as usize].mana_pool.colorless += 1;

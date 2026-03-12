@@ -2117,6 +2117,29 @@ impl GameState {
                     );
                 }
             }
+            // Talon Gates of Madara: "When this land enters, up to one target creature phases out."
+            // Approximated as exile-and-return-at-next-end-step since phasing is not implemented.
+            CardName::TalonGatesOfMadara => {
+                // Find target creature (prefer opponent's creatures)
+                let opp = self.opponent(controller);
+                let target: Option<ObjectId> = self.battlefield.iter()
+                    .find(|p| p.is_creature() && p.controller == opp)
+                    .or_else(|| self.battlefield.iter().find(|p| p.is_creature() && p.id != _card_id))
+                    .map(|p| p.id);
+                if let Some(target_id) = target {
+                    if let Some(perm) = self.remove_permanent_to_zone(target_id, DestinationZone::Exile) {
+                        let owner = perm.owner;
+                        // Set up delayed trigger to return the creature at next end step
+                        self.add_delayed_trigger(crate::types::DelayedTrigger {
+                            condition: crate::types::DelayedTriggerCondition::AtBeginningOfNextEndStep,
+                            effect: TriggeredEffect::ExileLinkedReturn { card_id: target_id, card_owner: owner },
+                            controller,
+                            fires_once: true,
+                            source_id: Some(_card_id),
+                        });
+                    }
+                }
+            }
             // Argentum Masticore: protection from multicolored + upkeep trigger
             CardName::ArgentumMasticore => {
                 if let Some(perm) = self.find_permanent_mut(_card_id) {

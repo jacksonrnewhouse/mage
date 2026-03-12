@@ -106,6 +106,7 @@ impl GameState {
             | CardName::TolarianAcademy | CardName::GaeasCradle
             | CardName::UrborgTombOfYawgmoth | CardName::YavimayaCradleOfGrowth
             | CardName::Karakas | CardName::OtawaraSoaringCity | CardName::BoseijuWhoEndures
+            | CardName::TalonGatesOfMadara
             // White creatures
             | CardName::ThaliaGuardianOfThraben | CardName::AjaniNacatlPariah
             | CardName::KatakiWarsWage | CardName::OswaldFiddlebender
