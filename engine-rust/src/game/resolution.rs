@@ -2947,6 +2947,34 @@ impl GameState {
                 // Full implementation requires choosing from any graveyard; model as draw for now.
                 self.draw_cards(controller, 1);
             }
+            TriggeredEffect::BarrowgoyfCombatDamage { damage } => {
+                // Barrowgoyf deals combat damage to a player: mill that many cards.
+                // If you do, you may put a creature card from among them into your hand.
+                let pid = controller as usize;
+                let mut milled_ids = Vec::new();
+                for _ in 0..damage {
+                    if let Some(id) = self.players[pid].library.pop() {
+                        self.players[pid].graveyard.push(id);
+                        milled_ids.push(id);
+                    }
+                }
+                // Find a creature card among the milled cards and put it into hand.
+                let creature_id = milled_ids.iter().find(|&&id| {
+                    if let Some(cn) = self.card_name_for_id(id) {
+                        if let Some(def) = crate::card::find_card(db, cn) {
+                            return def.card_types.contains(&CardType::Creature);
+                        }
+                    }
+                    false
+                }).copied();
+                if let Some(cid) = creature_id {
+                    if let Some(pos) = self.players[pid].graveyard.iter().rposition(|&gid| gid == cid) {
+                        let card = self.players[pid].graveyard.remove(pos);
+                        self.players[pid].hand.push(card);
+                    }
+                }
+                self.check_emrakul_graveyard_shuffle(controller);
+            }
             TriggeredEffect::VesselDealsDamage { vessel_id } => {
                 // Vessel of the All-Consuming deals damage: put a +1/+1 counter on it.
                 if let Some(perm) = self.find_permanent_mut(vessel_id) {

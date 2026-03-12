@@ -103,6 +103,8 @@ pub enum TriggeredEffect {
     PsychicFrogCombatDamage,
     /// Mai, Scornful Striker deals combat damage to a player: you may cast a creature card from a graveyard
     MaiCombatDamage,
+    /// Barrowgoyf deals combat damage to a player: mill that many cards, may put a creature card among them into hand
+    BarrowgoyfCombatDamage { damage: i16 },
     /// Vessel of the All-Consuming deals damage: put a +1/+1 counter on it.
     VesselDealsDamage { vessel_id: ObjectId },
     /// Gain control of target permanent (Agent of Treachery ETB, etc.)

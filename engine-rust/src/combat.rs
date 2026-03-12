@@ -71,6 +71,7 @@ impl GameState {
                     CardName::ScrawlingCrawler => Some(TriggeredEffect::ScrawlingCrawlerCombatDamage),
                     CardName::PsychicFrog => Some(TriggeredEffect::PsychicFrogCombatDamage),
                     CardName::MaiScornfulStriker => Some(TriggeredEffect::MaiCombatDamage),
+                    CardName::Barrowgoyf => Some(TriggeredEffect::BarrowgoyfCombatDamage { damage: attacker_power }),
                     CardName::VesselOfTheAllConsuming => Some(TriggeredEffect::VesselDealsDamage { vessel_id: attacker_id }),
                     _ => None,
                 };
