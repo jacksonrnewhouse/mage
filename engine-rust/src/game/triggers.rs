@@ -268,15 +268,59 @@ impl GameState {
             ));
         }
 
-        for (source_id, source_name, effect, controller) in triggers {
+        // Displacer Kitten: whenever you cast a noncreature spell, exile up to one target
+        // nonland permanent you control, then return it to the battlefield under its owner's control.
+        let kitten_triggers: Vec<(ObjectId, PlayerId)> = self
+            .battlefield
+            .iter()
+            .filter(|p| p.card_name == CardName::DisplacerKitten && p.controller == caster)
+            .map(|p| (p.id, p.controller))
+            .collect();
+        for (source_id, controller) in kitten_triggers {
+            // Find a nonland permanent the controller controls to blink (not the Kitten itself)
+            let blink_targets: Vec<ObjectId> = self
+                .battlefield
+                .iter()
+                .filter(|p| p.controller == controller && !p.is_land() && p.id != source_id)
+                .map(|p| p.id)
+                .collect();
+            if let Some(&_target_id) = blink_targets.first() {
+                triggers.push((
+                    source_id,
+                    CardName::DisplacerKitten,
+                    TriggeredEffect::DisplacerKittenBlink,
+                    controller,
+                ));
+                // We'll add the target below in the loop
+                // For now, store the target and handle it in the push loop
+            }
+            // If no valid target, the "up to one" means we can still fire with no target (do nothing).
+        }
+
+        for (source_id, source_name, effect, controller) in &triggers {
+            let target_vec = match effect {
+                TriggeredEffect::DisplacerKittenBlink => {
+                    // Find best nonland permanent to blink (first one found)
+                    let blink_target: Option<ObjectId> = self
+                        .battlefield
+                        .iter()
+                        .find(|p| p.controller == *controller && !p.is_land() && p.id != *source_id)
+                        .map(|p| p.id);
+                    match blink_target {
+                        Some(tid) => vec![Target::Object(tid)],
+                        None => vec![],
+                    }
+                }
+                _ => vec![],
+            };
             self.stack.push(
                 StackItemKind::TriggeredAbility {
-                    source_id,
-                    source_name,
-                    effect,
+                    source_id: *source_id,
+                    source_name: *source_name,
+                    effect: effect.clone(),
                 },
-                controller,
-                vec![],
+                *controller,
+                target_vec,
             );
         }
     }

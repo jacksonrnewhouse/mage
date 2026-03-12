@@ -183,6 +183,13 @@ pub enum TriggeredEffect {
     /// or ability, reveal the top card of your library. If it's a land, put it onto the
     /// battlefield. Otherwise, put it into your hand.
     NaduTrigger,
+    /// Displacer Kitten: whenever you cast a noncreature spell, exile up to one target
+    /// nonland permanent you control, then return it to the battlefield under its owner's control.
+    DisplacerKittenBlink,
+    /// Kappa Cannoneer: whenever this or another artifact enters, put a +1/+1 counter on it.
+    KappaCannoneerTrigger { cannoneer_id: ObjectId },
+    /// Emry ETB: mill four cards.
+    EmryETB,
 }
 
 /// Activated ability effects.
@@ -300,6 +307,10 @@ pub enum ActivatedEffect {
     DovinPrevent,
     /// Necropotence: pay 1 life, draw a card (simplified approximation).
     NecropotencePayLife,
+    /// Aphetto Alchemist: untap target artifact or creature.
+    UntapArtifactOrCreature,
+    /// Emry, Lurker of the Loch: choose target artifact in graveyard, may cast it this turn.
+    EmryCastArtifact,
 }
 
 /// The game stack.

@@ -123,6 +123,7 @@ pub enum Keyword {
     Cascade = 1 << 20,
     Dredge = 1 << 21,
     Delve = 1 << 22,
+    CantBeBlocked = 1 << 23,
 }
 
 /// Compact bitfield for keyword abilities on a permanent.

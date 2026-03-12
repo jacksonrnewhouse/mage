@@ -348,6 +348,25 @@ impl GameState {
                                         vec![],
                                     );
                                 }
+                                // Kappa Cannoneer: "Whenever you cast an artifact spell,
+                                // put a +1/+1 counter on Kappa Cannoneer."
+                                let cannoneer_triggers: Vec<(ObjectId, PlayerId)> = self
+                                    .battlefield
+                                    .iter()
+                                    .filter(|p| p.card_name == crate::card::CardName::KappaCannoneer && p.controller == player_id)
+                                    .map(|p| (p.id, p.controller))
+                                    .collect();
+                                for (cannoneer_id, controller) in cannoneer_triggers {
+                                    self.stack.push(
+                                        crate::stack::StackItemKind::TriggeredAbility {
+                                            source_id: cannoneer_id,
+                                            source_name: crate::card::CardName::KappaCannoneer,
+                                            effect: crate::stack::TriggeredEffect::KappaCannoneerTrigger { cannoneer_id },
+                                        },
+                                        controller,
+                                        vec![],
+                                    );
+                                }
                             }
                             self.reset_priority_passes();
                         }
@@ -1377,6 +1396,36 @@ impl GameState {
                         _ => {}
                     }
                 }
+            }
+
+            // Aphetto Alchemist: {T}: Untap target artifact or creature (ability_index 0)
+            CardName::AphettoAlchemist if ability_index == 0 => {
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.tapped = true;
+                }
+                self.stack.push(
+                    StackItemKind::ActivatedAbility {
+                        source_id: permanent_id,
+                        source_name: card_name,
+                        effect: ActivatedEffect::UntapArtifactOrCreature,
+                    },
+                    controller,
+                    targets.to_vec(),
+                );
+                self.reset_priority_passes();
+            }
+
+            // Emry, Lurker of the Loch: {T}: Choose target artifact in your graveyard.
+            // You may cast that card this turn. (ability_index 0)
+            CardName::EmryLurkerOfTheLoch if ability_index == 0 => {
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.tapped = true;
+                }
+                // Grant the targeted artifact card permission to be cast from graveyard this turn
+                if let Some(Target::Object(artifact_id)) = targets.first() {
+                    self.emry_castable_artifacts.push(*artifact_id);
+                }
+                self.reset_priority_passes();
             }
 
             // Equipment: equip ability (ability_index == 20) — attach to target creature

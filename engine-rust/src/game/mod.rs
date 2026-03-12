@@ -88,6 +88,8 @@ pub struct GameState {
     // --- Graveyard casting ---
     /// Cards in graveyards that have been granted flashback by Snapcaster Mage (cleared at end of turn).
     pub snapcaster_flashback_cards: Vec<ObjectId>,
+    /// Artifact cards in graveyards that Emry has granted cast permission for this turn.
+    pub emry_castable_artifacts: Vec<ObjectId>,
 
     // --- Madness ---
     /// Cards currently exiled due to madness (waiting for the player to decide to cast or not).
@@ -296,6 +298,7 @@ impl GameState {
             card_registry: Vec::with_capacity(120),
             temporary_effects: Vec::new(),
             snapcaster_flashback_cards: Vec::new(),
+            emry_castable_artifacts: Vec::new(),
             madness_exiled: Vec::new(),
             exile_linked: Vec::new(),
             imprinted: Vec::new(),
@@ -525,6 +528,8 @@ impl GameState {
         self.end_of_turn_cleanup();
         // Clear Snapcaster Mage flashback grants
         self.snapcaster_flashback_cards.clear();
+        // Clear Emry graveyard cast grants
+        self.emry_castable_artifacts.clear();
     }
 
     /// Apply a temporary effect immediately to the target permanent,

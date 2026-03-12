@@ -325,7 +325,9 @@ impl GameState {
                         });
                         // Hogaak, Arisen Necropolis: can be cast from graveyard
                         let hogaak_from_graveyard = card_name == CardName::HogaakArisenNecropolis;
-                        let can_cast_from_gyd = has_own_flashback || has_snapcaster_flashback || yawgmoth_active || can_retrace || hogaak_from_graveyard;
+                        // Emry: artifact cards granted cast permission this turn
+                        let emry_castable = self.emry_castable_artifacts.contains(&card_id);
+                        let can_cast_from_gyd = has_own_flashback || has_snapcaster_flashback || yawgmoth_active || can_retrace || hogaak_from_graveyard || emry_castable;
 
                         if !can_cast_from_gyd {
                             continue;
@@ -841,6 +843,10 @@ impl GameState {
             // Can block each attacker
             for &(attacker_id, _) in &self.attackers {
                 if let Some(attacker) = self.find_permanent(attacker_id) {
+                    // Can't be blocked: creatures with this keyword cannot be blocked at all.
+                    if attacker.keywords.has(Keyword::CantBeBlocked) {
+                        continue;
+                    }
                     let can_block_flight = if attacker.keywords.has(Keyword::Flying) {
                         perm.can_block_flyer()
                     } else {
@@ -967,10 +973,10 @@ impl GameState {
         }
 
         // Affinity for artifacts: reduce cost by the number of artifacts the controller controls.
-        // Applies to ThoughtMonitor and Thoughtcast.
+        // Applies to ThoughtMonitor, Thoughtcast, Emry, and Kappa Cannoneer (improvise approximation).
         let has_affinity_for_artifacts = matches!(
             def.name,
-            CardName::ThoughtMonitor | CardName::Thoughtcast
+            CardName::ThoughtMonitor | CardName::Thoughtcast | CardName::EmryLurkerOfTheLoch | CardName::KappaCannoneer
         );
         if has_affinity_for_artifacts {
             let artifact_count = self.battlefield.iter()
@@ -1827,6 +1833,30 @@ impl GameState {
             let player = &self.players[perm.controller as usize];
             if player.mana_pool.total() >= 2 {
                 abilities.push((0, vec![]));
+            }
+        }
+
+        // Aphetto Alchemist: {T}: Untap target artifact or creature (ability_index 0)
+        if perm.card_name == CardName::AphettoAlchemist && !perm.tapped && !perm.entered_this_turn {
+            for target in &self.battlefield {
+                if target.id != perm.id && (target.is_artifact() || target.is_creature()) && target.tapped {
+                    abilities.push((0, vec![Target::Object(target.id)]));
+                }
+            }
+        }
+
+        // Emry, Lurker of the Loch: {T}: Choose target artifact card in your graveyard.
+        // You may cast that card this turn. (ability_index 0)
+        if perm.card_name == CardName::EmryLurkerOfTheLoch && !perm.tapped && !perm.entered_this_turn {
+            let graveyard = &self.players[perm.controller as usize].graveyard;
+            for &card_id in graveyard {
+                if let Some(cn) = self.card_name_for_id(card_id) {
+                    if let Some(def) = find_card(db, cn) {
+                        if def.card_types.contains(&CardType::Artifact) {
+                            abilities.push((0, vec![Target::Object(card_id)]));
+                        }
+                    }
+                }
             }
         }
 

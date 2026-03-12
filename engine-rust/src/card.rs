@@ -1614,7 +1614,11 @@ pub fn build_card_db() -> Vec<CardDef> {
         Some(1), Some(2), None, kw(), &[Blue],
         "{T}: Untap target artifact or creature. Morph {U}.");
     card!(CT(&[CreatureType::Phyrexian, CreatureType::Rogue]) MercurialSpelldancer, "Mercurial Spelldancer", ManaCost { blue: 1, generic: 1, ..c }, &[Creature], &[],
-        Some(2), Some(1), None, kw(), &[Blue],
+        Some(2), Some(1), None, {
+            let mut k = Keywords::empty();
+            k.add(Keyword::CantBeBlocked);
+            k
+        }, &[Blue],
         "Mercurial Spelldancer can't be blocked. Whenever you cast a noncreature spell, put an oil counter on Mercurial Spelldancer. Whenever Mercurial Spelldancer deals combat damage to a player, you may remove two oil counters from it. If you do, when you next cast an instant or sorcery spell this turn, copy that spell. You may choose new targets for the copy.");
     card!(ThassasOracle, "Thassa's Oracle", ManaCost { blue: 2, ..c }, &[Creature], &[],
         Some(1), Some(3), None, kw(), &[Blue],
@@ -1623,8 +1627,8 @@ pub fn build_card_db() -> Vec<CardDef> {
         Some(2), Some(1), None, flying(), &[Blue],
         "Kicker {X}. X can't be 0. Flying. When Thieving Skydiver enters, if it was kicked, gain control of target artifact with mana value X or less. If that artifact is an Equipment, attach it to Thieving Skydiver.");
     card!(ThundertrapTrainer, "Thundertrap Trainer", ManaCost { blue: 1, generic: 1, ..c }, &[Creature], &[],
-        Some(2), Some(2), None, kw(), &[Blue],
-        "Whenever you cast a noncreature spell, tap target creature an opponent controls.");
+        Some(1), Some(2), None, kw(), &[Blue],
+        "Offspring {4}. When this creature enters, look at the top four cards of your library. You may reveal a noncreature, nonland card from among them and put it into your hand. Put the rest on the bottom of your library in a random order.");
     card!(ADVENTURE(AdventureDef {
         display_name: "Petty Theft",
         cost: ManaCost { blue: 1, generic: 1, ..c },
@@ -1636,13 +1640,17 @@ pub fn build_card_db() -> Vec<CardDef> {
         Some(1), Some(2), None, kw(), &[Blue],
         "This spell costs {1} less for each artifact you control. When Emry enters, mill four cards. {T}: Choose target artifact in your graveyard. You may cast it this turn.");
     card!(PlagonLordOfTheBeach, "Plagon, Lord of the Beach", ManaCost { blue: 1, generic: 2, ..c }, &[Creature], &[Legendary],
-        Some(3), Some(3), None, kw(), &[Blue],
-        "Whenever you draw your second card each turn, create a 1/1 blue Starfish creature token. {T}: Draw a card, then discard a card.");
+        Some(0), Some(3), None, kw(), &[Blue],
+        "When Plagon enters, draw a card for each creature you control with toughness greater than its power. {W/U}: Target creature you control assigns combat damage equal to its toughness rather than its power this turn.");
     card!(DisplacerKitten, "Displacer Kitten", ManaCost { blue: 1, generic: 3, ..c }, &[Creature], &[],
         Some(2), Some(2), None, kw(), &[Blue],
         "Avoidance. Whenever you cast a noncreature spell, exile up to one target nonland permanent you control, then return it to the battlefield under its owner's control.");
     card!(KappaCannoneer, "Kappa Cannoneer", ManaCost { blue: 2, generic: 4, ..c }, &[Artifact, Creature], &[],
-        Some(4), Some(4), None, kw(), &[Blue],
+        Some(4), Some(4), None, {
+            let mut k = Keywords::empty();
+            k.add(Keyword::Ward);
+            k
+        }, &[Blue],
         "Improvise. Ward {4}. Whenever Kappa Cannoneer enters or whenever you cast an artifact spell, put a +1/+1 counter on Kappa Cannoneer and it can't be blocked this turn.");
     card!(ThoughtMonitor, "Thought Monitor", ManaCost { blue: 1, generic: 6, ..c }, &[Artifact, Creature], &[],
         Some(2), Some(2), None, flying(), &[Blue],
@@ -2111,7 +2119,11 @@ pub fn build_card_db() -> Vec<CardDef> {
         Some(3), Some(2), None, kw(), &[],
         "Whenever Scrap Trawler or another artifact you control is put into a graveyard from the battlefield, return target artifact card in your graveyard with lesser mana value to your hand.");
     card!(ScrawlingCrawler, "Scrawling Crawler", ManaCost::generic(3), &[Artifact, Creature], &[],
-        Some(3), Some(3), None, kw(), &[],
+        Some(3), Some(3), None, {
+            let mut k = Keywords::empty();
+            k.add(Keyword::CantBeBlocked);
+            k
+        }, &[],
         "Scrawling Crawler can't be blocked. Whenever Scrawling Crawler deals combat damage to a player, draw a card.");
     card!(CT(&[CreatureType::Golem]) LodestoneGolem, "Lodestone Golem", ManaCost::generic(4), &[Artifact, Creature], &[],
         Some(5), Some(3), None, kw(), &[],

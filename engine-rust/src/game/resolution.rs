@@ -2026,6 +2026,41 @@ impl GameState {
                     vec![],
                 );
             }
+            // Thundertrap Trainer: ETB — look at top 4 cards, take noncreature nonland
+            // Simplified: draw a card (approximation of the impulse-like effect)
+            CardName::ThundertrapTrainer => {
+                self.draw_cards(controller, 1);
+            }
+            // Plagon, Lord of the Beach: ETB — draw a card for each creature you control
+            // with toughness greater than its power
+            CardName::PlagonLordOfTheBeach => {
+                let count = self.battlefield.iter()
+                    .filter(|p| p.controller == controller && p.is_creature() && p.toughness() > p.power())
+                    .count();
+                if count > 0 {
+                    self.draw_cards(controller, count);
+                }
+            }
+            // Kappa Cannoneer: ETB — put a +1/+1 counter on it
+            CardName::KappaCannoneer => {
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: _card_id,
+                        source_name: card_name,
+                        effect: TriggeredEffect::KappaCannoneerTrigger { cannoneer_id: _card_id },
+                    },
+                    controller,
+                    vec![],
+                );
+            }
+            // Emry, Lurker of the Loch: mill 4 cards on ETB
+            CardName::EmryLurkerOfTheLoch => {
+                for _ in 0..4 {
+                    if let Some(id) = self.players[controller as usize].library.pop() {
+                        self.players[controller as usize].graveyard.push(id);
+                    }
+                }
+            }
             // Snapcaster Mage: ETB handled separately in handle_etb_with_cast_targets
             // because it needs the targets from the CastSpell action.
             CardName::SnapcasterMage => {}
@@ -3451,6 +3486,57 @@ impl GameState {
                 }
             }
 
+            TriggeredEffect::DisplacerKittenBlink => {
+                // Displacer Kitten: exile up to one target nonland permanent you control,
+                // then return it to the battlefield under its owner's control.
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    let target_id = *target_id;
+                    // Get the card info before removing
+                    let card_name_opt = self.find_permanent(target_id).map(|p| p.card_name);
+                    let owner = self.find_permanent(target_id).map(|p| p.owner);
+                    if let (Some(cn), Some(owner)) = (card_name_opt, owner) {
+                        // Remove from battlefield (exile then return)
+                        self.remove_permanent(target_id);
+                        // Return to battlefield under owner's control
+                        if let Some(def) = find_card(db, cn) {
+                            let mut perm = crate::permanent::Permanent::new(
+                                target_id,
+                                cn,
+                                owner,
+                                owner,
+                                def.power,
+                                def.toughness,
+                                def.loyalty,
+                                def.keywords,
+                                def.card_types,
+                            );
+                            perm.colors = def.color_identity.to_vec();
+                            perm.creature_types = def.creature_types.to_vec();
+                            perm.entered_this_turn = true;
+                            self.battlefield.push(perm);
+                            self.handle_etb(cn, target_id, owner);
+                        }
+                    }
+                }
+            }
+
+            TriggeredEffect::KappaCannoneerTrigger { cannoneer_id } => {
+                // Kappa Cannoneer: put a +1/+1 counter on it
+                if let Some(perm) = self.find_permanent_mut(cannoneer_id) {
+                    perm.counters.add(CounterType::PlusOnePlusOne, 1);
+                }
+            }
+
+            TriggeredEffect::EmryETB => {
+                // Emry: mill 4 cards (already handled inline in handle_etb_with_x)
+                // This variant is for stack-based resolution if needed.
+                for _ in 0..4 {
+                    if let Some(id) = self.players[controller as usize].library.pop() {
+                        self.players[controller as usize].graveyard.push(id);
+                    }
+                }
+            }
+
             _ => {}
         }
         let _ = db; // suppress unused warning when db not used in all arms
@@ -4140,6 +4226,17 @@ impl GameState {
                 // The actual card exiles from library and puts into hand at end step,
                 // but for game tree search, drawing immediately is a reasonable model.
                 self.draw_cards(controller, 1);
+            }
+            ActivatedEffect::UntapArtifactOrCreature => {
+                // Aphetto Alchemist: untap target artifact or creature
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    if let Some(perm) = self.find_permanent_mut(*target_id) {
+                        perm.tapped = false;
+                    }
+                }
+            }
+            ActivatedEffect::EmryCastArtifact => {
+                // Emry: handled at activation time (grants cast permission via emry_castable_artifacts)
             }
         }
     }
