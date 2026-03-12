@@ -1086,13 +1086,17 @@ impl GameState {
                 }
             }
             CardName::SeedsOfInnocence => {
-                // Destroy all artifacts
-                let to_destroy: Vec<ObjectId> = self.battlefield.iter()
+                // Destroy all artifacts. Controller of each gains life equal to its mana value.
+                let to_destroy: Vec<(ObjectId, PlayerId, i32)> = self.battlefield.iter()
                     .filter(|p| p.is_artifact())
-                    .map(|p| p.id)
+                    .map(|p| {
+                        let mv = find_card(db, p.card_name).map(|d| d.mana_cost.cmc() as i32).unwrap_or(0);
+                        (p.id, p.controller, mv)
+                    })
                     .collect();
-                for id in to_destroy {
-                    self.destroy_permanent(id);
+                for (id, artifact_controller, mv) in &to_destroy {
+                    self.destroy_permanent(*id);
+                    self.players[*artifact_controller as usize].life += *mv;
                 }
             }
             CardName::ForceOfVigor => {
