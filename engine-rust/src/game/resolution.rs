@@ -4022,6 +4022,11 @@ impl GameState {
                 self.players[target_player as usize].life -= 2;
             }
 
+            TriggeredEffect::HarshMentorDamage { target_player } => {
+                // Harsh Mentor deals 2 damage to the opponent who activated the ability
+                self.players[target_player as usize].life -= 2;
+            }
+
             TriggeredEffect::AnimateDeadETB => {
                 // Handled inline in handle_etb_with_x for AnimateDead
             }

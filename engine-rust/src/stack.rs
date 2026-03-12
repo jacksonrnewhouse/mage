@@ -169,6 +169,9 @@ pub enum TriggeredEffect {
     ChaliceCounter { spell_id: ObjectId },
     /// Eidolon of the Great Revel: whenever a player casts a spell with MV 3 or less, deal 2 damage to that player.
     EidolonDamage { target_player: PlayerId },
+    /// Harsh Mentor: whenever an opponent activates an ability of an artifact, creature, or land
+    /// that isn't a mana ability, deal 2 damage to that player.
+    HarshMentorDamage { target_player: PlayerId },
     /// Animate Dead ETB: return target creature from any graveyard to the battlefield under your control with -1/-0.
     AnimateDeadETB,
     /// Mystic Remora: whenever an opponent casts a noncreature spell, draw a card.

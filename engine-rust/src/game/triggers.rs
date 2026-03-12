@@ -691,4 +691,28 @@ impl GameState {
             );
         }
     }
+
+    /// Check Harsh Mentor triggered ability: whenever an opponent activates an ability of an
+    /// artifact, creature, or land that isn't a mana ability, Harsh Mentor deals 2 damage to
+    /// that player. Called after a non-mana activated ability is activated.
+    pub(crate) fn check_harsh_mentor_trigger(&mut self, activator: PlayerId) {
+        let mentor_triggers: Vec<(ObjectId, PlayerId)> = self
+            .battlefield
+            .iter()
+            .filter(|p| p.card_name == CardName::HarshMentor)
+            .filter(|p| p.controller != activator)
+            .map(|p| (p.id, p.controller))
+            .collect();
+        for (source_id, controller) in mentor_triggers {
+            self.stack.push(
+                StackItemKind::TriggeredAbility {
+                    source_id,
+                    source_name: CardName::HarshMentor,
+                    effect: TriggeredEffect::HarshMentorDamage { target_player: activator },
+                },
+                controller,
+                vec![Target::Player(activator)],
+            );
+        }
+    }
 }

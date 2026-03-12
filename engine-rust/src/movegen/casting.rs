@@ -862,6 +862,15 @@ impl GameState {
             }
         }
 
+        // Harsh Mentor: triggers when an opponent activates a non-mana ability of an
+        // artifact, creature, or land. All abilities handled in apply_activated_ability are
+        // non-mana abilities (mana abilities use activate_mana_ability instead).
+        if let Some(source_perm) = self.find_permanent(permanent_id) {
+            if source_perm.is_artifact() || source_perm.is_creature() || source_perm.is_land() {
+                self.check_harsh_mentor_trigger(controller);
+            }
+        }
+
         match card_name {
             CardName::BlackLotus => {
                 // Sacrifice + add 3 mana of any color
