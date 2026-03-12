@@ -955,6 +955,24 @@ impl GameState {
                 self.reset_priority_passes();
             }
 
+            // Mystic Forge: {T}, Pay 1 life: Exile the top card of your library.
+            CardName::MysticForge if ability_index == 0 => {
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.tapped = true;
+                }
+                self.players[controller as usize].life -= 1;
+                self.stack.push(
+                    StackItemKind::ActivatedAbility {
+                        source_id: permanent_id,
+                        source_name: card_name,
+                        effect: ActivatedEffect::MysticForgeExile,
+                    },
+                    controller,
+                    vec![],
+                );
+                self.reset_priority_passes();
+            }
+
             // The One Ring: {T}: Put a burden counter, then draw cards equal to burden counters.
             CardName::TheOneRing if ability_index == 0 => {
                 self.stack.push(

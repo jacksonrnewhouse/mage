@@ -4769,6 +4769,14 @@ impl GameState {
                 // but for game tree search, drawing immediately is a reasonable model.
                 self.draw_cards(controller, 1);
             }
+            ActivatedEffect::MysticForgeExile => {
+                // Mystic Forge: exile the top card of your library.
+                let pid = controller as usize;
+                if let Some(card_id) = self.players[pid].library.pop() {
+                    let card_name = self.card_name_for_id(card_id).unwrap_or(CardName::Plains);
+                    self.exile.push((card_id, card_name, controller));
+                }
+            }
             ActivatedEffect::UntapArtifactOrCreature => {
                 // Aphetto Alchemist: untap target artifact or creature
                 if let Some(Target::Object(target_id)) = targets.first() {

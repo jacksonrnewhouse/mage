@@ -363,6 +363,8 @@ pub enum ActivatedEffect {
     SylvanSafekeeperShroud,
     /// Emperor of Bones: {1}{B}: Adapt 2. Put two +1/+1 counters on it if it has none.
     EmperorOfBonesAdapt { emperor_id: ObjectId },
+    /// Mystic Forge: {T}, Pay 1 life: Exile the top card of your library.
+    MysticForgeExile,
 }
 
 /// The game stack.

@@ -1876,6 +1876,14 @@ impl GameState {
             }
         }
 
+        // Mystic Forge: {T}, Pay 1 life: Exile the top card of your library.
+        if perm.card_name == CardName::MysticForge && !perm.tapped {
+            let player = &self.players[perm.controller as usize];
+            if player.life >= 2 && !player.library.is_empty() {
+                abilities.push((0, vec![]));
+            }
+        }
+
         // Emperor of Bones: {1}{B}: Adapt 2 (ability_index 0)
         // Only available if it has no +1/+1 counters (adapt restriction).
         if perm.card_name == CardName::EmperorOfBones {

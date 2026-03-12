@@ -261,3 +261,88 @@ fn test_mystic_forge_allows_colorless_instant_from_top() {
     });
     assert!(found, "Mystic Forge should allow casting colorless (non-artifact) spells from top of library");
 }
+
+/// Mystic Forge: {T}, Pay 1 life: Exile the top card of your library.
+#[test]
+fn test_mystic_forge_exile_activated_ability() {
+    let (mut state, db) = make_main_phase_state();
+
+    let forge_id = put_permanent(&mut state, &db, CardName::MysticForge, 0);
+    let bolt_id = push_library_top(&mut state, CardName::LightningBolt, 0);
+
+    state.players[0].life = 10;
+
+    // Should generate an ActivateAbility action for the exile ability
+    let actions = state.legal_actions(&db);
+    let found = actions.iter().any(|a| {
+        matches!(a, Action::ActivateAbility { permanent_id, ability_index, .. }
+            if *permanent_id == forge_id && *ability_index == 0)
+    });
+    assert!(found, "Mystic Forge should offer tap, Pay 1 life: Exile top card ability");
+
+    // Apply the ability
+    state.apply_action(
+        &Action::ActivateAbility {
+            permanent_id: forge_id,
+            ability_index: 0,
+            targets: vec![],
+        },
+        &db,
+    );
+
+    // Life should be paid
+    assert_eq!(state.players[0].life, 9, "Should pay 1 life");
+
+    // Forge should be tapped
+    let forge = state.battlefield.iter().find(|p| p.id == forge_id).unwrap();
+    assert!(forge.tapped, "Mystic Forge should be tapped");
+
+    // Ability should be on the stack
+    assert_eq!(state.stack.len(), 1, "Exile ability should be on the stack");
+
+    // Resolve the ability (pass priority twice)
+    state.apply_action(&Action::PassPriority, &db);
+    state.apply_action(&Action::PassPriority, &db);
+
+    // Top card should be exiled
+    assert!(state.players[0].library.is_empty(), "Top card should be removed from library");
+    let exiled = state.exile.iter().any(|(id, _, _)| *id == bolt_id);
+    assert!(exiled, "Top card should be in exile");
+}
+
+/// Mystic Forge: cannot activate exile ability when tapped.
+#[test]
+fn test_mystic_forge_exile_not_when_tapped() {
+    let (mut state, db) = make_main_phase_state();
+
+    let forge_id = put_permanent(&mut state, &db, CardName::MysticForge, 0);
+    push_library_top(&mut state, CardName::LightningBolt, 0);
+    state.players[0].life = 10;
+
+    // Tap the forge
+    state.battlefield.iter_mut().find(|p| p.id == forge_id).unwrap().tapped = true;
+
+    let actions = state.legal_actions(&db);
+    let found = actions.iter().any(|a| {
+        matches!(a, Action::ActivateAbility { permanent_id, ability_index, .. }
+            if *permanent_id == forge_id && *ability_index == 0)
+    });
+    assert!(!found, "Mystic Forge should NOT offer exile ability when tapped");
+}
+
+/// Mystic Forge: cannot activate exile ability with insufficient life.
+#[test]
+fn test_mystic_forge_exile_not_with_low_life() {
+    let (mut state, db) = make_main_phase_state();
+
+    let forge_id = put_permanent(&mut state, &db, CardName::MysticForge, 0);
+    push_library_top(&mut state, CardName::LightningBolt, 0);
+    state.players[0].life = 1; // Too low (need >= 2 to avoid suicide)
+
+    let actions = state.legal_actions(&db);
+    let found = actions.iter().any(|a| {
+        matches!(a, Action::ActivateAbility { permanent_id, ability_index, .. }
+            if *permanent_id == forge_id && *ability_index == 0)
+    });
+    assert!(!found, "Mystic Forge should NOT offer exile ability when life is too low");
+}
