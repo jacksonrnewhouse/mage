@@ -2760,13 +2760,40 @@ impl GameState {
                     .collect()
             }
 
-            // Target creature in any graveyard
-            CardName::Reanimate | CardName::Exhume => {
+            // Target creature card in any graveyard
+            CardName::Reanimate => {
                 let mut targets = Vec::new();
                 for pid in 0..self.num_players as usize {
                     for &id in &self.players[pid].graveyard {
-                        targets.push(vec![Target::Object(id)]);
+                        if let Some(cn) = self.card_name_for_id(id) {
+                            if let Some(def) = find_card(db, cn) {
+                                if def.card_types.contains(&CardType::Creature) {
+                                    targets.push(vec![Target::Object(id)]);
+                                }
+                            }
+                        }
                     }
+                }
+                targets
+            }
+
+            // Exhume: each player puts a creature card from their graveyard onto the battlefield.
+            // No targeting — caster chooses which creature card from their own graveyard.
+            CardName::Exhume => {
+                let mut targets = Vec::new();
+                for &id in &self.players[controller as usize].graveyard {
+                    if let Some(cn) = self.card_name_for_id(id) {
+                        if let Some(def) = find_card(db, cn) {
+                            if def.card_types.contains(&CardType::Creature) {
+                                targets.push(vec![Target::Object(id)]);
+                            }
+                        }
+                    }
+                }
+                // If no creature cards in caster's graveyard, Exhume can still be cast
+                // (opponent might have creatures); use empty target list.
+                if targets.is_empty() {
+                    targets.push(vec![]);
                 }
                 targets
             }

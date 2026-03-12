@@ -1574,24 +1574,70 @@ impl GameState {
 
             // === Reanimation ===
             CardName::Exhume => {
-                // Each player puts a creature from graveyard onto battlefield
+                // Each player puts a creature card from their graveyard onto the battlefield.
+                // The caster's chosen creature is in the target; opponent gets first creature card found.
+                let cage_active = self.grafdiggers_cage_active();
+                let priest_active = self.containment_priest_active();
+
+                // Caster's creature: use the target if provided
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    for pid in 0..self.num_players as usize {
+                        if let Some(pos) = self.players[pid].graveyard.iter().position(|&id| id == *target_id) {
+                            let card_id = self.players[pid].graveyard.remove(pos);
+                            if let Some(cn) = self.card_name_for_id(card_id) {
+                                if cage_active || priest_active {
+                                    self.exile.push((card_id, cn, pid as PlayerId));
+                                } else {
+                                    let card_def = find_card(db, cn);
+                                    let (power, toughness, loyalty, keywords, card_types) = if let Some(def) = card_def {
+                                        (def.power, def.toughness, def.loyalty, def.keywords, def.card_types)
+                                    } else {
+                                        (Some(0), Some(0), None, Keywords::empty(), &[CardType::Creature][..])
+                                    };
+                                    let perm = Permanent::new(
+                                        card_id, cn, pid as PlayerId, pid as PlayerId,
+                                        power, toughness, loyalty, keywords, card_types,
+                                    );
+                                    self.battlefield.push(perm);
+                                    self.handle_etb(cn, card_id, pid as PlayerId);
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                // Each other player: pick first creature card from their graveyard
                 for pid in 0..self.num_players as usize {
-                    if let Some(pos) = self.players[pid].graveyard.iter().position(|_| true) {
+                    if pid as PlayerId == controller {
+                        continue;
+                    }
+                    // Find first creature card in this player's graveyard
+                    let creature_pos = self.players[pid].graveyard.iter().position(|&id| {
+                        self.card_name_for_id(id)
+                            .and_then(|cn| find_card(db, cn))
+                            .map(|def| def.card_types.contains(&CardType::Creature))
+                            .unwrap_or(false)
+                    });
+                    if let Some(pos) = creature_pos {
                         let card_id = self.players[pid].graveyard.remove(pos);
-                        let card_name = self.card_name_for_id(card_id);
-                        if let Some(cn) = card_name {
-                            let card_def = find_card(db, cn);
-                            let (power, toughness, loyalty, keywords, card_types) = if let Some(def) = card_def {
-                                (def.power, def.toughness, def.loyalty, def.keywords, def.card_types)
+                        if let Some(cn) = self.card_name_for_id(card_id) {
+                            if cage_active || priest_active {
+                                self.exile.push((card_id, cn, pid as PlayerId));
                             } else {
-                                (Some(0), Some(0), None, Keywords::empty(), &[CardType::Creature][..])
-                            };
-                            let perm = Permanent::new(
-                                card_id, cn, pid as PlayerId, pid as PlayerId,
-                                power, toughness, loyalty, keywords, card_types,
-                            );
-                            self.battlefield.push(perm);
-                            self.handle_etb(cn, card_id, pid as PlayerId);
+                                let card_def = find_card(db, cn);
+                                let (power, toughness, loyalty, keywords, card_types) = if let Some(def) = card_def {
+                                    (def.power, def.toughness, def.loyalty, def.keywords, def.card_types)
+                                } else {
+                                    (Some(0), Some(0), None, Keywords::empty(), &[CardType::Creature][..])
+                                };
+                                let perm = Permanent::new(
+                                    card_id, cn, pid as PlayerId, pid as PlayerId,
+                                    power, toughness, loyalty, keywords, card_types,
+                                );
+                                self.battlefield.push(perm);
+                                self.handle_etb(cn, card_id, pid as PlayerId);
+                            }
                         }
                     }
                 }
