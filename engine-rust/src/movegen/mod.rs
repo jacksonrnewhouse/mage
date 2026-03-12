@@ -1059,6 +1059,12 @@ impl GameState {
         self.battlefield.iter().any(|p| p.card_name == CardName::YavimayaCradleOfGrowth)
     }
 
+    /// Check if Damping Sphere is on the battlefield.
+    /// "If a land is tapped for two or more mana, it produces {C} instead."
+    fn damping_sphere_active(&self) -> bool {
+        self.battlefield.iter().any(|p| p.card_name == CardName::DampingSphere)
+    }
+
     /// Apply land-type static effects (Blood Moon, Urborg, Yavimaya) to a land's mana options.
     /// - Blood Moon: nonbasic lands lose all abilities and become Mountains (only tap for R).
     /// - Urborg: all lands gain {T}: Add {B}.
@@ -1575,7 +1581,12 @@ impl GameState {
                 if let Some(perm) = self.find_permanent_mut(permanent_id) {
                     perm.tapped = true;
                 }
-                self.players[controller as usize].mana_pool.colorless += 2;
+                // Damping Sphere: land tapped for 2+ mana produces {C} instead
+                if self.damping_sphere_active() {
+                    self.players[controller as usize].mana_pool.colorless += 1;
+                } else {
+                    self.players[controller as usize].mana_pool.colorless += 2;
+                }
                 self.players[controller as usize].life -= 2;
                 true
             }
@@ -1628,7 +1639,12 @@ impl GameState {
                 if let Some(perm) = self.find_permanent_mut(permanent_id) {
                     perm.tapped = true;
                 }
-                self.players[controller as usize].mana_pool.add_workshop(3);
+                // Damping Sphere: land tapped for 2+ mana produces {C} instead
+                if self.damping_sphere_active() {
+                    self.players[controller as usize].mana_pool.colorless += 1;
+                } else {
+                    self.players[controller as usize].mana_pool.add_workshop(3);
+                }
                 true
             }
 
@@ -1637,7 +1653,12 @@ impl GameState {
                 if let Some(perm) = self.find_permanent_mut(permanent_id) {
                     perm.tapped = true;
                 }
-                self.players[controller as usize].mana_pool.colorless += 2;
+                // Damping Sphere: land tapped for 2+ mana produces {C} instead
+                if self.damping_sphere_active() {
+                    self.players[controller as usize].mana_pool.colorless += 1;
+                } else {
+                    self.players[controller as usize].mana_pool.colorless += 2;
+                }
                 true
             }
 
@@ -1650,9 +1671,14 @@ impl GameState {
                 if let Some(perm) = self.find_permanent_mut(permanent_id) {
                     perm.tapped = true;
                 }
-                self.players[controller as usize]
-                    .mana_pool
-                    .add(Some(Color::Green), creature_count);
+                // Damping Sphere: land tapped for 2+ mana produces {C} instead
+                if creature_count >= 2 && self.damping_sphere_active() {
+                    self.players[controller as usize].mana_pool.colorless += 1;
+                } else {
+                    self.players[controller as usize]
+                        .mana_pool
+                        .add(Some(Color::Green), creature_count);
+                }
                 true
             }
 
@@ -1685,9 +1711,14 @@ impl GameState {
                 if let Some(perm) = self.find_permanent_mut(permanent_id) {
                     perm.tapped = true;
                 }
-                self.players[controller as usize]
-                    .mana_pool
-                    .add(Some(Color::Blue), artifact_count);
+                // Damping Sphere: land tapped for 2+ mana produces {C} instead
+                if artifact_count >= 2 && self.damping_sphere_active() {
+                    self.players[controller as usize].mana_pool.colorless += 1;
+                } else {
+                    self.players[controller as usize]
+                        .mana_pool
+                        .add(Some(Color::Blue), artifact_count);
+                }
                 true
             }
 

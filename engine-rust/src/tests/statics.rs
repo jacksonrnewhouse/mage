@@ -375,3 +375,111 @@ fn test_manglehorn_treasure_tokens_enter_tapped() {
     let own_treasure = state.battlefield.iter().find(|p| p.id == own_treasure_id).unwrap();
     assert!(!own_treasure.tapped, "Controller's own Treasure should NOT enter tapped with Manglehorn");
 }
+
+#[test]
+fn test_damping_sphere_ancient_tomb_produces_one_colorless() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // Put Damping Sphere on the battlefield
+    let sphere_id = state.new_object_id();
+    state.card_registry.push((sphere_id, CardName::DampingSphere));
+    let def = find_card(&db, CardName::DampingSphere).unwrap();
+    let mut sphere = crate::permanent::Permanent::new(
+        sphere_id, CardName::DampingSphere, 0, 0,
+        def.power, def.toughness, None, def.keywords, def.card_types,
+    );
+    sphere.entered_this_turn = false;
+    state.battlefield.push(sphere);
+
+    // Put Ancient Tomb on the battlefield
+    let tomb_id = state.new_object_id();
+    state.card_registry.push((tomb_id, CardName::AncientTomb));
+    let tomb_def = find_card(&db, CardName::AncientTomb).unwrap();
+    let mut tomb = crate::permanent::Permanent::new(
+        tomb_id, CardName::AncientTomb, 0, 0,
+        tomb_def.power, tomb_def.toughness, None, tomb_def.keywords, tomb_def.card_types,
+    );
+    tomb.entered_this_turn = false;
+    state.battlefield.push(tomb);
+
+    let mana_before = state.players[0].mana_pool.colorless;
+    state.activate_mana_ability(tomb_id, None);
+    let mana_after = state.players[0].mana_pool.colorless;
+
+    // Ancient Tomb normally produces 2 colorless, but Damping Sphere reduces it to 1
+    assert_eq!(mana_after - mana_before, 1,
+        "Ancient Tomb should produce only 1 colorless mana under Damping Sphere");
+}
+
+#[test]
+fn test_damping_sphere_does_not_affect_single_mana_lands() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // Put Damping Sphere on the battlefield
+    let sphere_id = state.new_object_id();
+    state.card_registry.push((sphere_id, CardName::DampingSphere));
+    let def = find_card(&db, CardName::DampingSphere).unwrap();
+    let mut sphere = crate::permanent::Permanent::new(
+        sphere_id, CardName::DampingSphere, 0, 0,
+        def.power, def.toughness, None, def.keywords, def.card_types,
+    );
+    sphere.entered_this_turn = false;
+    state.battlefield.push(sphere);
+
+    // Put a basic Island on the battlefield
+    let island_id = state.new_object_id();
+    state.card_registry.push((island_id, CardName::Island));
+    let island_def = find_card(&db, CardName::Island).unwrap();
+    let mut island = crate::permanent::Permanent::new(
+        island_id, CardName::Island, 0, 0,
+        island_def.power, island_def.toughness, None, island_def.keywords, island_def.card_types,
+    );
+    island.entered_this_turn = false;
+    state.battlefield.push(island);
+
+    let blue_before = state.players[0].mana_pool.blue;
+    state.activate_mana_ability(island_id, Some(Color::Blue));
+    let blue_after = state.players[0].mana_pool.blue;
+
+    // Basic lands produce only 1 mana, so Damping Sphere should not affect them
+    assert_eq!(blue_after - blue_before, 1,
+        "Basic Island should still produce 1 blue mana under Damping Sphere");
+}
+
+#[test]
+fn test_damping_sphere_does_not_affect_sol_ring() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // Put Damping Sphere on the battlefield
+    let sphere_id = state.new_object_id();
+    state.card_registry.push((sphere_id, CardName::DampingSphere));
+    let def = find_card(&db, CardName::DampingSphere).unwrap();
+    let mut sphere = crate::permanent::Permanent::new(
+        sphere_id, CardName::DampingSphere, 0, 0,
+        def.power, def.toughness, None, def.keywords, def.card_types,
+    );
+    sphere.entered_this_turn = false;
+    state.battlefield.push(sphere);
+
+    // Put Sol Ring on the battlefield
+    let ring_id = state.new_object_id();
+    state.card_registry.push((ring_id, CardName::SolRing));
+    let ring_def = find_card(&db, CardName::SolRing).unwrap();
+    let mut ring = crate::permanent::Permanent::new(
+        ring_id, CardName::SolRing, 0, 0,
+        ring_def.power, ring_def.toughness, None, ring_def.keywords, ring_def.card_types,
+    );
+    ring.entered_this_turn = false;
+    state.battlefield.push(ring);
+
+    let mana_before = state.players[0].mana_pool.colorless;
+    state.activate_mana_ability(ring_id, None);
+    let mana_after = state.players[0].mana_pool.colorless;
+
+    // Sol Ring is an artifact, not a land, so Damping Sphere should NOT affect it
+    assert_eq!(mana_after - mana_before, 2,
+        "Sol Ring should still produce 2 colorless mana under Damping Sphere (it's not a land)");
+}
