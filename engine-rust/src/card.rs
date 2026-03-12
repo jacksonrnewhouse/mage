@@ -1218,7 +1218,7 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Search your library for a card, then shuffle and put it on top. You lose 2 life.");
     card!(YawgmothsWill, "Yawgmoth's Will", ManaCost { black: 1, generic: 2, ..c }, &[Sorcery], &[Legendary], None, None, None, kw(), &[Black],
         "Until end of turn, you may play lands and cast spells from your graveyard. If a card would be put into your graveyard from anywhere this turn, exile it instead.");
-    card!(TendrilsOfAgony, "Tendrils of Agony", ManaCost { black: 2, generic: 2, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Black],
+    card!(TendrilsOfAgony, "Tendrils of Agony", ManaCost { black: 2, generic: 2, ..c }, &[Sorcery], &[], None, None, None, storm(), &[Black],
         "Target player loses 2 life and you gain 2 life. Storm.");
 
     // === Black Creatures ===
