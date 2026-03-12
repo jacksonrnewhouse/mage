@@ -2393,6 +2393,24 @@ impl GameState {
             abilities.push((0, vec![]));
         }
 
+        // --- Gorilla Shaman: {X}{X}{1}: Destroy target noncreature artifact with mana value X ---
+        if perm.card_name == CardName::GorillaShaman {
+            let player = &self.players[perm.controller as usize];
+            let available_mana = player.mana_pool.total();
+            for target in &self.battlefield {
+                if target.is_artifact() && !target.is_creature() {
+                    let target_mv = find_card(db, target.card_name)
+                        .map(|d| d.mana_cost.cmc())
+                        .unwrap_or(0);
+                    // Cost is {X}{X}{1} where X = target's mana value, so total = 2*X + 1
+                    let total_cost = (target_mv as u16) * 2 + 1;
+                    if available_mana >= total_cost {
+                        abilities.push((0, vec![Target::Object(target.id)]));
+                    }
+                }
+            }
+        }
+
         // --- Sylvan Safekeeper: Sacrifice a land: Target creature you control gains shroud until end of turn ---
         if perm.card_name == CardName::SylvanSafekeeper {
             // Check if there's a land to sacrifice (any land you control other than Safekeeper itself)

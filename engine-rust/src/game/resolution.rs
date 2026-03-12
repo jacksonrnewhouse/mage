@@ -5495,6 +5495,23 @@ impl GameState {
                 }
             }
 
+            // === Gorilla Shaman ===
+            ActivatedEffect::GorillaShamanDestroy { target_mv } => {
+                // Destroy target noncreature artifact with mana value X.
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    // Verify target is still a noncreature artifact with the expected MV
+                    let valid = self.find_permanent(*target_id).map(|p| {
+                        p.is_artifact() && !p.is_creature()
+                            && find_card(db, p.card_name)
+                                .map(|d| d.mana_cost.cmc())
+                                .unwrap_or(0) == target_mv
+                    }).unwrap_or(false);
+                    if valid {
+                        self.destroy_permanent(*target_id);
+                    }
+                }
+            }
+
             // === Hermit Druid ===
             ActivatedEffect::HermitDruidReveal => {
                 // Reveal cards from top of library until a basic land is revealed.

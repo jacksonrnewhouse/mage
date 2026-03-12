@@ -398,6 +398,8 @@ pub enum ActivatedEffect {
     MysticForgeExile,
     /// Boromir, Warden of the Tower: Sacrifice — creatures you control gain indestructible until end of turn.
     BoromirSacrifice,
+    /// Gorilla Shaman: {X}{X}{1}: Destroy target noncreature artifact with mana value X.
+    GorillaShamanDestroy { target_mv: u8 },
 }
 
 /// The game stack.

@@ -826,7 +826,7 @@ impl GameState {
         permanent_id: ObjectId,
         ability_index: u8,
         targets: &[Target],
-        _db: &[CardDef],
+        db: &[CardDef],
     ) {
         let perm = match self.find_permanent(permanent_id) {
             Some(p) => p,
@@ -1980,6 +1980,32 @@ impl GameState {
                     vec![],
                 );
                 self.reset_priority_passes();
+            }
+
+            // Gorilla Shaman: {X}{X}{1}: Destroy target noncreature artifact with mana value X. (ability_index 0)
+            CardName::GorillaShaman if ability_index == 0 => {
+                // Determine the target's mana value to compute cost
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    let target_mv = self.find_permanent(*target_id)
+                        .and_then(|p| find_card(db, p.card_name))
+                        .map(|d| d.mana_cost.cmc())
+                        .unwrap_or(0);
+                    let total_cost = (target_mv as u8) * 2 + 1;
+                    let cost = crate::mana::ManaCost::generic(total_cost);
+                    if !self.players[controller as usize].mana_pool.pay(&cost) {
+                        return;
+                    }
+                    self.stack.push(
+                        StackItemKind::ActivatedAbility {
+                            source_id: permanent_id,
+                            source_name: card_name,
+                            effect: ActivatedEffect::GorillaShamanDestroy { target_mv },
+                        },
+                        controller,
+                        targets.to_vec(),
+                    );
+                    self.reset_priority_passes();
+                }
             }
 
             // Boromir, Warden of the Tower: Sacrifice: Creatures you control gain indestructible until end of turn. (ability_index 0)
