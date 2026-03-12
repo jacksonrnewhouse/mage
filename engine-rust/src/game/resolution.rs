@@ -3048,12 +3048,11 @@ impl GameState {
                 );
             }
 
-            // Roiling Vortex: register recurring upkeep trigger to deal 1 damage to each player.
+            // Roiling Vortex: register recurring upkeep trigger to deal 1 damage to the active player.
+            // Fires at the beginning of *each* player's upkeep, not just the controller's.
             CardName::RoilingVortex => {
                 self.add_delayed_trigger(crate::types::DelayedTrigger {
-                    condition: crate::types::DelayedTriggerCondition::AtBeginningOfUpkeep {
-                        player: controller,
-                    },
+                    condition: crate::types::DelayedTriggerCondition::AtBeginningOfNextUpkeep,
                     effect: TriggeredEffect::RoilingVortexUpkeep,
                     controller,
                     fires_once: false,
@@ -4000,10 +3999,9 @@ impl GameState {
             }
 
             TriggeredEffect::RoilingVortexUpkeep => {
-                // Roiling Vortex: deal 1 damage to each player
-                for pid in 0..self.num_players {
-                    self.players[pid as usize].life -= 1;
-                }
+                // Roiling Vortex: deal 1 damage to the player whose upkeep it is
+                let active = self.active_player;
+                self.players[active as usize].life -= 1;
             }
 
             TriggeredEffect::RoilingVortexFreeCast { target_player } => {
