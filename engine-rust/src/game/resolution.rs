@@ -3411,6 +3411,46 @@ impl GameState {
                 }
             }
 
+            TriggeredEffect::NaduTrigger => {
+                // Nadu, Winged Wisdom: reveal the top card of your library.
+                // If it's a land card, put it onto the battlefield.
+                // Otherwise, put it into your hand.
+                let top_card = self.players[controller as usize].library.last().copied();
+                if let Some(card_id) = top_card {
+                    let card_name_opt = self.card_name_for_id(card_id);
+                    if let Some(cn) = card_name_opt {
+                        let is_land = find_card(db, cn)
+                            .map(|def| def.card_types.contains(&CardType::Land))
+                            .unwrap_or(false);
+                        // Remove from top of library
+                        self.players[controller as usize].library.pop();
+                        if is_land {
+                            // Put it onto the battlefield (tapped, per the card text in the db)
+                            if let Some(def) = find_card(db, cn) {
+                                let mut perm = crate::permanent::Permanent::new(
+                                    card_id,
+                                    cn,
+                                    controller,
+                                    controller,
+                                    def.power,
+                                    def.toughness,
+                                    def.loyalty,
+                                    def.keywords,
+                                    def.card_types,
+                                );
+                                perm.colors = def.color_identity.to_vec();
+                                perm.tapped = true;
+                                self.battlefield.push(perm);
+                                self.handle_etb(cn, card_id, controller);
+                            }
+                        } else {
+                            // Put it into your hand
+                            self.players[controller as usize].hand.push(card_id);
+                        }
+                    }
+                }
+            }
+
             _ => {}
         }
         let _ = db; // suppress unused warning when db not used in all arms

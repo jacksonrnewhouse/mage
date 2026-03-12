@@ -41,6 +41,7 @@ mod saga;
 mod adventure;
 mod transform;
 mod initiative;
+mod nadu;
 
 pub(crate) fn setup_simple_game() -> (GameState, Vec<CardDef>) {
     let db = build_card_db();

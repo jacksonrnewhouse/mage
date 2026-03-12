@@ -371,6 +371,70 @@ impl GameState {
         }
     }
 
+    /// Check Nadu, Winged Wisdom targeting triggers.
+    /// Nadu grants all creatures you control: "Whenever this creature becomes the target
+    /// of a spell or ability, reveal the top card of your library. If it's a land card,
+    /// put it onto the battlefield. Otherwise, put it into your hand."
+    /// This ability triggers only twice per creature per turn.
+    ///
+    /// `targeted_creature_ids` is the set of creature ObjectIds being targeted.
+    pub(crate) fn check_nadu_targeting_triggers(&mut self, targeted_creature_ids: &[ObjectId]) {
+        // Find all Nadu permanents on the battlefield
+        let nadus: Vec<(ObjectId, PlayerId)> = self
+            .battlefield
+            .iter()
+            .filter(|p| p.card_name == CardName::NaduWingedWisdom)
+            .map(|p| (p.id, p.controller))
+            .collect();
+
+        if nadus.is_empty() {
+            return;
+        }
+
+        for &(nadu_id, nadu_controller) in &nadus {
+            for &creature_id in targeted_creature_ids {
+                // The creature must be controlled by Nadu's controller
+                let is_own_creature = self
+                    .battlefield
+                    .iter()
+                    .any(|p| p.id == creature_id && p.controller == nadu_controller && p.is_creature());
+                if !is_own_creature {
+                    continue;
+                }
+
+                // Check the twice-per-turn limit for this creature
+                let trigger_count = self
+                    .nadu_triggers_this_turn
+                    .iter()
+                    .find(|(id, _)| *id == creature_id)
+                    .map(|(_, count)| *count)
+                    .unwrap_or(0);
+
+                if trigger_count >= 2 {
+                    continue;
+                }
+
+                // Increment the trigger count
+                if let Some(entry) = self.nadu_triggers_this_turn.iter_mut().find(|(id, _)| *id == creature_id) {
+                    entry.1 += 1;
+                } else {
+                    self.nadu_triggers_this_turn.push((creature_id, 1));
+                }
+
+                // Push the trigger onto the stack
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: nadu_id,
+                        source_name: CardName::NaduWingedWisdom,
+                        effect: TriggeredEffect::NaduTrigger,
+                    },
+                    nadu_controller,
+                    vec![],
+                );
+            }
+        }
+    }
+
     /// Check Eidolon of the Great Revel triggered ability: whenever a player casts a spell
     /// with mana value 3 or less, Eidolon deals 2 damage to that player.
     /// Called after any spell is pushed to the stack.

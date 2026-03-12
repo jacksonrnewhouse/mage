@@ -179,6 +179,10 @@ pub enum TriggeredEffect {
     RoilingVortexFreeCast { target_player: PlayerId },
     /// Patchwork Automaton: whenever you cast an artifact spell, put a +1/+1 counter on it.
     PatchworkAutomatonCast { automaton_id: ObjectId },
+    /// Nadu, Winged Wisdom: whenever a creature you control becomes the target of a spell
+    /// or ability, reveal the top card of your library. If it's a land, put it onto the
+    /// battlefield. Otherwise, put it into your hand.
+    NaduTrigger,
 }
 
 /// Activated ability effects.

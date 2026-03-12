@@ -145,6 +145,12 @@ pub struct GameState {
     /// Examples: "at the beginning of the next end step, sacrifice this" (Sneak Attack evoke-like),
     ///           "at the beginning of your next upkeep, draw a card".
     pub delayed_triggers: Vec<DelayedTrigger>,
+
+    // --- Nadu trigger tracking ---
+    /// Tracks how many times each creature has triggered Nadu's ability this turn.
+    /// Each entry is (creature_id, trigger_count). The ability triggers only twice
+    /// per creature per turn.
+    pub nadu_triggers_this_turn: Vec<(ObjectId, u8)>,
 }
 
 /// When the game needs a player to make a choice (tutor, discard, etc.)
@@ -301,6 +307,7 @@ impl GameState {
             undercity_room: [0; 2],
             emblems: Vec::new(),
             delayed_triggers: Vec::new(),
+            nadu_triggers_this_turn: Vec::new(),
         }
     }
 
@@ -587,6 +594,7 @@ impl GameState {
         self.phase = Phase::Beginning;
         self.step = Some(Step::Untap);
         self.storm_count = 0;
+        self.nadu_triggers_this_turn.clear();
 
         let active = self.active_player as usize;
         self.players[active].reset_for_turn();

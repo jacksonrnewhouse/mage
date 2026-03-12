@@ -296,6 +296,23 @@ impl GameState {
                                     );
                                 }
                             }
+                            // Nadu, Winged Wisdom: check targeting triggers for creature targets
+                            if !permanent_targets.is_empty() {
+                                let creature_target_ids: Vec<ObjectId> = permanent_targets.iter()
+                                    .filter_map(|t| if let Target::Object(id) = t {
+                                        if self.find_permanent(*id).map(|p| p.is_creature()).unwrap_or(false) {
+                                            Some(*id)
+                                        } else {
+                                            None
+                                        }
+                                    } else {
+                                        None
+                                    })
+                                    .collect();
+                                if !creature_target_ids.is_empty() {
+                                    self.check_nadu_targeting_triggers(&creature_target_ids);
+                                }
+                            }
                             // Tezzeret, Cruel Captain emblem: "Whenever you cast an artifact spell,
                             // search your library for an artifact card, put it onto the battlefield."
                             if def.card_types.contains(&CardType::Artifact)
@@ -662,6 +679,24 @@ impl GameState {
         };
         let card_name = perm.card_name;
         let controller = perm.controller;
+
+        // Nadu, Winged Wisdom: check targeting triggers for creature targets of activated abilities.
+        {
+            let creature_target_ids: Vec<ObjectId> = targets.iter()
+                .filter_map(|t| if let Target::Object(id) = t {
+                    if self.find_permanent(*id).map(|p| p.is_creature()).unwrap_or(false) {
+                        Some(*id)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                })
+                .collect();
+            if !creature_target_ids.is_empty() {
+                self.check_nadu_targeting_triggers(&creature_target_ids);
+            }
+        }
 
         match card_name {
             CardName::BlackLotus => {
