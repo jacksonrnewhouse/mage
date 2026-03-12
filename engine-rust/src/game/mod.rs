@@ -1567,6 +1567,23 @@ impl GameState {
             }
         }
     }
+
+    /// City of Traitors: "When you play another land, sacrifice this land."
+    /// Called after a land enters the battlefield. Sacrifices any City of Traitors
+    /// controlled by the same player that is not the land just played.
+    pub fn check_city_of_traitors_sacrifice(&mut self, land_just_played: ObjectId, controller: PlayerId) {
+        let city_ids: Vec<ObjectId> = self.battlefield.iter()
+            .filter(|p| {
+                p.card_name == CardName::CityOfTraitors
+                    && p.controller == controller
+                    && p.id != land_just_played
+            })
+            .map(|p| p.id)
+            .collect();
+        for city_id in city_ids {
+            self.remove_permanent_to_zone(city_id, DestinationZone::Graveyard);
+        }
+    }
 }
 
 /// Placeholder card name for tokens (they don't have real card names).

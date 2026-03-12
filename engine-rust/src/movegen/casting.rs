@@ -43,6 +43,8 @@ impl GameState {
                             self.battlefield.push(perm);
                             self.apply_enters_tapped_statics(*card_id, player_id);
                             self.handle_etb(cn, *card_id, player_id);
+                            // City of Traitors: "When you play another land, sacrifice this land."
+                            self.check_city_of_traitors_sacrifice(*card_id, player_id);
                         }
                     }
                 }
@@ -77,6 +79,8 @@ impl GameState {
                             self.battlefield.push(perm);
                             self.apply_enters_tapped_statics(*card_id, player_id);
                             self.handle_etb(cn, *card_id, player_id);
+                            // City of Traitors: "When you play another land, sacrifice this land."
+                            self.check_city_of_traitors_sacrifice(*card_id, player_id);
                         }
                     }
                 }
