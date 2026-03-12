@@ -43,6 +43,8 @@ pub enum AltCost {
     Unmask { exile_id: ObjectId },
     /// Mindbreak Trap: free cast if an opponent cast 3+ spells this turn.
     MindbreakTrap,
+    /// Overload: pay the overload cost to change "target" to "each" in the spell's text.
+    Overload,
 }
 
 /// A game action that can be taken by the active/priority player.

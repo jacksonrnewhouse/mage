@@ -2285,6 +2285,16 @@ impl GameState {
                 // Free cast — no cost to pay (trap condition already verified).
                 true
             }
+            AltCost::Overload => {
+                // Pay the overload cost ({4}{R} for Vandalblast) from the mana pool.
+                // Tax effects are already accounted for during action generation.
+                let overload_cost = crate::mana::ManaCost { red: 1, generic: 4, ..crate::mana::ManaCost::ZERO };
+                if !self.players[player_id as usize].mana_pool.can_pay(&overload_cost) {
+                    return false;
+                }
+                self.players[player_id as usize].mana_pool.pay(&overload_cost);
+                true
+            }
         }
     }
 

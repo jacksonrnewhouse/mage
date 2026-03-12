@@ -1160,9 +1160,25 @@ impl GameState {
                 }
             }
 
+            CardName::Vandalblast => {
+                if targets.is_empty() {
+                    // Overloaded: destroy each artifact opponents control
+                    let opponent = self.opponent(controller);
+                    let to_destroy: Vec<ObjectId> = self.battlefield.iter()
+                        .filter(|p| p.controller == opponent && p.is_artifact())
+                        .map(|p| p.id)
+                        .collect();
+                    for id in to_destroy {
+                        self.destroy_permanent(id);
+                    }
+                } else if let Some(Target::Object(target_id)) = targets.first() {
+                    // Single target: destroy target artifact you don't control
+                    self.destroy_permanent(*target_id);
+                }
+            }
+
             CardName::Disenchant | CardName::NaturesClaim | CardName::Fragmentize
             | CardName::AbruptDecay | CardName::AncientGrudge | CardName::ShatteringSpree
-            | CardName::Vandalblast
             | CardName::MoltenCollapse | CardName::FatalPush
             | CardName::BitterTriumph | CardName::SnuffOut
             | CardName::UntimelyMalfunction | CardName::Crash | CardName::CouncilsJudgment

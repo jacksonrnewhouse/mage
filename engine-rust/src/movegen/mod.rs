@@ -2717,12 +2717,21 @@ impl GameState {
 
             // Target artifact or enchantment
             CardName::Disenchant | CardName::NaturesClaim
-            | CardName::AncientGrudge | CardName::ShatteringSpree | CardName::Vandalblast
+            | CardName::AncientGrudge | CardName::ShatteringSpree
             | CardName::UntimelyMalfunction | CardName::Crash
             | CardName::SunderingEruption => {
                 self.battlefield
                     .iter()
                     .filter(|p| p.is_artifact() || p.is_enchantment())
+                    .map(|p| vec![Target::Object(p.id)])
+                    .collect()
+            }
+
+            // Vandalblast: target artifact you don't control
+            CardName::Vandalblast => {
+                self.battlefield
+                    .iter()
+                    .filter(|p| p.is_artifact() && p.controller != controller)
                     .map(|p| vec![Target::Object(p.id)])
                     .collect()
             }
@@ -3504,6 +3513,28 @@ impl GameState {
                                 alt_cost: Some(AltCost::MindbreakTrap),
                                 modes: vec![],
                             });
+                        }
+                    }
+                }
+
+                // --- Vandalblast overload: pay {4}{R} to destroy all artifacts opponents control ---
+                CardName::Vandalblast => {
+                    if sorcery_speed {
+                        if let Some(def) = find_card(db, card_name) {
+                            let overload_cost = crate::mana::ManaCost { red: 1, generic: 4, ..crate::mana::ManaCost::ZERO };
+                            let effective_overload = self.effective_cost_with_base(def, player_id, overload_cost);
+                            if player.mana_pool.can_pay(&effective_overload) {
+                                // Overload has no targets (it affects "each" instead of "target")
+                                actions.push(Action::CastSpell {
+                                    card_id,
+                                    targets: vec![],
+                                    x_value: 0,
+                                    from_graveyard: false,
+                                    from_library_top: false,
+                                    alt_cost: Some(AltCost::Overload),
+                                    modes: vec![],
+                                });
+                            }
                         }
                     }
                 }
