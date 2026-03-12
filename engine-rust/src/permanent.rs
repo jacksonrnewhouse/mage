@@ -167,6 +167,11 @@ impl Permanent {
                         return true;
                     }
                 }
+                Protection::FromMulticolored => {
+                    if source_colors.len() >= 2 {
+                        return true;
+                    }
+                }
             }
         }
         false

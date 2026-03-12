@@ -90,6 +90,9 @@ pub enum Protection {
     FromColor(Color),
     /// Protection from a specific player (e.g., True-Name Nemesis).
     FromPlayer(PlayerId),
+    /// Protection from multicolored (e.g., Stonecoil Serpent, Argentum Masticore).
+    /// Prevents damage/targeting/blocking from sources with 2+ colors.
+    FromMulticolored,
 }
 
 /// Keyword abilities that affect game rules directly.

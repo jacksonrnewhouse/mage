@@ -2000,8 +2000,11 @@ impl GameState {
                     );
                 }
             }
-            // Argentum Masticore: upkeep trigger — sacrifice unless you discard a card
+            // Argentum Masticore: protection from multicolored + upkeep trigger
             CardName::ArgentumMasticore => {
+                if let Some(perm) = self.find_permanent_mut(_card_id) {
+                    perm.protections.push(Protection::FromMulticolored);
+                }
                 self.add_delayed_trigger(crate::types::DelayedTrigger {
                     condition: crate::types::DelayedTriggerCondition::AtBeginningOfUpkeep {
                         player: controller,
@@ -2237,11 +2240,13 @@ impl GameState {
             }
 
             // Stonecoil Serpent: enters with X +1/+1 counters (X chosen when cast, {X} cost)
+            // Also has protection from multicolored (static ability set on ETB).
             CardName::StonecoilSerpent => {
-                if x_value > 0 {
-                    if let Some(perm) = self.find_permanent_mut(_card_id) {
+                if let Some(perm) = self.find_permanent_mut(_card_id) {
+                    if x_value > 0 {
                         perm.counters.add(CounterType::PlusOnePlusOne, x_value as i16);
                     }
+                    perm.protections.push(Protection::FromMulticolored);
                 }
             }
 
