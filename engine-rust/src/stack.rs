@@ -161,6 +161,8 @@ pub enum TriggeredEffect {
     /// Oko -5: exchange control of target artifact/creature you control and target creature
     /// opponent controls with power 3 or less.
     OkoExchange,
+    /// Chalice of the Void: whenever a player casts a spell with mana value equal to charge counters, counter it.
+    ChaliceCounter { spell_id: ObjectId },
 }
 
 /// Activated ability effects.

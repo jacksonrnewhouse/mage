@@ -78,6 +78,12 @@ impl GameState {
         let is_active = player_id == self.active_player;
         let sorcery_speed = is_main_phase && stack_empty && is_active;
 
+        // Teferi, Time Raveler: opponents can only cast spells at sorcery speed.
+        // If an opponent controls Teferi, this player loses the ability to cast at instant speed.
+        let teferi_restricts = self.battlefield.iter().any(|p| {
+            p.card_name == CardName::TeferiTimeRaveler && p.controller != player_id
+        });
+
         // --- Play a land (sorcery speed, one per turn) ---
         if sorcery_speed && player.land_plays_remaining > 0 {
             for &card_id in &player.hand {
@@ -103,7 +109,10 @@ impl GameState {
                     // Check timing
                     let can_cast_at_instant_speed = def.card_types.contains(&CardType::Instant)
                         || def.keywords.has(Keyword::Flash);
-                    let can_cast = if can_cast_at_instant_speed {
+                    let can_cast = if teferi_restricts {
+                        // Teferi, Time Raveler: opponent can only cast at sorcery speed
+                        sorcery_speed
+                    } else if can_cast_at_instant_speed {
                         true // Can cast instants anytime with priority
                     } else {
                         sorcery_speed
@@ -311,7 +320,9 @@ impl GameState {
                         // Check timing (flashback follows same timing as original spell type)
                         let can_cast_at_instant_speed = def.card_types.contains(&CardType::Instant)
                             || def.keywords.has(Keyword::Flash);
-                        let can_cast = if can_cast_at_instant_speed {
+                        let can_cast = if teferi_restricts {
+                            sorcery_speed
+                        } else if can_cast_at_instant_speed {
                             true
                         } else {
                             sorcery_speed
@@ -458,7 +469,11 @@ impl GameState {
                                 // Timing check
                                 let can_cast_instant = top_def.card_types.contains(&CardType::Instant)
                                     || top_def.keywords.has(Keyword::Flash);
-                                let can_cast = can_cast_instant || sorcery_speed;
+                                let can_cast = if teferi_restricts {
+                                    sorcery_speed
+                                } else {
+                                    can_cast_instant || sorcery_speed
+                                };
 
                                 if can_cast {
                                     // Which enablers allow casting this card?
@@ -539,7 +554,7 @@ impl GameState {
         // --- Alternate-cost spells ---
         // Generate CastSpell actions for cards that can be cast by paying an alternate cost
         // instead of their normal mana cost (Force cycle, evoke creatures, etc.).
-        self.generate_alt_cost_actions(player_id, db, &mut actions, sorcery_speed);
+        self.generate_alt_cost_actions(player_id, db, &mut actions, sorcery_speed, teferi_restricts);
 
         // --- Activate mana abilities (tap lands/moxen for mana) ---
         let artifact_lockdown = self.battlefield.iter().any(|p| {
@@ -598,7 +613,9 @@ impl GameState {
                     if let Some(ref adv) = def.adventure {
                         // Check timing: adventure instants can be cast anytime, sorceries at sorcery speed
                         let adv_is_instant = adv.card_types.contains(&CardType::Instant);
-                        let can_cast_adv = if adv_is_instant { true } else { sorcery_speed };
+                        let can_cast_adv = if teferi_restricts {
+                            sorcery_speed
+                        } else if adv_is_instant { true } else { sorcery_speed };
                         if !can_cast_adv {
                             continue;
                         }
@@ -638,7 +655,11 @@ impl GameState {
                 if let Some(def) = find_card(db, card_name) {
                     // Creatures can only be cast at sorcery speed (unless flash)
                     let has_flash = def.keywords.has(Keyword::Flash);
-                    let can_cast = has_flash || sorcery_speed;
+                    let can_cast = if teferi_restricts {
+                        sorcery_speed
+                    } else {
+                        has_flash || sorcery_speed
+                    };
                     if !can_cast {
                         continue;
                     }
@@ -2248,6 +2269,7 @@ impl GameState {
         db: &[CardDef],
         actions: &mut Vec<Action>,
         sorcery_speed: bool,
+        teferi_restricts: bool,
     ) {
         let player = &self.players[player_id as usize];
         let is_opponent_turn = player_id != self.active_player;
@@ -2257,6 +2279,19 @@ impl GameState {
                 Some(cn) => cn,
                 None => continue,
             };
+
+            // Teferi, Time Raveler: opponent can only cast at sorcery speed.
+            // For alt-cost spells that are instants (Force of Will, Force of Negation),
+            // check if they can be cast given the Teferi restriction.
+            if teferi_restricts {
+                if let Some(def) = find_card(db, card_name) {
+                    let is_instant_speed = def.card_types.contains(&CardType::Instant)
+                        || def.keywords.has(Keyword::Flash);
+                    if is_instant_speed && !sorcery_speed {
+                        continue;
+                    }
+                }
+            }
 
             match card_name {
                 // --- Force of Will: exile blue card + pay 1 life, instant speed, stack must be non-empty ---

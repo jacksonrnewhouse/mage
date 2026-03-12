@@ -193,6 +193,8 @@ impl GameState {
                             // Check Lavinia / Boromir: counter free spells cast by opponents.
                             let mana_was_spent = alt_cost.is_none() && !(*from_library_top && self.battlefield.iter().any(|p| p.card_name == CardName::BolassCitadel && p.controller == player_id));
                             self.check_lavinia_trigger(player_id, spell_id, mana_was_spent);
+                            // Chalice of the Void: counter spells with MV equal to charge counters.
+                            self.check_chalice_trigger(spell_id, def.mana_cost.cmc());
                             self.players[player_id as usize].spells_cast_this_turn += 1;
                             if !def.card_types.contains(&CardType::Artifact) {
                                 self.players[player_id as usize].nonartifact_spells_cast_this_turn += 1;
@@ -378,6 +380,14 @@ impl GameState {
                                 true,   // cast_as_adventure
                                 vec![], // modes
                             );
+                            // Chalice of the Void: check adventure's mana cost.
+                            // The mana value of an adventure spell on the stack is the adventure's cost.
+                            // However, the spell_id wasn't captured from push_with_all_flags above.
+                            // We need to get it. Let's find the top of the stack.
+                            if let Some(top_item) = self.stack.top() {
+                                let adventure_spell_id = top_item.id;
+                                self.check_chalice_trigger(adventure_spell_id, adv.cost.cmc());
+                            }
                             self.players[player_id as usize].spells_cast_this_turn += 1;
                             self.players[player_id as usize].nonartifact_spells_cast_this_turn += 1;
                             self.players[player_id as usize].noncreature_spells_cast_this_turn += 1;
@@ -411,7 +421,7 @@ impl GameState {
                             self.adventure_exiled.swap_remove(p);
                         }
                         // Push the creature spell onto the stack normally
-                        self.stack.push(
+                        let spell_id = self.stack.push(
                             StackItemKind::Spell {
                                 card_name: cn,
                                 card_id: *card_id,
@@ -420,6 +430,8 @@ impl GameState {
                             player_id,
                             vec![],
                         );
+                        // Chalice of the Void: counter spells with MV equal to charge counters.
+                        self.check_chalice_trigger(spell_id, def.mana_cost.cmc());
                         self.players[player_id as usize].spells_cast_this_turn += 1;
                         if !def.card_types.contains(&CardType::Artifact) {
                             self.players[player_id as usize].nonartifact_spells_cast_this_turn += 1;

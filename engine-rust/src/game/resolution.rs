@@ -1645,6 +1645,16 @@ impl GameState {
         _controller: PlayerId,
         targets: &[Target],
     ) {
+        // Torpor Orb: creatures entering the battlefield don't cause abilities to trigger.
+        let torpor_orb_active = self.battlefield.iter().any(|p| p.card_name == CardName::TorporOrb);
+        if torpor_orb_active {
+            let is_creature = self.find_permanent(_card_id)
+                .map(|p| p.is_creature())
+                .unwrap_or(false);
+            if is_creature {
+                return;
+            }
+        }
         match card_name {
             CardName::SnapcasterMage => {
                 // targets[0] is the graveyard card that gains flashback until end of turn.
@@ -1657,6 +1667,32 @@ impl GameState {
     }
 
     pub(crate) fn handle_etb_with_x(&mut self, card_name: CardName, _card_id: ObjectId, controller: PlayerId, x_value: u8) {
+        // Torpor Orb: creatures entering the battlefield don't cause abilities to trigger.
+        let torpor_orb_active = self.battlefield.iter().any(|p| p.card_name == CardName::TorporOrb);
+        if torpor_orb_active {
+            let is_creature = self.find_permanent(_card_id)
+                .map(|p| p.is_creature())
+                .unwrap_or(false);
+            if is_creature {
+                // Still handle non-trigger ETB effects (counters from X spells like Chalice, Walking Ballista, etc.)
+                // These are replacement effects, not triggered abilities.
+                match card_name {
+                    CardName::ChaliceOfTheVoid => {
+                        // Chalice is not a creature, so this won't actually fire here.
+                        // But keep the pattern for future X-cost creatures.
+                    }
+                    CardName::WalkingBallista | CardName::StonecoilSerpent => {
+                        if x_value > 0 {
+                            if let Some(perm) = self.find_permanent_mut(_card_id) {
+                                perm.counters.add(CounterType::PlusOnePlusOne, x_value as i16);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+                return;
+            }
+        }
         match card_name {
             // Orcish Bowmasters: amass 1 and deal 1
             CardName::OrcishBowmasters => {
@@ -3014,6 +3050,26 @@ impl GameState {
                 // Counter the spell (if it's still on the stack)
                 if let Some(item) = self.stack.remove(spell_id) {
                     self.route_countered_spell(item);
+                }
+            }
+
+            TriggeredEffect::ChaliceCounter { spell_id } => {
+                // Counter the spell (if it's still on the stack and can be countered)
+                if let Some(item) = self.stack.remove(spell_id) {
+                    if !item.cant_be_countered {
+                        self.route_countered_spell(item);
+                    } else {
+                        // Put it back — can't be countered
+                        self.stack.push_with_flags(
+                            item.kind,
+                            item.controller,
+                            item.targets,
+                            item.cant_be_countered,
+                            item.x_value,
+                            item.cast_from_graveyard,
+                            item.modes,
+                        );
+                    }
                 }
             }
 

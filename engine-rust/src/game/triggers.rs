@@ -264,6 +264,32 @@ impl GameState {
         }
     }
 
+    /// Check Chalice of the Void triggered ability: whenever a player casts a spell,
+    /// if its mana value equals the number of charge counters on Chalice, counter that spell.
+    /// Called after any spell is pushed to the stack.
+    pub(crate) fn check_chalice_trigger(&mut self, spell_id: ObjectId, spell_cmc: u8) {
+        let chalice_triggers: Vec<(ObjectId, PlayerId)> = self
+            .battlefield
+            .iter()
+            .filter(|p| {
+                p.card_name == CardName::ChaliceOfTheVoid
+                    && p.counters.get(crate::types::CounterType::Charge) == spell_cmc as i16
+            })
+            .map(|p| (p.id, p.controller))
+            .collect();
+        for (source_id, controller) in chalice_triggers {
+            self.stack.push(
+                StackItemKind::TriggeredAbility {
+                    source_id,
+                    source_name: CardName::ChaliceOfTheVoid,
+                    effect: TriggeredEffect::ChaliceCounter { spell_id },
+                },
+                controller,
+                vec![Target::Object(spell_id)],
+            );
+        }
+    }
+
     /// Check Lavinia's and Boromir's triggered abilities: whenever an opponent casts a spell,
     /// if no mana was spent to cast it, counter that spell.
     /// Called after any spell is pushed to the stack.
