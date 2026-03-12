@@ -41,6 +41,8 @@ pub enum AltCost {
     /// Unmask: exile a black card from hand rather than pay mana cost.
     /// `exile_id` is the ObjectId of the black card being exiled from hand.
     Unmask { exile_id: ObjectId },
+    /// Mindbreak Trap: free cast if an opponent cast 3+ spells this turn.
+    MindbreakTrap,
 }
 
 /// A game action that can be taken by the active/priority player.

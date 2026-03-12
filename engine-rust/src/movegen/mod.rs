@@ -2630,12 +2630,34 @@ impl GameState {
             CardName::Counterspell | CardName::ManaDrain | CardName::MentalMisstep
             | CardName::ForceOfWill | CardName::ForceOfNegation | CardName::Flusterstorm
             | CardName::Daze | CardName::ManaLeak | CardName::MemoryLapse | CardName::Remand
-            | CardName::SpellPierce | CardName::MysticalDispute | CardName::MindbreakTrap => {
+            | CardName::SpellPierce | CardName::MysticalDispute => {
                 self.stack
                     .items()
                     .iter()
                     .map(|item| vec![Target::Object(item.id)])
                     .collect()
+            }
+
+            // Mindbreak Trap: exile any number of target spells (all non-empty subsets)
+            CardName::MindbreakTrap => {
+                let spell_ids: Vec<ObjectId> = self.stack
+                    .items()
+                    .iter()
+                    .map(|item| item.id)
+                    .collect();
+                let n = spell_ids.len();
+                let mut target_sets = Vec::new();
+                // Enumerate all non-empty subsets (2^n - 1 combinations)
+                for mask in 1..(1u32 << n) {
+                    let mut targets = Vec::new();
+                    for i in 0..n {
+                        if mask & (1 << i) != 0 {
+                            targets.push(Target::Object(spell_ids[i]));
+                        }
+                    }
+                    target_sets.push(targets);
+                }
+                target_sets
             }
 
             // Target artifact or enchantment spell on stack
@@ -3432,6 +3454,25 @@ impl GameState {
                             alt_cost: Some(AltCost::OnceUponATime),
                             modes: vec![],
                         });
+                    }
+                }
+
+                // --- Mindbreak Trap: free if an opponent cast 3+ spells this turn ---
+                CardName::MindbreakTrap => {
+                    let opponent_id = 1 - player_id;
+                    if self.players[opponent_id as usize].spells_cast_this_turn >= 3 {
+                        let target_sets = self.generate_targets(card_name, player_id, db);
+                        for targets in &target_sets {
+                            actions.push(Action::CastSpell {
+                                card_id,
+                                targets: targets.clone(),
+                                x_value: 0,
+                                from_graveyard: false,
+                                from_library_top: false,
+                                alt_cost: Some(AltCost::MindbreakTrap),
+                                modes: vec![],
+                            });
+                        }
                     }
                 }
 

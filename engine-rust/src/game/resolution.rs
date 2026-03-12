@@ -208,11 +208,13 @@ impl GameState {
                 }
             }
             CardName::MindbreakTrap => {
-                // Exile target spell from the stack (not counter — bypasses "can't be countered")
-                if let Some(Target::Object(spell_id)) = targets.first() {
-                    if let Some(item) = self.stack.remove(*spell_id) {
-                        if let crate::stack::StackItemKind::Spell { card_id, card_name, .. } = item.kind {
-                            self.exile.push((card_id, card_name, item.controller));
+                // Exile any number of target spells from the stack (not counter — bypasses "can't be countered")
+                for target in targets.iter() {
+                    if let Target::Object(spell_id) = target {
+                        if let Some(item) = self.stack.remove(*spell_id) {
+                            if let crate::stack::StackItemKind::Spell { card_id, card_name, .. } = item.kind {
+                                self.exile.push((card_id, card_name, item.controller));
+                            }
                         }
                     }
                 }

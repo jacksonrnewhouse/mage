@@ -2243,6 +2243,10 @@ impl GameState {
                 self.exile.push((*exile_id, exile_name, player_id));
                 true
             }
+            AltCost::MindbreakTrap => {
+                // Free cast — no cost to pay (trap condition already verified).
+                true
+            }
         }
     }
 
