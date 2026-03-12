@@ -1915,7 +1915,9 @@ impl GameState {
                 }
                 CardName::DackFayden => {
                     // +1: Target player draws 2, discards 2
-                    abilities.push((0, vec![Target::Player(perm.controller)]));
+                    for pid in 0..self.players.len() {
+                        abilities.push((0, vec![Target::Player(pid as u8)]));
+                    }
                     // -2: Steal artifact
                     if perm.loyalty >= 2 {
                         for target in &self.battlefield {
