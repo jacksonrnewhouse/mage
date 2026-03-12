@@ -42,6 +42,7 @@ mod adventure;
 mod transform;
 mod initiative;
 mod nadu;
+mod colorless_abilities;
 
 pub(crate) fn setup_simple_game() -> (GameState, Vec<CardDef>) {
     let db = build_card_db();

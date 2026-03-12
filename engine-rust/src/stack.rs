@@ -192,6 +192,16 @@ pub enum TriggeredEffect {
     KappaCannoneerTrigger { cannoneer_id: ObjectId },
     /// Emry ETB: mill four cards.
     EmryETB,
+    /// Chromatic Star: when put into graveyard from the battlefield, draw a card.
+    ChromaticStarDeath,
+    /// Scrap Trawler: when this or another artifact dies, return a lesser-MV artifact from graveyard.
+    ScrapTrawlerDeath,
+    /// The Mightstone and Weakstone ETB: choose draw 2 or -5/-5.
+    MightstoneWeakstoneETB { permanent_id: ObjectId },
+    /// Golos ETB: search library for a land card and put it onto the battlefield tapped.
+    GolosETB,
+    /// Soul-Guide Lantern ETB: exile target card from a graveyard.
+    SoulGuideLanternETB,
 }
 
 /// Activated ability effects.
@@ -319,6 +329,14 @@ pub enum ActivatedEffect {
     AetherSpellbombDraw,
     /// Cryogen Relic: {1}{U}, Sacrifice: Put a stun counter on target tapped creature.
     CryogenRelicStun,
+    /// Tormod's Crypt: {T}, Sacrifice: Exile target player's graveyard.
+    TormodsCryptExile,
+    /// Soul-Guide Lantern: {T}, Sacrifice: Exile each opponent's graveyard.
+    SoulGuideLanternExile,
+    /// Soul-Guide Lantern: {1}, {T}, Sacrifice: Draw a card.
+    SoulGuideLanternDraw,
+    /// Manifold Key: {3}, {T}: Target creature can't be blocked this turn.
+    ManifoldKeyUnblockable,
 }
 
 /// The game stack.

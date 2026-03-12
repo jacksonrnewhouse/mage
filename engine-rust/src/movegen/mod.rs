@@ -1307,11 +1307,19 @@ impl GameState {
                 }
             }
 
-            // Chromatic Star: any color
-            CardName::ChromaticStar => vec![
-                Some(Color::White), Some(Color::Blue), Some(Color::Black),
-                Some(Color::Red), Some(Color::Green),
-            ],
+            // Chromatic Star: {1}, {T}, Sacrifice: Add one mana of any color.
+            // Requires {1} additional mana to activate.
+            CardName::ChromaticStar => {
+                let player = &self.players[perm.controller as usize];
+                if player.mana_pool.total() >= 1 {
+                    vec![
+                        Some(Color::White), Some(Color::Blue), Some(Color::Black),
+                        Some(Color::Red), Some(Color::Green),
+                    ]
+                } else {
+                    vec![]
+                }
+            }
 
             // Delighted Halfling: colorless, or any color for legendaries (simplified as any)
             CardName::DelightedHalfling => vec![
@@ -1448,11 +1456,27 @@ impl GameState {
             | CardName::Gleemox
             | CardName::ChromeMox
             | CardName::MoxDiamond
-            | CardName::ChromaticStar
             | CardName::DelightedHalfling => {
                 if let Some(perm) = self.find_permanent_mut(permanent_id) {
                     perm.tapped = true;
                 }
+                self.players[controller as usize]
+                    .mana_pool
+                    .add(color_choice, 1);
+                true
+            }
+
+            // Chromatic Star: {1}, {T}, Sacrifice: Add one mana of any color.
+            // The death trigger (draw a card) fires via check_dies_triggers.
+            CardName::ChromaticStar => {
+                // Pay {1}
+                let cost = crate::mana::ManaCost::generic(1);
+                if !self.players[controller as usize].mana_pool.pay(&cost) {
+                    return false;
+                }
+                // Sacrifice (destroys the permanent, sends to graveyard, triggers dies triggers)
+                self.destroy_permanent(permanent_id);
+                // Add one mana of chosen color
                 self.players[controller as usize]
                     .mana_pool
                     .add(color_choice, 1);
@@ -1887,6 +1911,40 @@ impl GameState {
                 for target in &self.battlefield {
                     if target.is_creature() && target.tapped {
                         abilities.push((0, vec![Target::Object(target.id)]));
+                    }
+                }
+            }
+        }
+
+        // Tormod's Crypt: {T}, Sacrifice: Exile target player's graveyard. (ability_index 0)
+        if perm.card_name == CardName::TormodsCrypt {
+            for pid in 0..self.players.len() {
+                if !self.players[pid].graveyard.is_empty() {
+                    abilities.push((0, vec![Target::Player(pid as PlayerId)]));
+                }
+            }
+        }
+
+        // Soul-Guide Lantern ability 0: {T}, Sacrifice: Exile each opponent's graveyard.
+        if perm.card_name == CardName::SoulGuideLantern {
+            let opp = self.opponent(perm.controller);
+            if !self.players[opp as usize].graveyard.is_empty() {
+                abilities.push((0, vec![]));
+            }
+            // Soul-Guide Lantern ability 1: {1}, {T}, Sacrifice: Draw a card.
+            let player = &self.players[perm.controller as usize];
+            if player.mana_pool.total() >= 1 {
+                abilities.push((1, vec![]));
+            }
+        }
+
+        // Manifold Key ability 1: {3}, {T}: Target creature can't be blocked this turn.
+        if perm.card_name == CardName::ManifoldKey && !perm.tapped {
+            let player = &self.players[perm.controller as usize];
+            if player.mana_pool.total() >= 3 {
+                for target in &self.battlefield {
+                    if target.is_creature() && target.controller == perm.controller {
+                        abilities.push((1, vec![Target::Object(target.id)]));
                     }
                 }
             }

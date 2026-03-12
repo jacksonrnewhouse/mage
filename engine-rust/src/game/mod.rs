@@ -276,6 +276,8 @@ pub enum ChoiceReason {
         card_id: ObjectId,
         madness_cost: crate::mana::ManaCost,
     },
+    /// Golos ETB: search library for a land card to put onto the battlefield tapped.
+    GolosETBSearch,
 }
 impl GameState {
     /// Create a new two-player game.

@@ -62,10 +62,78 @@ impl GameState {
                     );
                 }
             }
+            CardName::ChromaticStar => {
+                // When Chromatic Star is put into a graveyard from the battlefield, draw a card.
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: died_id,
+                        source_name: died_name,
+                        effect: TriggeredEffect::ChromaticStarDeath,
+                    },
+                    controller,
+                    vec![],
+                );
+            }
             _ => {}
         }
 
         // --- Triggers on other permanents that care about things dying ---
+
+        // Scrap Trawler: when this or another artifact dies, return a lesser-MV artifact from graveyard.
+        if is_artifact {
+            let scrap_trawlers: Vec<(ObjectId, PlayerId)> = self.battlefield.iter()
+                .filter(|p| p.card_name == CardName::ScrapTrawler && p.controller == controller)
+                .map(|p| (p.id, p.controller))
+                .collect();
+
+            // Also check if the dying permanent itself is Scrap Trawler (it triggers on its own death too)
+            let died_is_scrap_trawler = died_name == CardName::ScrapTrawler;
+
+            let trawler_sources: Vec<(ObjectId, PlayerId)> = if died_is_scrap_trawler {
+                // Scrap Trawler itself dying — it triggers from the graveyard
+                vec![(died_id, controller)]
+            } else {
+                scrap_trawlers
+            };
+
+            for (source_id, trawler_controller) in trawler_sources {
+                // Find the MV of the dying artifact
+                let db = crate::card::build_card_db();
+                let dying_mv = self.card_name_for_id(died_id)
+                    .and_then(|cn| find_card(&db, cn))
+                    .map(|def| def.mana_cost.cmc())
+                    .unwrap_or(0);
+
+                // Find artifacts in graveyard with lesser MV
+                let pid = trawler_controller as usize;
+                let valid_targets: Vec<ObjectId> = self.players[pid].graveyard.iter()
+                    .filter(|&&id| {
+                        if id == died_id { return false; }
+                        let is_valid = self.card_name_for_id(id)
+                            .and_then(|cn| find_card(&db, cn))
+                            .map(|def| {
+                                def.card_types.contains(&CardType::Artifact) && def.mana_cost.cmc() < dying_mv
+                            })
+                            .unwrap_or(false);
+                        is_valid
+                    })
+                    .copied()
+                    .collect();
+
+                if let Some(&target_id) = valid_targets.first() {
+                    self.stack.push(
+                        StackItemKind::TriggeredAbility {
+                            source_id,
+                            source_name: CardName::ScrapTrawler,
+                            effect: TriggeredEffect::ScrapTrawlerDeath,
+                        },
+                        trawler_controller,
+                        vec![Target::Object(target_id)],
+                    );
+                }
+            }
+        }
+
         // Skullclamp: when equipped creature dies, draw 2
         let skullclamp_controllers: Vec<PlayerId> = self.battlefield.iter()
             .filter(|p| p.card_name == CardName::SkullClamp)

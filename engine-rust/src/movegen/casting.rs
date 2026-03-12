@@ -1651,6 +1651,76 @@ impl GameState {
                 self.reset_priority_passes();
             }
 
+            // Tormod's Crypt: {T}, Sacrifice: Exile target player's graveyard. (ability_index 0)
+            CardName::TormodsCrypt if ability_index == 0 => {
+                self.destroy_permanent(permanent_id);
+                self.stack.push(
+                    StackItemKind::ActivatedAbility {
+                        source_id: permanent_id,
+                        source_name: card_name,
+                        effect: ActivatedEffect::TormodsCryptExile,
+                    },
+                    controller,
+                    targets.to_vec(),
+                );
+                self.reset_priority_passes();
+            }
+
+            // Soul-Guide Lantern ability 0: {T}, Sacrifice: Exile each opponent's graveyard.
+            CardName::SoulGuideLantern if ability_index == 0 => {
+                self.destroy_permanent(permanent_id);
+                self.stack.push(
+                    StackItemKind::ActivatedAbility {
+                        source_id: permanent_id,
+                        source_name: card_name,
+                        effect: ActivatedEffect::SoulGuideLanternExile,
+                    },
+                    controller,
+                    vec![],
+                );
+                self.reset_priority_passes();
+            }
+
+            // Soul-Guide Lantern ability 1: {1}, {T}, Sacrifice: Draw a card.
+            CardName::SoulGuideLantern if ability_index == 1 => {
+                let cost = crate::mana::ManaCost::generic(1);
+                if !self.players[controller as usize].mana_pool.pay(&cost) {
+                    return;
+                }
+                self.destroy_permanent(permanent_id);
+                self.stack.push(
+                    StackItemKind::ActivatedAbility {
+                        source_id: permanent_id,
+                        source_name: card_name,
+                        effect: ActivatedEffect::SoulGuideLanternDraw,
+                    },
+                    controller,
+                    vec![],
+                );
+                self.reset_priority_passes();
+            }
+
+            // Manifold Key ability 1: {3}, {T}: Target creature can't be blocked this turn.
+            CardName::ManifoldKey if ability_index == 1 => {
+                let cost = crate::mana::ManaCost::generic(3);
+                if !self.players[controller as usize].mana_pool.pay(&cost) {
+                    return;
+                }
+                if let Some(perm_mut) = self.find_permanent_mut(permanent_id) {
+                    perm_mut.tapped = true;
+                }
+                self.stack.push(
+                    StackItemKind::ActivatedAbility {
+                        source_id: permanent_id,
+                        source_name: card_name,
+                        effect: ActivatedEffect::ManifoldKeyUnblockable,
+                    },
+                    controller,
+                    targets.to_vec(),
+                );
+                self.reset_priority_passes();
+            }
+
             // Engineered Explosives: {2}, Sacrifice: Destroy each nonland permanent with MV equal to charge counters (ability_index 0)
             CardName::EngineeredExplosives if ability_index == 0 => {
                 let cost = crate::mana::ManaCost::generic(2);

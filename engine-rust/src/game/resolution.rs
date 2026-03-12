@@ -2049,6 +2049,74 @@ impl GameState {
                     fires_once: false,
                 });
             }
+            // The Mightstone and Weakstone: ETB modal (draw 2 or -5/-5)
+            CardName::TheMightstoneAndWeakstone => {
+                // Mode 0: draw 2 cards (no target needed)
+                // Mode 1: target creature gets -5/-5 until end of turn
+                // Check if any opponent creature exists for mode 1
+                let opp = self.opponent(controller);
+                let enemy_creatures: Vec<ObjectId> = self.battlefield.iter()
+                    .filter(|p| p.is_creature() && p.controller == opp)
+                    .map(|p| p.id)
+                    .collect();
+                if let Some(&target_id) = enemy_creatures.first() {
+                    // Push with target for -5/-5 mode (AI can choose)
+                    self.stack.push(
+                        StackItemKind::TriggeredAbility {
+                            source_id: _card_id,
+                            source_name: card_name,
+                            effect: TriggeredEffect::MightstoneWeakstoneETB { permanent_id: _card_id },
+                        },
+                        controller,
+                        vec![Target::Object(target_id)],
+                    );
+                } else {
+                    // No valid creature target — just draw 2
+                    self.stack.push(
+                        StackItemKind::TriggeredAbility {
+                            source_id: _card_id,
+                            source_name: card_name,
+                            effect: TriggeredEffect::MightstoneWeakstoneETB { permanent_id: _card_id },
+                        },
+                        controller,
+                        vec![],
+                    );
+                }
+            }
+            // Golos, Tireless Pilgrim: ETB search for a land
+            CardName::GolosTirelessPilgrim => {
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: _card_id,
+                        source_name: card_name,
+                        effect: TriggeredEffect::GolosETB,
+                    },
+                    controller,
+                    vec![],
+                );
+            }
+            // Soul-Guide Lantern: ETB exile target card from a graveyard
+            CardName::SoulGuideLantern => {
+                // Find a card in any graveyard to target
+                let mut target_card: Option<(ObjectId, PlayerId)> = None;
+                for pid in 0..self.players.len() {
+                    if let Some(&card_id) = self.players[pid].graveyard.last() {
+                        target_card = Some((card_id, pid as PlayerId));
+                        break;
+                    }
+                }
+                if let Some((card_id, _)) = target_card {
+                    self.stack.push(
+                        StackItemKind::TriggeredAbility {
+                            source_id: _card_id,
+                            source_name: card_name,
+                            effect: TriggeredEffect::SoulGuideLanternETB,
+                        },
+                        controller,
+                        vec![Target::Object(card_id)],
+                    );
+                }
+            }
             // Coveted Jewel: draw 3 cards on ETB
             CardName::CovetedJewel => {
                 self.stack.push(
@@ -3686,6 +3754,81 @@ impl GameState {
                 }
             }
 
+            TriggeredEffect::ChromaticStarDeath => {
+                // Chromatic Star: when put into graveyard from the battlefield, draw a card.
+                self.draw_cards(controller, 1);
+            }
+
+            TriggeredEffect::ScrapTrawlerDeath => {
+                // Scrap Trawler: return target artifact card in graveyard with lesser MV to hand.
+                // targets[0] should be the artifact to return.
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    // Find the card in the graveyard and move it to hand
+                    let pid = controller as usize;
+                    if let Some(pos) = self.players[pid].graveyard.iter().position(|&id| id == *target_id) {
+                        let card_id = self.players[pid].graveyard.remove(pos);
+                        self.players[pid].hand.push(card_id);
+                    }
+                }
+            }
+
+            TriggeredEffect::MightstoneWeakstoneETB { permanent_id } => {
+                // Modal: mode determined by targets.
+                // If targets has a creature target, apply -5/-5 until end of turn.
+                // Otherwise, draw 2 cards.
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    // -5/-5 mode
+                    self.add_temporary_effect(TemporaryEffect::ModifyPT {
+                        target: *target_id,
+                        power: -5,
+                        toughness: -5,
+                    });
+                } else {
+                    // Draw 2 mode
+                    self.draw_cards(controller, 2);
+                }
+                let _ = permanent_id;
+            }
+
+            TriggeredEffect::GolosETB => {
+                // Golos: search library for a land card, put it onto the battlefield tapped.
+                // This uses the pending_choice system for land selection.
+                let searchable: Vec<ObjectId> = self.players[controller as usize]
+                    .library
+                    .iter()
+                    .filter(|&&id| {
+                        self.card_name_for_id(id)
+                            .map(|cn| crate::card::is_land_card(cn))
+                            .unwrap_or(false)
+                    })
+                    .copied()
+                    .collect();
+                if !searchable.is_empty() {
+                    self.pending_choice = Some(PendingChoice {
+                        player: controller,
+                        kind: ChoiceKind::ChooseFromList {
+                            options: searchable,
+                            reason: ChoiceReason::GolosETBSearch,
+                        },
+                    });
+                }
+            }
+
+            TriggeredEffect::SoulGuideLanternETB => {
+                // Exile target card from a graveyard.
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    // Find and remove from any graveyard
+                    for pid in 0..self.players.len() {
+                        if let Some(pos) = self.players[pid].graveyard.iter().position(|&id| id == *target_id) {
+                            let card_id = self.players[pid].graveyard.remove(pos);
+                            let card_name = self.card_name_for_id(card_id).unwrap_or(CardName::Plains);
+                            self.exile.push((card_id, card_name, pid as PlayerId));
+                            break;
+                        }
+                    }
+                }
+            }
+
             _ => {}
         }
         let _ = db; // suppress unused warning when db not used in all arms
@@ -4409,6 +4552,45 @@ impl GameState {
                     }
                 }
                 // "up to one" — if no target, nothing happens
+            }
+
+            // === Tormod's Crypt ===
+            ActivatedEffect::TormodsCryptExile => {
+                // Exile target player's graveyard
+                if let Some(Target::Player(target_player)) = targets.first() {
+                    let pid = *target_player as usize;
+                    let gy_cards: Vec<ObjectId> = self.players[pid].graveyard.drain(..).collect();
+                    for card_id in gy_cards {
+                        let card_name = self.card_name_for_id(card_id).unwrap_or(CardName::Plains);
+                        self.exile.push((card_id, card_name, *target_player));
+                    }
+                }
+            }
+
+            // === Soul-Guide Lantern ===
+            ActivatedEffect::SoulGuideLanternExile => {
+                // Exile each opponent's graveyard
+                let opp = self.opponent(controller);
+                let pid = opp as usize;
+                let gy_cards: Vec<ObjectId> = self.players[pid].graveyard.drain(..).collect();
+                for card_id in gy_cards {
+                    let card_name = self.card_name_for_id(card_id).unwrap_or(CardName::Plains);
+                    self.exile.push((card_id, card_name, opp));
+                }
+            }
+            ActivatedEffect::SoulGuideLanternDraw => {
+                // Draw a card
+                self.draw_cards(controller, 1);
+            }
+
+            // === Manifold Key ===
+            ActivatedEffect::ManifoldKeyUnblockable => {
+                // Target creature can't be blocked this turn
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    if let Some(perm) = self.find_permanent_mut(*target_id) {
+                        perm.keywords.add(Keyword::CantBeBlocked);
+                    }
+                }
             }
         }
     }
