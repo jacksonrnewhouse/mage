@@ -38,6 +38,9 @@ pub enum AltCost {
     ForceOfVigor { exile_id: ObjectId },
     /// Once Upon a Time: free cast if it's the first spell you've cast this game.
     OnceUponATime,
+    /// Unmask: exile a black card from hand rather than pay mana cost.
+    /// `exile_id` is the ObjectId of the black card being exiled from hand.
+    Unmask { exile_id: ObjectId },
 }
 
 /// A game action that can be taken by the active/priority player.

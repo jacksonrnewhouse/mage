@@ -2189,6 +2189,18 @@ impl GameState {
                 // Free cast — no cost to pay.
                 true
             }
+            AltCost::Unmask { exile_id } => {
+                // Cost: exile a black card from hand.
+                let player = &self.players[player_id as usize];
+                let exile_in_hand = player.hand.contains(exile_id);
+                if !exile_in_hand {
+                    return false;
+                }
+                self.players[player_id as usize].remove_from_hand(*exile_id);
+                let exile_name = self.card_name_for_id(*exile_id).unwrap_or(CardName::Plains);
+                self.exile.push((*exile_id, exile_name, player_id));
+                true
+            }
         }
     }
 

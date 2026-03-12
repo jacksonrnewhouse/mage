@@ -3387,6 +3387,37 @@ impl GameState {
                     }
                 }
 
+                // --- Unmask: exile a black card from hand (sorcery speed) ---
+                CardName::Unmask => {
+                    if !sorcery_speed {
+                        continue;
+                    }
+                    let black_exile_candidates: Vec<ObjectId> = player.hand.iter()
+                        .copied()
+                        .filter(|&other_id| {
+                            other_id != card_id
+                                && self.card_name_for_id(other_id)
+                                    .and_then(|cn| find_card(db, cn))
+                                    .map(|d| d.color_identity.contains(&Color::Black))
+                                    .unwrap_or(false)
+                        })
+                        .collect();
+                    for exile_id in black_exile_candidates {
+                        let target_sets = self.generate_targets(card_name, player_id, db);
+                        for targets in &target_sets {
+                            actions.push(Action::CastSpell {
+                                card_id,
+                                targets: targets.clone(),
+                                x_value: 0,
+                                from_graveyard: false,
+                                from_library_top: false,
+                                alt_cost: Some(AltCost::Unmask { exile_id }),
+                                modes: vec![],
+                            });
+                        }
+                    }
+                }
+
                 // --- Once Upon a Time: free if first spell of the game ---
                 CardName::OnceUponATime => {
                     if player.spells_cast_this_game == 0 {
