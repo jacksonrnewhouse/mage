@@ -27,6 +27,15 @@ pub enum AltCost {
     PhyrexianMana { life_paid: u8, normal_cost: crate::mana::ManaCost },
     /// Snuff Out: pay 4 life (must control a Swamp).
     SnuffOut,
+    /// Daze: return an Island you control to its owner's hand.
+    /// `island_id` is the ObjectId of the Island permanent being bounced.
+    Daze { island_id: ObjectId },
+    /// Gush: return two Islands you control to their owner's hand.
+    /// `island_id1` and `island_id2` are the ObjectIds of the two Island permanents.
+    Gush { island_id1: ObjectId, island_id2: ObjectId },
+    /// Force of Vigor: exile a green card from hand (not your turn only).
+    /// `exile_id` is the ObjectId of the green card being exiled from hand.
+    ForceOfVigor { exile_id: ObjectId },
 }
 
 /// A game action that can be taken by the active/priority player.

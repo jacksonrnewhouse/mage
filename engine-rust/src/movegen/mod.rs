@@ -733,6 +733,21 @@ impl GameState {
             }
         }
 
+        // --- Spirit Guide mana abilities (exile from hand for mana, instant speed) ---
+        // ability_index 2 = spirit guide exile
+        for &card_id in &player.hand {
+            if let Some(card_name) = self.card_name_for_id(card_id) {
+                if matches!(card_name, CardName::ElvishSpiritGuide | CardName::SimianSpiritGuide) {
+                    actions.push(Action::ActivateFromHand {
+                        card_id,
+                        ability_index: 2,
+                        targets: vec![],
+                        x_value: 0,
+                    });
+                }
+            }
+        }
+
         actions
     }
 
@@ -1702,6 +1717,53 @@ impl GameState {
             }
         }
 
+        // Walking Ballista: {4}: Put a +1/+1 counter on Walking Ballista (ability_index 0)
+        if perm.card_name == CardName::WalkingBallista {
+            let player = &self.players[perm.controller as usize];
+            if player.mana_pool.total() >= 4 {
+                abilities.push((0, vec![]));
+            }
+            // Remove a +1/+1 counter: deal 1 damage to any target (ability_index 1)
+            if perm.counters.get(CounterType::PlusOnePlusOne) > 0 {
+                // Can target any player
+                for pid in 0..self.players.len() {
+                    abilities.push((1, vec![Target::Player(pid as PlayerId)]));
+                }
+                // Can target any creature or planeswalker
+                for target in &self.battlefield {
+                    if target.is_creature() || target.is_planeswalker() {
+                        abilities.push((1, vec![Target::Object(target.id)]));
+                    }
+                }
+            }
+        }
+
+        // Time Vault: {T}: Take an extra turn after this one (ability_index 0)
+        if perm.card_name == CardName::TimeVault && !perm.tapped {
+            abilities.push((0, vec![]));
+        }
+        // Time Vault: Skip your next turn: Untap Time Vault (ability_index 1)
+        if perm.card_name == CardName::TimeVault && perm.tapped {
+            abilities.push((1, vec![]));
+        }
+
+        // Krark-Clan Ironworks: Sacrifice an artifact: Add {C}{C} (ability_index 0)
+        if perm.card_name == CardName::KrarkClanIronworks {
+            for target in &self.battlefield {
+                if target.is_artifact() && target.controller == perm.controller {
+                    abilities.push((0, vec![Target::Object(target.id)]));
+                }
+            }
+        }
+
+        // Engineered Explosives: {2}, Sacrifice: Destroy each nonland permanent with MV equal to charge counters (ability_index 0)
+        if perm.card_name == CardName::EngineeredExplosives {
+            let player = &self.players[perm.controller as usize];
+            if player.mana_pool.total() >= 2 {
+                abilities.push((0, vec![]));
+            }
+        }
+
         // Isochron Scepter: {2},{T} — copy and cast the imprinted instant for free.
         // Can only activate if there is an imprinted card.
         if perm.card_name == CardName::IsochronScepter && !perm.tapped {
@@ -2639,6 +2701,135 @@ impl GameState {
                                     modes: vec![],
                                 });
                             }
+                        }
+                    }
+                }
+
+                // --- Daze: return an Island you control to its owner's hand ---
+                CardName::Daze => {
+                    if self.stack.is_empty() {
+                        continue;
+                    }
+                    // Find all Islands controlled by this player
+                    let islands: Vec<ObjectId> = self.battlefield.iter()
+                        .filter(|p| p.controller == player_id && matches!(p.card_name,
+                            CardName::Island
+                            | CardName::UndergroundSea | CardName::VolcanicIsland
+                            | CardName::Tundra | CardName::TropicalIsland
+                            | CardName::HallowedFountain | CardName::WateryGrave
+                            | CardName::SteamVents | CardName::BreedingPool
+                        ))
+                        .map(|p| p.id)
+                        .collect();
+                    if islands.is_empty() {
+                        continue;
+                    }
+                    // Generate one action per island (representative: first island)
+                    let island_id = islands[0];
+                    let target_sets = self.generate_targets(card_name, player_id, db);
+                    if target_sets.is_empty() {
+                        for item in self.stack.items() {
+                            actions.push(Action::CastSpell {
+                                card_id,
+                                targets: vec![Target::Object(item.id)],
+                                x_value: 0,
+                                from_graveyard: false,
+                                from_library_top: false,
+                                alt_cost: Some(AltCost::Daze { island_id }),
+                                modes: vec![],
+                            });
+                        }
+                    } else {
+                        for targets in &target_sets {
+                            actions.push(Action::CastSpell {
+                                card_id,
+                                targets: targets.clone(),
+                                x_value: 0,
+                                from_graveyard: false,
+                                from_library_top: false,
+                                alt_cost: Some(AltCost::Daze { island_id }),
+                                modes: vec![],
+                            });
+                        }
+                    }
+                }
+
+                // --- Gush: return two Islands you control to their owner's hand ---
+                CardName::Gush => {
+                    // Gush is a sorcery... no, it's an instant. Check sorcery speed only if needed.
+                    // Gush's alt cost can be used at instant speed (it's an Instant).
+                    let islands: Vec<ObjectId> = self.battlefield.iter()
+                        .filter(|p| p.controller == player_id && matches!(p.card_name,
+                            CardName::Island
+                            | CardName::UndergroundSea | CardName::VolcanicIsland
+                            | CardName::Tundra | CardName::TropicalIsland
+                            | CardName::HallowedFountain | CardName::WateryGrave
+                            | CardName::SteamVents | CardName::BreedingPool
+                        ))
+                        .map(|p| p.id)
+                        .collect();
+                    if islands.len() < 2 {
+                        continue;
+                    }
+                    // Representative pair: first two islands
+                    let island_id1 = islands[0];
+                    let island_id2 = islands[1];
+                    let target_sets = self.generate_targets(card_name, player_id, db);
+                    if target_sets.is_empty() {
+                        actions.push(Action::CastSpell {
+                            card_id,
+                            targets: vec![],
+                            x_value: 0,
+                            from_graveyard: false,
+                            from_library_top: false,
+                            alt_cost: Some(AltCost::Gush { island_id1, island_id2 }),
+                            modes: vec![],
+                        });
+                    } else {
+                        for targets in &target_sets {
+                            actions.push(Action::CastSpell {
+                                card_id,
+                                targets: targets.clone(),
+                                x_value: 0,
+                                from_graveyard: false,
+                                from_library_top: false,
+                                alt_cost: Some(AltCost::Gush { island_id1, island_id2 }),
+                                modes: vec![],
+                            });
+                        }
+                    }
+                }
+
+                // --- Force of Vigor: exile a green card from hand (not your turn) ---
+                CardName::ForceOfVigor => {
+                    if !is_opponent_turn {
+                        continue;
+                    }
+                    let green_exile_candidates: Vec<ObjectId> = player.hand.iter()
+                        .copied()
+                        .filter(|&other_id| {
+                            other_id != card_id
+                                && self.card_name_for_id(other_id)
+                                    .and_then(|cn| find_card(db, cn))
+                                    .map(|d| d.color_identity.contains(&Color::Green))
+                                    .unwrap_or(false)
+                        })
+                        .collect();
+                    for exile_id in green_exile_candidates {
+                        let target_sets = self.generate_targets(card_name, player_id, db);
+                        if target_sets.is_empty() {
+                            continue;
+                        }
+                        for targets in &target_sets {
+                            actions.push(Action::CastSpell {
+                                card_id,
+                                targets: targets.clone(),
+                                x_value: 0,
+                                from_graveyard: false,
+                                from_library_top: false,
+                                alt_cost: Some(AltCost::ForceOfVigor { exile_id }),
+                                modes: vec![],
+                            });
                         }
                     }
                 }
