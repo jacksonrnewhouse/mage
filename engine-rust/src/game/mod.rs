@@ -857,17 +857,24 @@ impl GameState {
 
     /// Check whether a graveyard-replacement effect is in play for the given card owner.
     /// Returns the actual destination zone (Exile when Rest in Peace is on the battlefield,
-    /// Graveyard otherwise).
-    pub fn graveyard_destination(&self, _owner: PlayerId) -> DestinationZone {
+    /// or when Dauthi Voidwalker is controlled by an opponent; Graveyard otherwise).
+    pub fn graveyard_destination(&self, owner: PlayerId) -> DestinationZone {
         let rest_in_peace_on_battlefield = self
             .battlefield
             .iter()
             .any(|p| p.card_name == CardName::RestInPeace);
         if rest_in_peace_on_battlefield {
-            DestinationZone::Exile
-        } else {
-            DestinationZone::Graveyard
+            return DestinationZone::Exile;
         }
+        // Dauthi Voidwalker: if an opponent controls one, cards owned by `owner` are exiled instead.
+        let dauthi_voidwalker_opponent = self
+            .battlefield
+            .iter()
+            .any(|p| p.card_name == CardName::DauthiVoidwalker && p.controller != owner);
+        if dauthi_voidwalker_opponent {
+            return DestinationZone::Exile;
+        }
+        DestinationZone::Graveyard
     }
 
     /// Check whether Grafdigger's Cage is on the battlefield.

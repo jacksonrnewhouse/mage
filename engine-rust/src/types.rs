@@ -124,6 +124,7 @@ pub enum Keyword {
     Dredge = 1 << 21,
     Delve = 1 << 22,
     CantBeBlocked = 1 << 23,
+    Shadow = 1 << 24,
 }
 
 /// Compact bitfield for keyword abilities on a permanent.

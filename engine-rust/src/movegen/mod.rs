@@ -872,6 +872,13 @@ impl GameState {
                     if attacker.keywords.has(Keyword::CantBeBlocked) {
                         continue;
                     }
+                    // Shadow: creatures with shadow can only be blocked by creatures with shadow,
+                    // and creatures without shadow cannot block creatures with shadow (and vice versa).
+                    let attacker_has_shadow = attacker.keywords.has(Keyword::Shadow);
+                    let blocker_has_shadow = perm.keywords.has(Keyword::Shadow);
+                    if attacker_has_shadow != blocker_has_shadow {
+                        continue;
+                    }
                     let can_block_flight = if attacker.keywords.has(Keyword::Flying) {
                         perm.can_block_flyer()
                     } else {

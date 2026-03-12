@@ -1072,6 +1072,12 @@ pub fn build_card_db() -> Vec<CardDef> {
         k.add(Keyword::Reach);
         k
     };
+    #[allow(unused)]
+    let shadow = || {
+        let mut k = Keywords::empty();
+        k.add(Keyword::Shadow);
+        k
+    };
     let c = ManaCost::ZERO;
 
     // === Basic Lands ===
@@ -1762,7 +1768,7 @@ pub fn build_card_db() -> Vec<CardDef> {
         Some(0), None, None, kw(), &[Black],
         "Nethergoyf's power is equal to the number of card types among cards in your graveyard and its toughness is equal to that number plus 1. Escape - {2}{B}, exile any number of other cards from your graveyard with four or more card types among them.");
     card!(DauthiVoidwalker, "Dauthi Voidwalker", ManaCost { black: 2, ..c }, &[Creature], &[],
-        Some(3), Some(2), None, haste(), &[Black],
+        Some(3), Some(2), None, shadow(), &[Black],
         "Shadow. If a card would be put into an opponent's graveyard from anywhere, instead exile it with a void counter on it. {T}, Sacrifice Dauthi Voidwalker: Choose an exiled card an opponent owns with a void counter on it. You may play it this turn without paying its mana cost.");
     card!(EmperorOfBones, "Emperor of Bones", ManaCost { black: 1, generic: 1, ..c }, &[Creature], &[],
         Some(1), Some(2), None, kw(), &[Black],
