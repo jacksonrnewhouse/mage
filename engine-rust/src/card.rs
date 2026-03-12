@@ -2068,7 +2068,11 @@ pub fn build_card_db() -> Vec<CardDef> {
         Some(1), Some(1), None, kw(), &[],
         "When Myr Retriever dies, return another target artifact card from your graveyard to your hand.");
     card!(PatchworkAutomaton, "Patchwork Automaton", ManaCost::generic(2), &[Artifact, Creature], &[],
-        Some(1), Some(1), None, kw(), &[],
+        Some(1), Some(1), None, {
+            let mut k = Keywords::empty();
+            k.add(Keyword::Ward);
+            k
+        }, &[],
         "Ward {2}. Whenever you cast an artifact spell, put a +1/+1 counter on Patchwork Automaton.");
     card!(PhyrexianRevoker, "Phyrexian Revoker", ManaCost::generic(2), &[Artifact, Creature], &[],
         Some(2), Some(1), None, kw(), &[],

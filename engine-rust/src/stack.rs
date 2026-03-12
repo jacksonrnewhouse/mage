@@ -177,6 +177,8 @@ pub enum TriggeredEffect {
     RoilingVortexUpkeep,
     /// Roiling Vortex: whenever a player casts a spell without paying its mana cost, deal 5 damage to that player.
     RoilingVortexFreeCast { target_player: PlayerId },
+    /// Patchwork Automaton: whenever you cast an artifact spell, put a +1/+1 counter on it.
+    PatchworkAutomatonCast { automaton_id: ObjectId },
 }
 
 /// Activated ability effects.

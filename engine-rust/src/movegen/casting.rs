@@ -311,6 +311,27 @@ impl GameState {
                                     vec![],
                                 );
                             }
+                            // Patchwork Automaton: "Whenever you cast an artifact spell,
+                            // put a +1/+1 counter on Patchwork Automaton."
+                            if def.card_types.contains(&CardType::Artifact) {
+                                let automaton_triggers: Vec<(ObjectId, PlayerId)> = self
+                                    .battlefield
+                                    .iter()
+                                    .filter(|p| p.card_name == crate::card::CardName::PatchworkAutomaton && p.controller == player_id)
+                                    .map(|p| (p.id, p.controller))
+                                    .collect();
+                                for (automaton_id, controller) in automaton_triggers {
+                                    self.stack.push(
+                                        crate::stack::StackItemKind::TriggeredAbility {
+                                            source_id: automaton_id,
+                                            source_name: crate::card::CardName::PatchworkAutomaton,
+                                            effect: crate::stack::TriggeredEffect::PatchworkAutomatonCast { automaton_id },
+                                        },
+                                        controller,
+                                        vec![],
+                                    );
+                                }
+                            }
                             self.reset_priority_passes();
                         }
                     }

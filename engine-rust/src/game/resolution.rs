@@ -3404,6 +3404,13 @@ impl GameState {
                 self.players[target_player as usize].life -= 5;
             }
 
+            TriggeredEffect::PatchworkAutomatonCast { automaton_id } => {
+                // Patchwork Automaton: put a +1/+1 counter on it
+                if let Some(perm) = self.find_permanent_mut(automaton_id) {
+                    perm.counters.add(CounterType::PlusOnePlusOne, 1);
+                }
+            }
+
             _ => {}
         }
         let _ = db; // suppress unused warning when db not used in all arms
