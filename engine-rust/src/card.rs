@@ -1924,7 +1924,7 @@ pub fn build_card_db() -> Vec<CardDef> {
     // Note: Untimely Malfunction is blue ({1}{U} Sorcery), defined above in blue section.
     card!(Crash, "Crash", ManaCost { red: 1, generic: 2, ..c }, &[Instant], &[], None, None, None, kw(), &[Red],
         "You may sacrifice a Mountain rather than pay this spell's mana cost. Destroy target artifact.");
-    card!(Meltdown, "Meltdown", ManaCost { red: 1, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Red],
+    card!(X(1) Meltdown, "Meltdown", ManaCost { red: 1, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Red],
         "Destroy each artifact with mana value X or less.");
     card!(ShatteringSpree, "Shattering Spree", ManaCost::r(1), &[Sorcery], &[], None, None, None, kw(), &[Red],
         "Destroy target artifact. Replicate {R}.");
