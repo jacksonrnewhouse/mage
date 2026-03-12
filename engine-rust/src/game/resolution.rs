@@ -1604,15 +1604,19 @@ impl GameState {
                 }
             }
             CardName::MemorysJourney => {
-                // Shuffle up to 3 target cards from a single graveyard into their owner's library
-                // Simplified: targets[0] is one card from controller's graveyard, shuffle it into library
-                for target in targets.iter().take(3) {
+                // Target player shuffles up to three target cards from their graveyard into their library.
+                // targets[0] = Target::Player(pid), targets[1..] = Target::Object(card_id)
+                let target_player = match targets.first() {
+                    Some(Target::Player(pid)) => *pid as usize,
+                    _ => controller as usize,
+                };
+                for target in targets.iter().skip(1).take(3) {
                     if let Target::Object(target_id) = target {
-                        let gy = &mut self.players[controller as usize].graveyard;
+                        let gy = &mut self.players[target_player].graveyard;
                         if let Some(pos) = gy.iter().position(|&id| id == *target_id) {
                             let card = gy.remove(pos);
-                            // Put into library (shuffled in)
-                            self.players[controller as usize].library.push(card);
+                            // Put into target player's library (shuffled in)
+                            self.players[target_player].library.push(card);
                         }
                     }
                 }

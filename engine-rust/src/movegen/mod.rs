@@ -2662,12 +2662,23 @@ impl GameState {
             }
 
             // Target card in own graveyard
-            CardName::Regrowth | CardName::NoxiousRevival | CardName::MemorysJourney => {
+            CardName::Regrowth | CardName::NoxiousRevival => {
                 self.players[controller as usize]
                     .graveyard
                     .iter()
                     .map(|&id| vec![Target::Object(id)])
                     .collect()
+            }
+
+            // Memory's Journey: target player + card from that player's graveyard
+            CardName::MemorysJourney => {
+                let mut targets = Vec::new();
+                for pid in 0..self.num_players as usize {
+                    for &id in &self.players[pid].graveyard {
+                        targets.push(vec![Target::Player(pid as PlayerId), Target::Object(id)]);
+                    }
+                }
+                targets
             }
 
             // Snapcaster Mage: ETB targets an instant or sorcery in the controller's graveyard.
