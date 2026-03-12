@@ -2185,7 +2185,7 @@ impl GameState {
                 CardName::MinscAndBooTimelessHeroes => {
                     // +1: Create Boo (1/1 Hamster with trample and haste)
                     abilities.push((0, vec![]));
-                    // -2: Target creature you control gets +X/+0 and trample (X = its power)
+                    // -2: Target creature you control gets +X/+0, trample, and haste (X = its power)
                     if perm.loyalty >= 2 {
                         for target in &self.battlefield {
                             if target.is_creature() && target.controller == perm.controller {

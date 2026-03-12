@@ -4118,7 +4118,7 @@ impl GameState {
                 self.battlefield.push(token);
             }
             ActivatedEffect::MinscPump => {
-                // Minsc & Boo -2: Target creature gets +X/+0 and trample until EOT, where X = its power.
+                // Minsc & Boo -2: Target creature gets +X/+0, trample, and haste until EOT, where X = its power.
                 if let Some(Target::Object(target_id)) = targets.first() {
                     let power = self.find_permanent(*target_id).map(|p| p.power()).unwrap_or(0);
                     if power > 0 {
@@ -4137,6 +4137,13 @@ impl GameState {
                     });
                     if let Some(perm) = self.find_permanent_mut(*target_id) {
                         perm.keywords.add(Keyword::Trample);
+                    }
+                    self.temporary_effects.push(TemporaryEffect::GrantKeyword {
+                        target: *target_id,
+                        keyword: Keyword::Haste,
+                    });
+                    if let Some(perm) = self.find_permanent_mut(*target_id) {
+                        perm.keywords.add(Keyword::Haste);
                     }
                 }
             }
