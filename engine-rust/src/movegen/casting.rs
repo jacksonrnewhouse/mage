@@ -167,6 +167,25 @@ impl GameState {
                         } else {
                             // Normal mana cost (with tax effects applied).
                             let mut cost = self.effective_cost(def, player_id);
+                            // Mystical Dispute costs {2} less if it targets a blue spell.
+                            if cn == CardName::MysticalDispute {
+                                let targets_blue = targets.iter().any(|t| {
+                                    if let Target::Object(obj_id) = t {
+                                        self.stack.items().iter().any(|item| {
+                                            item.id == *obj_id && matches!(&item.kind, StackItemKind::Spell { card_name: target_cn, .. } if {
+                                                find_card(db, *target_cn)
+                                                    .map(|d| d.color_identity.contains(&Color::Blue))
+                                                    .unwrap_or(false)
+                                            })
+                                        })
+                                    } else {
+                                        false
+                                    }
+                                });
+                                if targets_blue {
+                                    cost.generic = cost.generic.saturating_sub(2);
+                                }
+                            }
                             // For X spells, add X * x_multiplier to the generic cost.
                             if def.has_x_cost {
                                 let x_cost = (*x_value as u16) * (def.x_multiplier as u16);

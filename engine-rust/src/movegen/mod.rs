@@ -192,7 +192,23 @@ impl GameState {
                     }
 
                     // Check mana cost (including Thalia tax, etc.)
-                    let effective_cost = self.effective_cost(def, player_id);
+                    let mut effective_cost = self.effective_cost(def, player_id);
+                    // Mystical Dispute costs {2} less if it targets a blue spell.
+                    // For affordability, check if any blue spell is on the stack.
+                    if card_name == CardName::MysticalDispute {
+                        let has_blue_target = self.stack.items().iter().any(|item| {
+                            if let StackItemKind::Spell { card_name: cn, .. } = &item.kind {
+                                find_card(db, *cn)
+                                    .map(|d| d.color_identity.contains(&Color::Blue))
+                                    .unwrap_or(false)
+                            } else {
+                                false
+                            }
+                        });
+                        if has_blue_target {
+                            effective_cost.generic = effective_cost.generic.saturating_sub(2);
+                        }
+                    }
                     let is_artifact = def.card_types.contains(&CardType::Artifact);
 
                     // For X spells, determine the range of valid X values
