@@ -263,6 +263,17 @@ impl GameState {
                             if is_noncreature {
                                 self.check_noncreature_cast_triggers(player_id);
                             }
+                            // Lurrus of the Dream-Den: track once-per-turn graveyard cast
+                            if *from_graveyard
+                                && def.mana_cost.cmc() <= 2
+                                && (def.card_types.contains(&CardType::Creature)
+                                    || def.card_types.contains(&CardType::Artifact)
+                                    || def.card_types.contains(&CardType::Enchantment)
+                                    || def.card_types.contains(&CardType::Planeswalker))
+                                && self.battlefield.iter().any(|p| p.card_name == CardName::LurrusOfTheDreamDen && p.controller == player_id)
+                            {
+                                self.lurrus_cast_used[player_id as usize] = true;
+                            }
                             // Emrakul, the Aeons Torn: when cast, take an extra turn after this one.
                             if cn == CardName::EmrakulTheAeonsTorn {
                                 self.stack.push(

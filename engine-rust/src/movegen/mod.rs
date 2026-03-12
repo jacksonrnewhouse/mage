@@ -327,7 +327,16 @@ impl GameState {
                         let hogaak_from_graveyard = card_name == CardName::HogaakArisenNecropolis;
                         // Emry: artifact cards granted cast permission this turn
                         let emry_castable = self.emry_castable_artifacts.contains(&card_id);
-                        let can_cast_from_gyd = has_own_flashback || has_snapcaster_flashback || yawgmoth_active || can_retrace || hogaak_from_graveyard || emry_castable;
+                        // Lurrus of the Dream-Den: once per turn, cast a permanent spell with MV <= 2 from graveyard
+                        let lurrus_castable = !self.lurrus_cast_used[player_id as usize]
+                            && self.active_player == player_id
+                            && self.battlefield.iter().any(|p| p.card_name == CardName::LurrusOfTheDreamDen && p.controller == player_id)
+                            && def.mana_cost.cmc() <= 2
+                            && (def.card_types.contains(&CardType::Creature)
+                                || def.card_types.contains(&CardType::Artifact)
+                                || def.card_types.contains(&CardType::Enchantment)
+                                || def.card_types.contains(&CardType::Planeswalker));
+                        let can_cast_from_gyd = has_own_flashback || has_snapcaster_flashback || yawgmoth_active || can_retrace || hogaak_from_graveyard || emry_castable || lurrus_castable;
 
                         if !can_cast_from_gyd {
                             continue;

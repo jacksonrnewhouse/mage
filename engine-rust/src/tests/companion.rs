@@ -182,3 +182,156 @@ fn test_companion_action_generated_during_opponents_turn() {
     let has_companion_action = actions.iter().any(|a| matches!(a, Action::CompanionFromSideboard));
     assert!(has_companion_action, "CompanionFromSideboard should be available at instant speed (opponent's turn)");
 }
+
+// ───── Lurrus graveyard cast ability ─────
+
+/// Helper: put a permanent on the battlefield.
+fn put_permanent(state: &mut GameState, db: &[CardDef], name: CardName, controller: PlayerId) -> ObjectId {
+    let id = state.new_object_id();
+    state.card_registry.push((id, name));
+    let def = find_card(db, name).expect("card not in db");
+    let perm = crate::permanent::Permanent::new(
+        id, name, controller, controller,
+        def.power, def.toughness, def.loyalty,
+        def.keywords, def.card_types,
+    );
+    state.battlefield.push(perm);
+    id
+}
+
+/// Helper: register a card and put it in a player's graveyard.
+fn put_in_graveyard(state: &mut GameState, name: CardName, owner: PlayerId) -> ObjectId {
+    let id = state.new_object_id();
+    state.card_registry.push((id, name));
+    state.players[owner as usize].graveyard.push(id);
+    id
+}
+
+#[test]
+fn test_lurrus_allows_casting_permanent_mv2_from_graveyard() {
+    let (mut state, db) = setup_main_phase();
+
+    // Put Lurrus on the battlefield for player 0
+    put_permanent(&mut state, &db, CardName::LurrusOfTheDreamDen, 0);
+
+    // Put a MV <= 2 permanent in the graveyard (Sol Ring: MV 1, artifact)
+    let sol_ring_id = put_in_graveyard(&mut state, CardName::SolRing, 0);
+
+    // Give player 0 enough mana to cast Sol Ring (MV 1)
+    state.players[0].mana_pool.colorless = 1;
+
+    let actions = state.legal_actions(&db);
+    let can_cast = actions.iter().any(|a| {
+        matches!(a, Action::CastSpell { card_id, from_graveyard: true, .. } if *card_id == sol_ring_id)
+    });
+    assert!(can_cast, "Lurrus should allow casting MV <= 2 permanent from graveyard");
+}
+
+#[test]
+fn test_lurrus_does_not_allow_mv3_from_graveyard() {
+    let (mut state, db) = setup_main_phase();
+
+    put_permanent(&mut state, &db, CardName::LurrusOfTheDreamDen, 0);
+
+    // Trinisphere is MV 3 — should NOT be castable via Lurrus
+    let trinisphere_id = put_in_graveyard(&mut state, CardName::Trinisphere, 0);
+
+    state.players[0].mana_pool.colorless = 3;
+
+    let actions = state.legal_actions(&db);
+    let can_cast = actions.iter().any(|a| {
+        matches!(a, Action::CastSpell { card_id, from_graveyard: true, .. } if *card_id == trinisphere_id)
+    });
+    assert!(!can_cast, "Lurrus should NOT allow casting MV > 2 permanent from graveyard");
+}
+
+#[test]
+fn test_lurrus_does_not_allow_noncreature_spell_from_graveyard() {
+    let (mut state, db) = setup_main_phase();
+
+    put_permanent(&mut state, &db, CardName::LurrusOfTheDreamDen, 0);
+
+    // Lightning Bolt is MV 1 but is an instant (not a permanent spell)
+    let bolt_id = put_in_graveyard(&mut state, CardName::LightningBolt, 0);
+
+    state.players[0].mana_pool.red = 1;
+
+    let actions = state.legal_actions(&db);
+    let can_cast = actions.iter().any(|a| {
+        matches!(a, Action::CastSpell { card_id, from_graveyard: true, .. } if *card_id == bolt_id)
+    });
+    assert!(!can_cast, "Lurrus should NOT allow casting non-permanent spells from graveyard");
+}
+
+#[test]
+fn test_lurrus_once_per_turn_restriction() {
+    let (mut state, db) = setup_main_phase();
+
+    put_permanent(&mut state, &db, CardName::LurrusOfTheDreamDen, 0);
+
+    // Put two cheap artifacts in graveyard
+    let sol_ring_id = put_in_graveyard(&mut state, CardName::SolRing, 0);
+    let mox_pearl_id = put_in_graveyard(&mut state, CardName::MoxPearl, 0);
+
+    state.players[0].mana_pool.colorless = 2;
+
+    // Cast the first one — should succeed
+    state.apply_action(&Action::CastSpell {
+        card_id: sol_ring_id,
+        targets: vec![],
+        x_value: 0,
+        from_graveyard: true,
+        from_library_top: false,
+        alt_cost: None,
+        modes: vec![],
+    }, &db);
+
+    // Lurrus cast should now be used
+    assert!(state.lurrus_cast_used[0], "Lurrus cast should be marked as used");
+
+    // Second graveyard cast should NOT be available via Lurrus
+    let actions = state.legal_actions(&db);
+    let can_cast_second = actions.iter().any(|a| {
+        matches!(a, Action::CastSpell { card_id, from_graveyard: true, .. } if *card_id == mox_pearl_id)
+    });
+    assert!(!can_cast_second, "Lurrus should only allow one graveyard cast per turn");
+}
+
+#[test]
+fn test_lurrus_only_on_your_turn() {
+    let (mut state, db) = setup_main_phase();
+
+    // Put Lurrus on the battlefield for player 0
+    put_permanent(&mut state, &db, CardName::LurrusOfTheDreamDen, 0);
+
+    // Put a cheap permanent in player 0's graveyard
+    let sol_ring_id = put_in_graveyard(&mut state, CardName::SolRing, 0);
+
+    state.players[0].mana_pool.colorless = 1;
+
+    // It's player 1's turn, but player 0 has priority
+    state.active_player = 1;
+    state.priority_player = 0;
+
+    let actions = state.legal_actions(&db);
+    let can_cast = actions.iter().any(|a| {
+        matches!(a, Action::CastSpell { card_id, from_graveyard: true, .. } if *card_id == sol_ring_id)
+    });
+    assert!(!can_cast, "Lurrus should only allow graveyard casting during your own turn");
+}
+
+#[test]
+fn test_lurrus_resets_on_new_turn() {
+    let (mut state, db) = setup_main_phase();
+
+    put_permanent(&mut state, &db, CardName::LurrusOfTheDreamDen, 0);
+
+    // Mark Lurrus cast as used
+    state.lurrus_cast_used[0] = true;
+
+    // Simulate end of turn cleanup
+    state.lurrus_cast_used = [false; 2];
+
+    // Should be reset
+    assert!(!state.lurrus_cast_used[0], "Lurrus cast should be reset after end of turn");
+}

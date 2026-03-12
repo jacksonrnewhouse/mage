@@ -153,6 +153,11 @@ pub struct GameState {
     /// Each entry is (creature_id, trigger_count). The ability triggers only twice
     /// per creature per turn.
     pub nadu_triggers_this_turn: Vec<(ObjectId, u8)>,
+
+    // --- Lurrus of the Dream-Den tracking ---
+    /// Tracks whether each player has used Lurrus's once-per-turn graveyard cast this turn.
+    /// Indexed by PlayerId. Reset at end of turn.
+    pub lurrus_cast_used: [bool; 2],
 }
 
 /// When the game needs a player to make a choice (tutor, discard, etc.)
@@ -311,6 +316,7 @@ impl GameState {
             emblems: Vec::new(),
             delayed_triggers: Vec::new(),
             nadu_triggers_this_turn: Vec::new(),
+            lurrus_cast_used: [false; 2],
         }
     }
 
@@ -530,6 +536,8 @@ impl GameState {
         self.snapcaster_flashback_cards.clear();
         // Clear Emry graveyard cast grants
         self.emry_castable_artifacts.clear();
+        // Clear Lurrus once-per-turn graveyard cast tracking
+        self.lurrus_cast_used = [false; 2];
     }
 
     /// Apply a temporary effect immediately to the target permanent,
