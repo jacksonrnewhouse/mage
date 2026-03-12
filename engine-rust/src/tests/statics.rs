@@ -3,6 +3,37 @@ use crate::action::*;
 use crate::types::*;
 use crate::game::*;
 
+/// Helper: place a permanent on the battlefield controlled by the given player.
+fn place_permanent(state: &mut GameState, db: &[CardDef], card_name: CardName, controller: PlayerId) -> ObjectId {
+    let id = state.new_object_id();
+    state.card_registry.push((id, card_name));
+    let def = find_card(db, card_name).unwrap();
+    let mut perm = crate::permanent::Permanent::new(
+        id, card_name, controller, controller,
+        def.power, def.toughness, def.loyalty, def.keywords, def.card_types,
+    );
+    perm.entered_this_turn = false;
+    perm.colors = def.color_identity.to_vec();
+    state.battlefield.push(perm);
+    id
+}
+
+/// Helper: add a card to a player's library.
+fn seed_library(state: &mut GameState, player: PlayerId, card_name: CardName) -> ObjectId {
+    let id = state.new_object_id();
+    state.card_registry.push((id, card_name));
+    state.players[player as usize].library.push(id);
+    id
+}
+
+/// Helper: add a card to a player's hand.
+fn add_to_hand(state: &mut GameState, player: PlayerId, card_name: CardName) -> ObjectId {
+    let id = state.new_object_id();
+    state.card_registry.push((id, card_name));
+    state.players[player as usize].hand.push(id);
+    id
+}
+
 #[test]
 fn test_spirit_of_the_labyrinth_limits_draws() {
     let db = build_card_db();
@@ -482,4 +513,184 @@ fn test_damping_sphere_does_not_affect_sol_ring() {
     // Sol Ring is an artifact, not a land, so Damping Sphere should NOT affect it
     assert_eq!(mana_after - mana_before, 2,
         "Sol Ring should still produce 2 colorless mana under Damping Sphere (it's not a land)");
+}
+
+// === Opposition Agent tests ===
+
+#[test]
+fn test_opposition_agent_blocks_opponent_tutor() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // P0 controls Opposition Agent
+    place_permanent(&mut state, &db, CardName::OppositionAgent, 0);
+
+    // P1 has a Demonic Tutor in hand and cards in library
+    let tutor_id = add_to_hand(&mut state, 1, CardName::DemonicTutor);
+    seed_library(&mut state, 1, CardName::LightningBolt);
+    seed_library(&mut state, 1, CardName::Counterspell);
+
+    // Set up game state for casting
+    state.turn_number = 1;
+    state.phase = Phase::PreCombatMain;
+    state.step = None;
+    state.active_player = 1;
+    state.priority_player = 1;
+    state.players[1].mana_pool.add(Some(Color::Black), 1);
+    state.players[1].mana_pool.add(None, 1);
+
+    // Cast Demonic Tutor
+    state.apply_action(
+        &Action::CastSpell {
+            card_id: tutor_id,
+            targets: vec![],
+            x_value: 0,
+            from_graveyard: false,
+            from_library_top: false,
+            alt_cost: None,
+            modes: vec![],
+        },
+        &db,
+    );
+
+    // Both pass priority to resolve
+    state.pass_priority(&db);
+    state.pass_priority(&db);
+
+    // No pending choice should be set because Opposition Agent blocks the search
+    assert!(
+        state.pending_choice.is_none(),
+        "Opponent should not be able to search library while Opposition Agent is on the battlefield"
+    );
+}
+
+#[test]
+fn test_opposition_agent_does_not_block_controller_tutor() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // P0 controls Opposition Agent
+    place_permanent(&mut state, &db, CardName::OppositionAgent, 0);
+
+    // P0 has a Demonic Tutor in hand and cards in library
+    let tutor_id = add_to_hand(&mut state, 0, CardName::DemonicTutor);
+    seed_library(&mut state, 0, CardName::LightningBolt);
+    seed_library(&mut state, 0, CardName::Counterspell);
+
+    // Set up game state for casting
+    state.turn_number = 1;
+    state.phase = Phase::PreCombatMain;
+    state.step = None;
+    state.active_player = 0;
+    state.priority_player = 0;
+    state.players[0].mana_pool.add(Some(Color::Black), 1);
+    state.players[0].mana_pool.add(None, 1);
+
+    // Cast Demonic Tutor
+    state.apply_action(
+        &Action::CastSpell {
+            card_id: tutor_id,
+            targets: vec![],
+            x_value: 0,
+            from_graveyard: false,
+            from_library_top: false,
+            alt_cost: None,
+            modes: vec![],
+        },
+        &db,
+    );
+
+    // Both pass priority to resolve
+    state.pass_priority(&db);
+    state.pass_priority(&db);
+
+    // P0 should still be able to search (Opposition Agent only blocks opponents)
+    assert!(
+        state.pending_choice.is_some(),
+        "Opposition Agent controller should still be able to search their library"
+    );
+}
+
+#[test]
+fn test_leonin_arbiter_blocks_all_searches() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // P0 controls Leonin Arbiter (blocks all players)
+    place_permanent(&mut state, &db, CardName::LeoninArbiter, 0);
+
+    // P0 has a Demonic Tutor and cards in library
+    let tutor_id = add_to_hand(&mut state, 0, CardName::DemonicTutor);
+    seed_library(&mut state, 0, CardName::LightningBolt);
+
+    // Set up game state
+    state.turn_number = 1;
+    state.phase = Phase::PreCombatMain;
+    state.step = None;
+    state.active_player = 0;
+    state.priority_player = 0;
+    state.players[0].mana_pool.add(Some(Color::Black), 1);
+    state.players[0].mana_pool.add(None, 1);
+
+    // Cast Demonic Tutor
+    state.apply_action(
+        &Action::CastSpell {
+            card_id: tutor_id,
+            targets: vec![],
+            x_value: 0,
+            from_graveyard: false,
+            from_library_top: false,
+            alt_cost: None,
+            modes: vec![],
+        },
+        &db,
+    );
+
+    // Both pass priority to resolve
+    state.pass_priority(&db);
+    state.pass_priority(&db);
+
+    // P0's search should be blocked by Leonin Arbiter
+    assert!(
+        state.pending_choice.is_none(),
+        "Leonin Arbiter should block library search for all players"
+    );
+}
+
+#[test]
+fn test_opposition_agent_blocks_opponent_fetchland() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // P0 controls Opposition Agent
+    place_permanent(&mut state, &db, CardName::OppositionAgent, 0);
+
+    // P1 has a fetchland on battlefield and fetchable lands in library
+    let fetch_id = place_permanent(&mut state, &db, CardName::FloodedStrand, 1);
+    seed_library(&mut state, 1, CardName::Island);
+    seed_library(&mut state, 1, CardName::Plains);
+
+    // Set up game state for P1 to activate
+    state.turn_number = 1;
+    state.phase = Phase::PreCombatMain;
+    state.step = None;
+    state.active_player = 1;
+    state.priority_player = 1;
+
+    // Activate the fetch land
+    state.apply_action(
+        &Action::ActivateAbility {
+            permanent_id: fetch_id,
+            ability_index: 0,
+            targets: vec![],
+        },
+        &db,
+    );
+
+    // P1 should not get a search choice (Opposition Agent blocks it)
+    // The fetch still sacrifices and costs life, but the search fails
+    assert!(
+        state.pending_choice.is_none(),
+        "Opponent's fetchland search should be blocked by Opposition Agent"
+    );
 }

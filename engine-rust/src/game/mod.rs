@@ -934,6 +934,18 @@ impl GameState {
             .any(|p| p.card_name == CardName::ContainmentPriest)
     }
 
+    /// Check whether library searching is restricted for the given player.
+    /// Returns true if:
+    /// - Leonin Arbiter is on the battlefield (players can't search libraries), OR
+    /// - An opponent controls Opposition Agent (simplified: opponents can't search libraries)
+    pub fn library_search_restricted(&self, searching_player: PlayerId) -> bool {
+        let opponent = self.opponent(searching_player);
+        self.battlefield.iter().any(|p| {
+            p.card_name == CardName::LeoninArbiter
+                || (p.card_name == CardName::OppositionAgent && p.controller == opponent)
+        })
+    }
+
     /// Send a card (by id and name) from any zone directly to the graveyard,
     /// applying graveyard-replacement effects (Rest in Peace → exile instead).
     /// Also applies Dryad Militant: if on the battlefield, instant/sorcery cards

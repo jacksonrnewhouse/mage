@@ -544,105 +544,120 @@ impl GameState {
 
             // === Tutors ===
             CardName::DemonicTutor => {
-                // In a real implementation, this would present a choice.
-                // For search engine: the choice is an action the AI makes.
-                let options: Vec<ObjectId> = self.players[controller as usize]
-                    .library
-                    .clone();
-                if !options.is_empty() {
-                    self.pending_choice = Some(PendingChoice {
-                        player: controller,
-                        kind: ChoiceKind::ChooseFromList {
-                            options,
-                            reason: ChoiceReason::DemonicTutorSearch,
-                        },
-                    });
+                // Leonin Arbiter / Opposition Agent: search is restricted
+                if !self.library_search_restricted(controller) {
+                    // In a real implementation, this would present a choice.
+                    // For search engine: the choice is an action the AI makes.
+                    let options: Vec<ObjectId> = self.players[controller as usize]
+                        .library
+                        .clone();
+                    if !options.is_empty() {
+                        self.pending_choice = Some(PendingChoice {
+                            player: controller,
+                            kind: ChoiceKind::ChooseFromList {
+                                options,
+                                reason: ChoiceReason::DemonicTutorSearch,
+                            },
+                        });
+                    }
                 }
             }
             CardName::VampiricTutor => {
                 self.players[controller as usize].life -= 2;
-                let options: Vec<ObjectId> = self.players[controller as usize]
-                    .library
-                    .clone();
-                if !options.is_empty() {
-                    self.pending_choice = Some(PendingChoice {
-                        player: controller,
-                        kind: ChoiceKind::ChooseFromList {
-                            options,
-                            reason: ChoiceReason::VampiricTutorSearch,
-                        },
-                    });
+                if !self.library_search_restricted(controller) {
+                    let options: Vec<ObjectId> = self.players[controller as usize]
+                        .library
+                        .clone();
+                    if !options.is_empty() {
+                        self.pending_choice = Some(PendingChoice {
+                            player: controller,
+                            kind: ChoiceKind::ChooseFromList {
+                                options,
+                                reason: ChoiceReason::VampiricTutorSearch,
+                            },
+                        });
+                    }
                 }
             }
             CardName::MysticalTutor => {
-                let options: Vec<ObjectId> = self.players[controller as usize]
-                    .library
-                    .clone();
-                if !options.is_empty() {
-                    self.pending_choice = Some(PendingChoice {
-                        player: controller,
-                        kind: ChoiceKind::ChooseFromList {
-                            options,
-                            reason: ChoiceReason::MysticalTutorSearch,
-                        },
-                    });
+                if !self.library_search_restricted(controller) {
+                    let options: Vec<ObjectId> = self.players[controller as usize]
+                        .library
+                        .clone();
+                    if !options.is_empty() {
+                        self.pending_choice = Some(PendingChoice {
+                            player: controller,
+                            kind: ChoiceKind::ChooseFromList {
+                                options,
+                                reason: ChoiceReason::MysticalTutorSearch,
+                            },
+                        });
+                    }
                 }
             }
             CardName::Entomb => {
-                let options: Vec<ObjectId> = self.players[controller as usize]
-                    .library
-                    .clone();
-                if !options.is_empty() {
-                    self.pending_choice = Some(PendingChoice {
-                        player: controller,
-                        kind: ChoiceKind::ChooseFromList {
-                            options,
-                            reason: ChoiceReason::EntombSearch,
-                        },
-                    });
+                if !self.library_search_restricted(controller) {
+                    let options: Vec<ObjectId> = self.players[controller as usize]
+                        .library
+                        .clone();
+                    if !options.is_empty() {
+                        self.pending_choice = Some(PendingChoice {
+                            player: controller,
+                            kind: ChoiceKind::ChooseFromList {
+                                options,
+                                reason: ChoiceReason::EntombSearch,
+                            },
+                        });
+                    }
                 }
             }
 
             // === More Tutors ===
             CardName::EnlightenedTutor | CardName::ImperialSeal | CardName::MerchantScroll => {
-                // Search library, put on top
-                let options: Vec<ObjectId> = self.players[controller as usize].library.clone();
-                if !options.is_empty() {
-                    self.pending_choice = Some(PendingChoice {
-                        player: controller,
-                        kind: ChoiceKind::ChooseFromList {
-                            options,
-                            reason: ChoiceReason::MysticalTutorSearch,
-                        },
-                    });
-                }
                 if card_name == CardName::ImperialSeal {
                     self.players[controller as usize].life -= 2;
                 }
+                if !self.library_search_restricted(controller) {
+                    // Search library, put on top
+                    let options: Vec<ObjectId> = self.players[controller as usize].library.clone();
+                    if !options.is_empty() {
+                        self.pending_choice = Some(PendingChoice {
+                            player: controller,
+                            kind: ChoiceKind::ChooseFromList {
+                                options,
+                                reason: ChoiceReason::MysticalTutorSearch,
+                            },
+                        });
+                    }
+                }
             }
             CardName::DemonicConsultation => {
-                // Exile top 6, then find named card - simplified: tutor to hand
-                let options: Vec<ObjectId> = self.players[controller as usize].library.clone();
-                if !options.is_empty() {
-                    self.pending_choice = Some(PendingChoice {
-                        player: controller,
-                        kind: ChoiceKind::ChooseFromList {
-                            options,
-                            reason: ChoiceReason::DemonicTutorSearch,
-                        },
-                    });
+                if !self.library_search_restricted(controller) {
+                    // Exile top 6, then find named card - simplified: tutor to hand
+                    let options: Vec<ObjectId> = self.players[controller as usize].library.clone();
+                    if !options.is_empty() {
+                        self.pending_choice = Some(PendingChoice {
+                            player: controller,
+                            kind: ChoiceKind::ChooseFromList {
+                                options,
+                                reason: ChoiceReason::DemonicTutorSearch,
+                            },
+                        });
+                    }
                 }
             }
             CardName::BeseechTheMirror => {
-                let options: Vec<ObjectId> = self.players[controller as usize].library.clone();
-                if !options.is_empty() {
-                    self.pending_choice = Some(PendingChoice {
-                        player: controller,
-                        kind: ChoiceKind::ChooseFromList {
-                            options,
-                            reason: ChoiceReason::DemonicTutorSearch,
-                        },
-                    });
+                if !self.library_search_restricted(controller) {
+                    let options: Vec<ObjectId> = self.players[controller as usize].library.clone();
+                    if !options.is_empty() {
+                        self.pending_choice = Some(PendingChoice {
+                            player: controller,
+                            kind: ChoiceKind::ChooseFromList {
+                                options,
+                                reason: ChoiceReason::DemonicTutorSearch,
+                            },
+                        });
+                    }
                 }
             }
 
@@ -1171,25 +1186,27 @@ impl GameState {
                     self.destroy_permanent(*target_id);
                 }
                 // Search library for any land card
-                let searchable: Vec<ObjectId> = self.players[controller as usize]
-                    .library
-                    .iter()
-                    .filter(|&&id| {
-                        self.card_name_for_id(id)
-                            .and_then(|cn| find_card(db, cn))
-                            .map(|def| def.card_types.contains(&CardType::Land))
-                            .unwrap_or(false)
-                    })
-                    .copied()
-                    .collect();
-                if !searchable.is_empty() {
-                    self.pending_choice = Some(PendingChoice {
-                        player: controller,
-                        kind: ChoiceKind::ChooseFromList {
-                            options: searchable,
-                            reason: ChoiceReason::GenericSearch,
-                        },
-                    });
+                if !self.library_search_restricted(controller) {
+                    let searchable: Vec<ObjectId> = self.players[controller as usize]
+                        .library
+                        .iter()
+                        .filter(|&&id| {
+                            self.card_name_for_id(id)
+                                .and_then(|cn| find_card(db, cn))
+                                .map(|def| def.card_types.contains(&CardType::Land))
+                                .unwrap_or(false)
+                        })
+                        .copied()
+                        .collect();
+                    if !searchable.is_empty() {
+                        self.pending_choice = Some(PendingChoice {
+                            player: controller,
+                            kind: ChoiceKind::ChooseFromList {
+                                options: searchable,
+                                reason: ChoiceReason::GenericSearch,
+                            },
+                        });
+                    }
                 }
             }
 
@@ -1198,25 +1215,27 @@ impl GameState {
                 if let Some(Target::Object(sac_id)) = targets.first() {
                     self.destroy_permanent(*sac_id);
                 }
-                let searchable: Vec<ObjectId> = self.players[controller as usize]
-                    .library
-                    .iter()
-                    .filter(|&&id| {
-                        self.card_name_for_id(id)
-                            .and_then(|cn| find_card(db, cn))
-                            .map(|def| def.card_types.contains(&CardType::Artifact))
-                            .unwrap_or(false)
-                    })
-                    .copied()
-                    .collect();
-                if !searchable.is_empty() {
-                    self.pending_choice = Some(PendingChoice {
-                        player: controller,
-                        kind: ChoiceKind::ChooseFromList {
-                            options: searchable,
-                            reason: ChoiceReason::GenericSearch,
-                        },
-                    });
+                if !self.library_search_restricted(controller) {
+                    let searchable: Vec<ObjectId> = self.players[controller as usize]
+                        .library
+                        .iter()
+                        .filter(|&&id| {
+                            self.card_name_for_id(id)
+                                .and_then(|cn| find_card(db, cn))
+                                .map(|def| def.card_types.contains(&CardType::Artifact))
+                                .unwrap_or(false)
+                        })
+                        .copied()
+                        .collect();
+                    if !searchable.is_empty() {
+                        self.pending_choice = Some(PendingChoice {
+                            player: controller,
+                            kind: ChoiceKind::ChooseFromList {
+                                options: searchable,
+                                reason: ChoiceReason::GenericSearch,
+                            },
+                        });
+                    }
                 }
             }
 
@@ -1228,25 +1247,27 @@ impl GameState {
                     self.destroy_permanent(*sac_id);
                 }
                 // Search for any artifact in library
-                let searchable: Vec<ObjectId> = self.players[controller as usize]
-                    .library
-                    .iter()
-                    .filter(|&&id| {
-                        self.card_name_for_id(id)
-                            .and_then(|cn| find_card(db, cn))
-                            .map(|def| def.card_types.contains(&CardType::Artifact))
-                            .unwrap_or(false)
-                    })
-                    .copied()
-                    .collect();
-                if !searchable.is_empty() {
-                    self.pending_choice = Some(PendingChoice {
-                        player: controller,
-                        kind: ChoiceKind::ChooseFromList {
-                            options: searchable,
-                            reason: ChoiceReason::GenericSearch,
-                        },
-                    });
+                if !self.library_search_restricted(controller) {
+                    let searchable: Vec<ObjectId> = self.players[controller as usize]
+                        .library
+                        .iter()
+                        .filter(|&&id| {
+                            self.card_name_for_id(id)
+                                .and_then(|cn| find_card(db, cn))
+                                .map(|def| def.card_types.contains(&CardType::Artifact))
+                                .unwrap_or(false)
+                        })
+                        .copied()
+                        .collect();
+                    if !searchable.is_empty() {
+                        self.pending_choice = Some(PendingChoice {
+                            player: controller,
+                            kind: ChoiceKind::ChooseFromList {
+                                options: searchable,
+                                reason: ChoiceReason::GenericSearch,
+                            },
+                        });
+                    }
                 }
             }
 
@@ -1255,28 +1276,30 @@ impl GameState {
                 if let Some(Target::Object(sac_id)) = targets.first() {
                     self.destroy_permanent(*sac_id);
                 }
-                let searchable: Vec<ObjectId> = self.players[controller as usize]
-                    .library
-                    .iter()
-                    .filter(|&&id| {
-                        self.card_name_for_id(id)
-                            .and_then(|cn| find_card(db, cn))
-                            .map(|def| {
-                                def.card_types.contains(&CardType::Creature)
-                                    && def.color_identity.contains(&Color::Green)
-                            })
-                            .unwrap_or(false)
-                    })
-                    .copied()
-                    .collect();
-                if !searchable.is_empty() {
-                    self.pending_choice = Some(PendingChoice {
-                        player: controller,
-                        kind: ChoiceKind::ChooseFromList {
-                            options: searchable,
-                            reason: ChoiceReason::GenericSearch,
-                        },
-                    });
+                if !self.library_search_restricted(controller) {
+                    let searchable: Vec<ObjectId> = self.players[controller as usize]
+                        .library
+                        .iter()
+                        .filter(|&&id| {
+                            self.card_name_for_id(id)
+                                .and_then(|cn| find_card(db, cn))
+                                .map(|def| {
+                                    def.card_types.contains(&CardType::Creature)
+                                        && def.color_identity.contains(&Color::Green)
+                                })
+                                .unwrap_or(false)
+                        })
+                        .copied()
+                        .collect();
+                    if !searchable.is_empty() {
+                        self.pending_choice = Some(PendingChoice {
+                            player: controller,
+                            kind: ChoiceKind::ChooseFromList {
+                                options: searchable,
+                                reason: ChoiceReason::GenericSearch,
+                            },
+                        });
+                    }
                 }
             }
 
@@ -1284,29 +1307,31 @@ impl GameState {
             // put it onto the battlefield. GSZ is then shuffled into the library (not graveyard).
             // The shuffle-into-library is handled in resolve_spell via the gsz_shuffle_back flag.
             CardName::GreenSunsZenith => {
-                let searchable: Vec<ObjectId> = self.players[controller as usize]
-                    .library
-                    .iter()
-                    .filter(|&&id| {
-                        self.card_name_for_id(id)
-                            .and_then(|cn| find_card(db, cn))
-                            .map(|def| {
-                                def.card_types.contains(&CardType::Creature)
-                                    && def.color_identity.contains(&Color::Green)
-                                    && def.mana_cost.cmc() <= x_value
-                            })
-                            .unwrap_or(false)
-                    })
-                    .copied()
-                    .collect();
-                if !searchable.is_empty() {
-                    self.pending_choice = Some(PendingChoice {
-                        player: controller,
-                        kind: ChoiceKind::ChooseFromList {
-                            options: searchable,
-                            reason: ChoiceReason::GenericSearch,
-                        },
-                    });
+                if !self.library_search_restricted(controller) {
+                    let searchable: Vec<ObjectId> = self.players[controller as usize]
+                        .library
+                        .iter()
+                        .filter(|&&id| {
+                            self.card_name_for_id(id)
+                                .and_then(|cn| find_card(db, cn))
+                                .map(|def| {
+                                    def.card_types.contains(&CardType::Creature)
+                                        && def.color_identity.contains(&Color::Green)
+                                        && def.mana_cost.cmc() <= x_value
+                                })
+                                .unwrap_or(false)
+                        })
+                        .copied()
+                        .collect();
+                    if !searchable.is_empty() {
+                        self.pending_choice = Some(PendingChoice {
+                            player: controller,
+                            kind: ChoiceKind::ChooseFromList {
+                                options: searchable,
+                                reason: ChoiceReason::GenericSearch,
+                            },
+                        });
+                    }
                 }
             }
 
@@ -3241,25 +3266,27 @@ impl GameState {
             TriggeredEffect::TezzeretEmblemArtifact => {
                 // Tezzeret, Cruel Captain emblem: search library for an artifact, put it
                 // onto the battlefield. Simplified: present as a search choice.
-                let options: Vec<ObjectId> = self.players[controller as usize]
-                    .library
-                    .iter()
-                    .filter(|&&id| {
-                        self.card_name_for_id(id)
-                            .and_then(|cn| crate::card::find_card(db, cn))
-                            .map(|def| def.card_types.contains(&crate::types::CardType::Artifact))
-                            .unwrap_or(false)
-                    })
-                    .copied()
-                    .collect();
-                if !options.is_empty() {
-                    self.pending_choice = Some(PendingChoice {
-                        player: controller,
-                        kind: ChoiceKind::ChooseFromList {
-                            options,
-                            reason: ChoiceReason::GenericSearch,
-                        },
-                    });
+                if !self.library_search_restricted(controller) {
+                    let options: Vec<ObjectId> = self.players[controller as usize]
+                        .library
+                        .iter()
+                        .filter(|&&id| {
+                            self.card_name_for_id(id)
+                                .and_then(|cn| crate::card::find_card(db, cn))
+                                .map(|def| def.card_types.contains(&crate::types::CardType::Artifact))
+                                .unwrap_or(false)
+                        })
+                        .copied()
+                        .collect();
+                    if !options.is_empty() {
+                        self.pending_choice = Some(PendingChoice {
+                            player: controller,
+                            kind: ChoiceKind::ChooseFromList {
+                                options,
+                                reason: ChoiceReason::GenericSearch,
+                            },
+                        });
+                    }
                 }
             }
             TriggeredEffect::SacrificeTarget { permanent_id } => {
@@ -3472,28 +3499,30 @@ impl GameState {
                             }
                             // Chapter III: Search for artifact with MV 0 or 1, put onto BF, sacrifice saga.
                             (CardName::UrzasSaga, 3) => {
-                                let options: Vec<ObjectId> = self.players[controller as usize]
-                                    .library
-                                    .iter()
-                                    .copied()
-                                    .filter(|&id| {
-                                        self.card_name_for_id(id)
-                                            .and_then(|cn| find_card(db, cn))
-                                            .map(|def| {
-                                                def.card_types.contains(&CardType::Artifact)
-                                                    && def.mana_cost.cmc() <= 1
-                                            })
-                                            .unwrap_or(false)
-                                    })
-                                    .collect();
-                                if !options.is_empty() {
-                                    self.pending_choice = Some(PendingChoice {
-                                        player: controller,
-                                        kind: ChoiceKind::ChooseFromList {
-                                            options,
-                                            reason: ChoiceReason::UrzasSagaChapterIII,
-                                        },
-                                    });
+                                if !self.library_search_restricted(controller) {
+                                    let options: Vec<ObjectId> = self.players[controller as usize]
+                                        .library
+                                        .iter()
+                                        .copied()
+                                        .filter(|&id| {
+                                            self.card_name_for_id(id)
+                                                .and_then(|cn| find_card(db, cn))
+                                                .map(|def| {
+                                                    def.card_types.contains(&CardType::Artifact)
+                                                        && def.mana_cost.cmc() <= 1
+                                                })
+                                                .unwrap_or(false)
+                                        })
+                                        .collect();
+                                    if !options.is_empty() {
+                                        self.pending_choice = Some(PendingChoice {
+                                            player: controller,
+                                            kind: ChoiceKind::ChooseFromList {
+                                                options,
+                                                reason: ChoiceReason::UrzasSagaChapterIII,
+                                            },
+                                        });
+                                    }
                                 }
                                 self.stack.push(
                                     StackItemKind::TriggeredAbility {
@@ -3900,24 +3929,26 @@ impl GameState {
             TriggeredEffect::GolosETB => {
                 // Golos: search library for a land card, put it onto the battlefield tapped.
                 // This uses the pending_choice system for land selection.
-                let searchable: Vec<ObjectId> = self.players[controller as usize]
-                    .library
-                    .iter()
-                    .filter(|&&id| {
-                        self.card_name_for_id(id)
-                            .map(|cn| crate::card::is_land_card(cn))
-                            .unwrap_or(false)
-                    })
-                    .copied()
-                    .collect();
-                if !searchable.is_empty() {
-                    self.pending_choice = Some(PendingChoice {
-                        player: controller,
-                        kind: ChoiceKind::ChooseFromList {
-                            options: searchable,
-                            reason: ChoiceReason::GolosETBSearch,
-                        },
-                    });
+                if !self.library_search_restricted(controller) {
+                    let searchable: Vec<ObjectId> = self.players[controller as usize]
+                        .library
+                        .iter()
+                        .filter(|&&id| {
+                            self.card_name_for_id(id)
+                                .map(|cn| crate::card::is_land_card(cn))
+                                .unwrap_or(false)
+                        })
+                        .copied()
+                        .collect();
+                    if !searchable.is_empty() {
+                        self.pending_choice = Some(PendingChoice {
+                            player: controller,
+                            kind: ChoiceKind::ChooseFromList {
+                                options: searchable,
+                                reason: ChoiceReason::GolosETBSearch,
+                            },
+                        });
+                    }
                 }
             }
 

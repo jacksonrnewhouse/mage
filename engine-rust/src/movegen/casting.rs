@@ -825,24 +825,26 @@ impl GameState {
                 self.players[controller as usize].life -= 1;
                 self.destroy_permanent(permanent_id);
                 // Search for appropriate land - present as choice
-                let searchable: Vec<ObjectId> = self.players[controller as usize]
-                    .library
-                    .iter()
-                    .filter(|&&id| {
-                        self.card_name_for_id(id)
-                            .map(|cn| self.is_fetchable(card_name, cn))
-                            .unwrap_or(false)
-                    })
-                    .copied()
-                    .collect();
-                if !searchable.is_empty() {
-                    self.pending_choice = Some(PendingChoice {
-                        player: controller,
-                        kind: ChoiceKind::ChooseFromList {
-                            options: searchable,
-                            reason: ChoiceReason::GenericSearch,
-                        },
-                    });
+                if !self.library_search_restricted(controller) {
+                    let searchable: Vec<ObjectId> = self.players[controller as usize]
+                        .library
+                        .iter()
+                        .filter(|&&id| {
+                            self.card_name_for_id(id)
+                                .map(|cn| self.is_fetchable(card_name, cn))
+                                .unwrap_or(false)
+                        })
+                        .copied()
+                        .collect();
+                    if !searchable.is_empty() {
+                        self.pending_choice = Some(PendingChoice {
+                            player: controller,
+                            kind: ChoiceKind::ChooseFromList {
+                                options: searchable,
+                                reason: ChoiceReason::GenericSearch,
+                            },
+                        });
+                    }
                 }
             }
 
