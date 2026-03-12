@@ -110,7 +110,7 @@ impl GameState {
             | CardName::ThaliaGuardianOfThraben | CardName::AjaniNacatlPariah
             | CardName::KatakiWarsWage | CardName::OswaldFiddlebender
             | CardName::PheliaExuberantShepherd | CardName::SamwiseTheStouthearted
-            | CardName::ArchonOfEmeria | CardName::BoromirWardenOfTheTower
+            | CardName::BoromirWardenOfTheTower
             | CardName::LoranOfTheThirdPath
             // Blue creatures
             | CardName::TamiyoInquisitiveStudent | CardName::EmryLurkerOfTheLoch
