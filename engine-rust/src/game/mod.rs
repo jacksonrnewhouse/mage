@@ -1270,30 +1270,43 @@ impl GameState {
     // --- Dynamic P/T ---
 
     /// Count the number of distinct card types among all cards in all players' graveyards.
-    /// Used for Tarmogoyf and similar lhurgoyf-style creatures.
+    /// Used for Tarmogoyf, Barrowgoyf, and similar lhurgoyf-style creatures.
     pub fn graveyard_card_type_count(&self, db: &[CardDef]) -> i16 {
         let mut seen_types: u8 = 0; // bitfield for CardType variants (7 types)
         for player in &self.players {
-            for &obj_id in &player.graveyard {
-                if let Some(card_name) = self.card_name_for_id(obj_id) {
-                    if let Some(def) = find_card(db, card_name) {
-                        for &ct in def.card_types {
-                            let bit = match ct {
-                                CardType::Land => 1 << 0,
-                                CardType::Creature => 1 << 1,
-                                CardType::Artifact => 1 << 2,
-                                CardType::Enchantment => 1 << 3,
-                                CardType::Instant => 1 << 4,
-                                CardType::Sorcery => 1 << 5,
-                                CardType::Planeswalker => 1 << 6,
-                            };
-                            seen_types |= bit;
-                        }
+            Self::accumulate_graveyard_types(&player.graveyard, self, db, &mut seen_types);
+        }
+        seen_types.count_ones() as i16
+    }
+
+    /// Count the number of distinct card types among cards in a single player's graveyard.
+    /// Used for Nethergoyf which only counts its controller's graveyard.
+    pub fn player_graveyard_card_type_count(&self, player: PlayerId, db: &[CardDef]) -> i16 {
+        let mut seen_types: u8 = 0;
+        Self::accumulate_graveyard_types(&self.players[player as usize].graveyard, self, db, &mut seen_types);
+        seen_types.count_ones() as i16
+    }
+
+    /// Helper: accumulate card type bits from a graveyard into the seen_types bitfield.
+    fn accumulate_graveyard_types(graveyard: &[ObjectId], state: &GameState, db: &[CardDef], seen_types: &mut u8) {
+        for &obj_id in graveyard {
+            if let Some(card_name) = state.card_name_for_id(obj_id) {
+                if let Some(def) = find_card(db, card_name) {
+                    for &ct in def.card_types {
+                        let bit = match ct {
+                            CardType::Land => 1 << 0,
+                            CardType::Creature => 1 << 1,
+                            CardType::Artifact => 1 << 2,
+                            CardType::Enchantment => 1 << 3,
+                            CardType::Instant => 1 << 4,
+                            CardType::Sorcery => 1 << 5,
+                            CardType::Planeswalker => 1 << 6,
+                        };
+                        *seen_types |= bit;
                     }
                 }
             }
         }
-        seen_types.count_ones() as i16
     }
 
     /// Effective power of a permanent, accounting for dynamic P/T (e.g. Tarmogoyf).
@@ -1305,8 +1318,14 @@ impl GameState {
             None => return 0,
         };
         match perm.card_name {
-            CardName::Tarmogoyf | CardName::Pyrogoyf => {
+            CardName::Tarmogoyf | CardName::Pyrogoyf | CardName::Barrowgoyf => {
                 let count = self.graveyard_card_type_count(db);
+                count + perm.power_mod
+                    + perm.counters.get(CounterType::PlusOnePlusOne)
+                    - perm.counters.get(CounterType::MinusOneMinusOne)
+            }
+            CardName::Nethergoyf => {
+                let count = self.player_graveyard_card_type_count(perm.controller, db);
                 count + perm.power_mod
                     + perm.counters.get(CounterType::PlusOnePlusOne)
                     - perm.counters.get(CounterType::MinusOneMinusOne)
@@ -1322,8 +1341,14 @@ impl GameState {
             None => return 0,
         };
         match perm.card_name {
-            CardName::Tarmogoyf | CardName::Pyrogoyf => {
+            CardName::Tarmogoyf | CardName::Pyrogoyf | CardName::Barrowgoyf => {
                 let count = self.graveyard_card_type_count(db);
+                count + 1 + perm.toughness_mod
+                    + perm.counters.get(CounterType::PlusOnePlusOne)
+                    - perm.counters.get(CounterType::MinusOneMinusOne)
+            }
+            CardName::Nethergoyf => {
+                let count = self.player_graveyard_card_type_count(perm.controller, db);
                 count + 1 + perm.toughness_mod
                     + perm.counters.get(CounterType::PlusOnePlusOne)
                     - perm.counters.get(CounterType::MinusOneMinusOne)
