@@ -738,8 +738,7 @@ impl GameState {
             }
 
             // === Wheel effects ===
-            CardName::WheelOfFortune | CardName::Timetwister | CardName::Windfall
-            | CardName::EchoOfEons => {
+            CardName::WheelOfFortune | CardName::Timetwister | CardName::EchoOfEons => {
                 for pid in 0..self.num_players as usize {
                     // Discard hand
                     let hand = std::mem::take(&mut self.players[pid].hand);
@@ -753,6 +752,22 @@ impl GameState {
                     }
                     // Draw 7
                     self.draw_cards(pid as PlayerId, 7);
+                }
+            }
+
+            // Windfall: each player discards, then draws equal to greatest number discarded
+            CardName::Windfall => {
+                let mut max_discarded = 0usize;
+                for pid in 0..self.num_players as usize {
+                    let hand = std::mem::take(&mut self.players[pid].hand);
+                    let discarded = hand.len();
+                    if discarded > max_discarded {
+                        max_discarded = discarded;
+                    }
+                    self.players[pid].graveyard.extend(hand);
+                }
+                for pid in 0..self.num_players as usize {
+                    self.draw_cards(pid as PlayerId, max_discarded);
                 }
             }
 
