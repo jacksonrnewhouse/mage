@@ -1736,8 +1736,8 @@ pub fn build_card_db() -> Vec<CardDef> {
     // === Blue Enchantments/Artifacts ===
     card!(AetherSpellbomb, "Aether Spellbomb", ManaCost::generic(1), &[Artifact], &[], None, None, None, kw(), &[Blue],
         "{U}, Sacrifice Aether Spellbomb: Return target creature to its owner's hand. {1}, Sacrifice Aether Spellbomb: Draw a card.");
-    card!(CryogenRelic, "Cryogen Relic", ManaCost::generic(2), &[Artifact], &[], None, None, None, kw(), &[Blue],
-        "When Cryogen Relic enters, draw a card. {2}, {T}, Sacrifice Cryogen Relic: Counter target activated or triggered ability.");
+    card!(CryogenRelic, "Cryogen Relic", ManaCost { blue: 1, generic: 1, ..ManaCost::ZERO }, &[Artifact], &[], None, None, None, kw(), &[Blue],
+        "When Cryogen Relic enters or leaves the battlefield, draw a card. {1}{U}, Sacrifice Cryogen Relic: Put a stun counter on up to one target tapped creature.");
     card!(MysticRemora, "Mystic Remora", ManaCost::u(1), &[Enchantment], &[], None, None, None, kw(), &[Blue],
         "Cumulative upkeep {1}. Whenever an opponent casts a noncreature spell, you may draw a card unless that player pays {4}.");
     card!(UnableToScream, "Unable to Scream", ManaCost::u(1), &[Enchantment], &[], None, None, None, kw(), &[Blue],

@@ -311,6 +311,12 @@ pub enum ActivatedEffect {
     UntapArtifactOrCreature,
     /// Emry, Lurker of the Loch: choose target artifact in graveyard, may cast it this turn.
     EmryCastArtifact,
+    /// Aether Spellbomb: {U}, Sacrifice: Return target creature to its owner's hand.
+    AetherSpellbombBounce,
+    /// Aether Spellbomb: {1}, Sacrifice: Draw a card.
+    AetherSpellbombDraw,
+    /// Cryogen Relic: {1}{U}, Sacrifice: Put a stun counter on target tapped creature.
+    CryogenRelicStun,
 }
 
 /// The game stack.

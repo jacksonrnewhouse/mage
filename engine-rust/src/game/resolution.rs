@@ -2638,6 +2638,19 @@ impl GameState {
                 });
             }
 
+            // Cryogen Relic: when this artifact enters the battlefield, draw a card.
+            CardName::CryogenRelic => {
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: _card_id,
+                        source_name: card_name,
+                        effect: TriggeredEffect::DrawCards(1),
+                    },
+                    controller,
+                    vec![],
+                );
+            }
+
             // Roiling Vortex: register recurring upkeep trigger to deal 1 damage to each player.
             CardName::RoilingVortex => {
                 self.add_delayed_trigger(crate::types::DelayedTrigger {
@@ -4272,6 +4285,29 @@ impl GameState {
             }
             ActivatedEffect::EmryCastArtifact => {
                 // Emry: handled at activation time (grants cast permission via emry_castable_artifacts)
+            }
+
+            // === Aether Spellbomb ===
+            ActivatedEffect::AetherSpellbombBounce => {
+                // Return target creature to its owner's hand
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    self.remove_permanent_to_zone(*target_id, DestinationZone::Hand);
+                }
+            }
+            ActivatedEffect::AetherSpellbombDraw => {
+                // Draw a card
+                self.draw_cards(controller, 1);
+            }
+
+            // === Cryogen Relic ===
+            ActivatedEffect::CryogenRelicStun => {
+                // Put a stun counter on up to one target tapped creature
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    if let Some(perm) = self.find_permanent_mut(*target_id) {
+                        perm.counters.add(CounterType::Stun, 1);
+                    }
+                }
+                // "up to one" — if no target, nothing happens
             }
         }
     }

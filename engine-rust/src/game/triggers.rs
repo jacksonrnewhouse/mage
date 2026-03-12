@@ -131,6 +131,19 @@ impl GameState {
             .find(|(app_id, _)| *app_id == left_id)
             .map(|(_, mv)| *mv);
 
+        // --- Cryogen Relic leaves: draw a card ---
+        if _left_name == CardName::CryogenRelic {
+            self.stack.push(
+                StackItemKind::TriggeredAbility {
+                    source_id: left_id,
+                    source_name: _left_name,
+                    effect: TriggeredEffect::DrawCards(1),
+                },
+                controller,
+                vec![],
+            );
+        }
+
         if let Some(token_mv) = skyclave_mv {
             self.skyclave_token_mv.retain(|(app_id, _)| *app_id != left_id);
             let opponent = self.opponent(controller);

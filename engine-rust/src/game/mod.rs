@@ -624,7 +624,13 @@ impl GameState {
     pub fn untap_step(&mut self) {
         for perm in &mut self.battlefield {
             if perm.controller == self.active_player && !perm.doesnt_untap {
-                perm.tapped = false;
+                // Stun counters: if a permanent with a stun counter would become untapped,
+                // remove one stun counter instead of untapping.
+                if perm.tapped && perm.counters.get(crate::types::CounterType::Stun) > 0 {
+                    perm.counters.remove(crate::types::CounterType::Stun, 1);
+                } else {
+                    perm.tapped = false;
+                }
             }
         }
     }

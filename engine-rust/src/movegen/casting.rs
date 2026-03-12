@@ -1571,6 +1571,63 @@ impl GameState {
                 self.reset_priority_passes();
             }
 
+            // Aether Spellbomb ability 0: {U}, Sacrifice: Return target creature to its owner's hand.
+            CardName::AetherSpellbomb if ability_index == 0 => {
+                let cost = crate::mana::ManaCost::u(1);
+                if !self.players[controller as usize].mana_pool.pay(&cost) {
+                    return;
+                }
+                self.destroy_permanent(permanent_id);
+                self.stack.push(
+                    StackItemKind::ActivatedAbility {
+                        source_id: permanent_id,
+                        source_name: card_name,
+                        effect: ActivatedEffect::AetherSpellbombBounce,
+                    },
+                    controller,
+                    targets.to_vec(),
+                );
+                self.reset_priority_passes();
+            }
+
+            // Aether Spellbomb ability 1: {1}, Sacrifice: Draw a card.
+            CardName::AetherSpellbomb if ability_index == 1 => {
+                let cost = crate::mana::ManaCost::generic(1);
+                if !self.players[controller as usize].mana_pool.pay(&cost) {
+                    return;
+                }
+                self.destroy_permanent(permanent_id);
+                self.stack.push(
+                    StackItemKind::ActivatedAbility {
+                        source_id: permanent_id,
+                        source_name: card_name,
+                        effect: ActivatedEffect::AetherSpellbombDraw,
+                    },
+                    controller,
+                    vec![],
+                );
+                self.reset_priority_passes();
+            }
+
+            // Cryogen Relic ability 0: {1}{U}, Sacrifice: Put a stun counter on up to one target tapped creature.
+            CardName::CryogenRelic if ability_index == 0 => {
+                let cost = crate::mana::ManaCost { blue: 1, generic: 1, ..crate::mana::ManaCost::ZERO };
+                if !self.players[controller as usize].mana_pool.pay(&cost) {
+                    return;
+                }
+                self.destroy_permanent(permanent_id);
+                self.stack.push(
+                    StackItemKind::ActivatedAbility {
+                        source_id: permanent_id,
+                        source_name: card_name,
+                        effect: ActivatedEffect::CryogenRelicStun,
+                    },
+                    controller,
+                    targets.to_vec(),
+                );
+                self.reset_priority_passes();
+            }
+
             // Engineered Explosives: {2}, Sacrifice: Destroy each nonland permanent with MV equal to charge counters (ability_index 0)
             CardName::EngineeredExplosives if ability_index == 0 => {
                 let cost = crate::mana::ManaCost::generic(2);

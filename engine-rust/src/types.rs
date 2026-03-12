@@ -307,6 +307,9 @@ pub enum CounterType {
     Burden,
     /// Lore counters placed on Saga enchantments to track chapter progression.
     Lore,
+    /// Stun counters: if a permanent with a stun counter would become untapped,
+    /// remove one stun counter instead.
+    Stun,
 }
 
 /// Represents a target for a spell or ability.

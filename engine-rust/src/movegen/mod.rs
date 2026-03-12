@@ -1845,6 +1845,37 @@ impl GameState {
             }
         }
 
+        // Aether Spellbomb ability 0: {U}, Sacrifice: Return target creature to its owner's hand.
+        if perm.card_name == CardName::AetherSpellbomb {
+            let player = &self.players[perm.controller as usize];
+            if player.mana_pool.blue >= 1 {
+                for target in &self.battlefield {
+                    if target.is_creature() {
+                        abilities.push((0, vec![Target::Object(target.id)]));
+                    }
+                }
+            }
+            // Aether Spellbomb ability 1: {1}, Sacrifice: Draw a card.
+            if player.mana_pool.total() >= 1 {
+                abilities.push((1, vec![]));
+            }
+        }
+
+        // Cryogen Relic ability 0: {1}{U}, Sacrifice: Put a stun counter on up to one target tapped creature.
+        if perm.card_name == CardName::CryogenRelic {
+            let player = &self.players[perm.controller as usize];
+            let cost = crate::mana::ManaCost { blue: 1, generic: 1, ..crate::mana::ManaCost::ZERO };
+            if player.mana_pool.can_pay(&cost) {
+                // "up to one" means we can activate with no target
+                abilities.push((0, vec![]));
+                for target in &self.battlefield {
+                    if target.is_creature() && target.tapped {
+                        abilities.push((0, vec![Target::Object(target.id)]));
+                    }
+                }
+            }
+        }
+
         // Aphetto Alchemist: {T}: Untap target artifact or creature (ability_index 0)
         if perm.card_name == CardName::AphettoAlchemist && !perm.tapped && !perm.entered_this_turn {
             for target in &self.battlefield {
