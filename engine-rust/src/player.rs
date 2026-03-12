@@ -43,6 +43,9 @@ pub struct Player {
     pub companion: Option<ObjectId>,
     /// Necropotence: skip draw step, discards are exiled instead of going to graveyard.
     pub necropotence_active: bool,
+    /// Veil of Summer: your spells can't be countered this turn;
+    /// you and permanents you control gain hexproof from blue and from black until end of turn.
+    pub veil_of_summer_active: bool,
 }
 
 impl Player {
@@ -70,6 +73,7 @@ impl Player {
             cards_discarded_this_turn: 0,
             companion: None,
             necropotence_active: false,
+            veil_of_summer_active: false,
         }
     }
 
@@ -99,6 +103,7 @@ impl Player {
         self.yawgmoth_will_active = false;
         self.protection_from_everything = false;
         self.cards_discarded_this_turn = 0;
+        self.veil_of_summer_active = false;
     }
 
     pub fn has_card_in_hand(&self, id: ObjectId) -> bool {

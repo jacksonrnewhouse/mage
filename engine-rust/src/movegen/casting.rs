@@ -254,6 +254,10 @@ impl GameState {
                             if !uncounterable {
                                 uncounterable = self.halfling_makes_uncounterable(player_id, def);
                             }
+                            // Veil of Summer: your spells can't be countered this turn.
+                            if !uncounterable {
+                                uncounterable = self.players[player_id as usize].veil_of_summer_active;
+                            }
                             // Mark evoke-cast spells so resolution can apply the sacrifice trigger.
                             let is_evoke = matches!(alt_cost, Some(AltCost::Evoke { .. }));
                             let spell_id = self.stack.push_with_flags(
@@ -535,7 +539,7 @@ impl GameState {
                                 },
                                 player_id,
                                 targets.clone(),
-                                false,  // cant_be_countered
+                                self.players[player_id as usize].veil_of_summer_active,  // cant_be_countered
                                 0,      // x_value
                                 false,  // cast_from_graveyard
                                 true,   // cast_as_adventure

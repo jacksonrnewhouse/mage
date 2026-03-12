@@ -925,8 +925,6 @@ impl GameState {
                 }
             }
             CardName::VeilOfSummer => {
-                // Your spells can't be countered this turn.
-                // You and permanents you control gain hexproof from blue and from black until end of turn.
                 // Draw a card if an opponent has cast a blue or black spell this turn.
                 // Simplified: check if opponent controls any blue or black permanents as a proxy
                 // for having cast blue/black spells. In a game tree search this is a reasonable heuristic.
@@ -937,6 +935,9 @@ impl GameState {
                 if opp_has_blue_or_black {
                     self.draw_cards(controller, 1);
                 }
+                // Your spells can't be countered this turn.
+                // You and permanents you control gain hexproof from blue and from black until end of turn.
+                self.players[controller as usize].veil_of_summer_active = true;
             }
             CardName::OnceUponATime => {
                 // Look at top 5, take creature or land - simplified: draw 1
@@ -4606,7 +4607,8 @@ impl GameState {
                             self.handle_etb(card_name, card_id, controller);
                         } else {
                             // Instant/sorcery: push onto stack, cast without paying cost
-                            let uncounterable = crate::movegen::is_uncounterable(card_name);
+                            let uncounterable = crate::movegen::is_uncounterable(card_name)
+                                || self.players[controller as usize].veil_of_summer_active;
                             self.stack.push_with_flags(
                                 crate::stack::StackItemKind::Spell {
                                     card_name,

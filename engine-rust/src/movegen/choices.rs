@@ -425,7 +425,8 @@ impl GameState {
                                 // Push spell onto the stack. Use cast_from_graveyard=true so that
                                 // after resolution the card is exiled (as per madness rules).
                                 use crate::stack::StackItemKind;
-                                let uncounterable = crate::movegen::is_uncounterable(card_name);
+                                let uncounterable = crate::movegen::is_uncounterable(card_name)
+                                    || self.players[owner as usize].veil_of_summer_active;
                                 self.stack.push_with_flags(
                                     StackItemKind::Spell {
                                         card_name,

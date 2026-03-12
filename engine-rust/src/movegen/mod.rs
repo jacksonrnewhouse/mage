@@ -2343,6 +2343,13 @@ impl GameState {
         if target.keywords.has(Keyword::Shroud) {
             return false;
         }
+        // Veil of Summer: permanents you control gain hexproof from blue and from black.
+        if self.players[target.controller as usize].veil_of_summer_active
+            && target.controller != caster
+            && source_colors.iter().any(|c| matches!(c, Color::Blue | Color::Black))
+        {
+            return false;
+        }
         // Protection: can't be targeted by sources with a protected quality.
         if target.is_protected_from(source_colors, caster) {
             return false;
