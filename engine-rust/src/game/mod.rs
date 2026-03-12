@@ -1591,6 +1591,24 @@ impl GameState {
                 }
             }
         }
+
+        // Archon of Emeria: "Nonbasic lands your opponents control enter tapped."
+        let is_nonbasic_land = self.battlefield.iter()
+            .find(|p| p.id == permanent_id)
+            .map(|p| p.is_land() && !matches!(p.card_name,
+                CardName::Plains | CardName::Island | CardName::Swamp
+                | CardName::Mountain | CardName::Forest))
+            .unwrap_or(false);
+
+        if is_nonbasic_land {
+            let opponent_has_archon = self.battlefield.iter()
+                .any(|p| p.card_name == CardName::ArchonOfEmeria && p.controller != controller);
+            if opponent_has_archon {
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.tapped = true;
+                }
+            }
+        }
     }
 
     /// City of Traitors: "When you play another land, sacrifice this land."

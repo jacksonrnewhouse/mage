@@ -408,6 +408,61 @@ fn test_manglehorn_treasure_tokens_enter_tapped() {
 }
 
 #[test]
+fn test_archon_of_emeria_nonbasic_lands_enter_tapped() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // P0 controls Archon of Emeria
+    let archon_id = state.new_object_id();
+    state.card_registry.push((archon_id, CardName::ArchonOfEmeria));
+    let def = find_card(&db, CardName::ArchonOfEmeria).unwrap();
+    let mut perm = crate::permanent::Permanent::new(
+        archon_id, CardName::ArchonOfEmeria, 0, 0,
+        def.power, def.toughness, None, def.keywords, def.card_types,
+    );
+    perm.entered_this_turn = false;
+    state.battlefield.push(perm);
+
+    // P1 (opponent) puts a nonbasic land onto the battlefield — should enter tapped
+    let volc_id = state.new_object_id();
+    state.card_registry.push((volc_id, CardName::VolcanicIsland));
+    let def2 = find_card(&db, CardName::VolcanicIsland).unwrap();
+    let perm2 = crate::permanent::Permanent::new(
+        volc_id, CardName::VolcanicIsland, 1, 1,
+        def2.power, def2.toughness, None, def2.keywords, def2.card_types,
+    );
+    state.battlefield.push(perm2);
+    state.apply_enters_tapped_statics(volc_id, 1);
+    let volc = state.battlefield.iter().find(|p| p.id == volc_id).unwrap();
+    assert!(volc.tapped, "Opponent's nonbasic land should enter tapped with Archon of Emeria");
+
+    // P0's own nonbasic land should NOT enter tapped
+    let own_volc_id = state.new_object_id();
+    state.card_registry.push((own_volc_id, CardName::VolcanicIsland));
+    let perm3 = crate::permanent::Permanent::new(
+        own_volc_id, CardName::VolcanicIsland, 0, 0,
+        def2.power, def2.toughness, None, def2.keywords, def2.card_types,
+    );
+    state.battlefield.push(perm3);
+    state.apply_enters_tapped_statics(own_volc_id, 0);
+    let own_volc = state.battlefield.iter().find(|p| p.id == own_volc_id).unwrap();
+    assert!(!own_volc.tapped, "Controller's own nonbasic land should NOT enter tapped with Archon");
+
+    // P1 (opponent) puts a basic land — should NOT enter tapped
+    let plains_id = state.new_object_id();
+    state.card_registry.push((plains_id, CardName::Plains));
+    let def3 = find_card(&db, CardName::Plains).unwrap();
+    let perm4 = crate::permanent::Permanent::new(
+        plains_id, CardName::Plains, 1, 1,
+        def3.power, def3.toughness, None, def3.keywords, def3.card_types,
+    );
+    state.battlefield.push(perm4);
+    state.apply_enters_tapped_statics(plains_id, 1);
+    let plains = state.battlefield.iter().find(|p| p.id == plains_id).unwrap();
+    assert!(!plains.tapped, "Opponent's basic land should NOT enter tapped with Archon of Emeria");
+}
+
+#[test]
 fn test_damping_sphere_ancient_tomb_produces_one_colorless() {
     let db = build_card_db();
     let mut state = GameState::new_two_player();
