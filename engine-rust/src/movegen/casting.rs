@@ -820,6 +820,21 @@ impl GameState {
                 self.reset_priority_passes();
             }
 
+            // Necropotence: pay 1 life, draw a card (simplified)
+            CardName::Necropotence if ability_index == 0 => {
+                self.players[controller as usize].life -= 1;
+                self.stack.push(
+                    StackItemKind::ActivatedAbility {
+                        source_id: permanent_id,
+                        source_name: card_name,
+                        effect: ActivatedEffect::NecropotencePayLife,
+                    },
+                    controller,
+                    vec![],
+                );
+                self.reset_priority_passes();
+            }
+
             // The One Ring: {T}: Put a burden counter, then draw cards equal to burden counters.
             CardName::TheOneRing if ability_index == 0 => {
                 self.stack.push(

@@ -496,10 +496,17 @@ impl GameState {
     fn cleanup_step(&mut self) {
         // Discard to hand size (7)
         let active = self.active_player as usize;
+        let necro_active = self.players[active].necropotence_active;
         while self.players[active].hand.len() > 7 {
             // For AI: this becomes a choice. For now, discard last card.
             if let Some(id) = self.players[active].hand.pop() {
-                self.players[active].graveyard.push(id);
+                if necro_active {
+                    // Necropotence: discards go to exile instead of graveyard
+                    let card_name = self.card_name_for_id(id).unwrap_or(CardName::Plains);
+                    self.exile.push((id, card_name, active as PlayerId));
+                } else {
+                    self.players[active].graveyard.push(id);
+                }
             }
         }
         // Clear damage and per-turn flags from all permanents
@@ -792,6 +799,17 @@ impl GameState {
 
         // Check leaves-battlefield triggers (for all removals)
         self.check_leaves_triggers(perm_id, perm_name, controller);
+
+        // Necropotence: when it leaves the battlefield, clear the flag.
+        // Only clear if the controller no longer controls any Necropotence.
+        if perm_name == CardName::Necropotence {
+            let still_has_necro = self.battlefield.iter().any(|p| {
+                p.card_name == CardName::Necropotence && p.controller == controller
+            });
+            if !still_has_necro {
+                self.players[controller as usize].necropotence_active = false;
+            }
+        }
 
         Some(perm)
     }
