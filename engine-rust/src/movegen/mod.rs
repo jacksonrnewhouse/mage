@@ -168,6 +168,29 @@ impl GameState {
                         }
                     }
 
+                    // Hogaak, Arisen Necropolis: can't spend mana to cast.
+                    // Must use convoke (tap creatures) and delve (exile graveyard cards).
+                    // Simplified: can cast if creature_count + graveyard_count >= 7 (CMC).
+                    if card_name == CardName::HogaakArisenNecropolis {
+                        let creature_count = self.battlefield.iter()
+                            .filter(|p| p.controller == player_id && p.is_creature() && !p.tapped)
+                            .count();
+                        let graveyard_count = self.players[player_id as usize].graveyard.len();
+                        // Need B and G from convoke (creatures of those colors) or just total >= 7
+                        if creature_count + graveyard_count >= 7 {
+                            actions.push(Action::CastSpell {
+                                card_id,
+                                targets: vec![],
+                                x_value: 0,
+                                from_graveyard: false,
+                                from_library_top: false,
+                                alt_cost: None,
+                                modes: vec![],
+                            });
+                        }
+                        continue;
+                    }
+
                     // Check mana cost (including Thalia tax, etc.)
                     let effective_cost = self.effective_cost(def, player_id);
                     let is_artifact = def.card_types.contains(&CardType::Artifact);
@@ -300,9 +323,32 @@ impl GameState {
                                 .map(|d| d.card_types.contains(&CardType::Land))
                                 .unwrap_or(false)
                         });
-                        let can_cast_from_gyd = has_own_flashback || has_snapcaster_flashback || yawgmoth_active || can_retrace;
+                        // Hogaak, Arisen Necropolis: can be cast from graveyard
+                        let hogaak_from_graveyard = card_name == CardName::HogaakArisenNecropolis;
+                        let can_cast_from_gyd = has_own_flashback || has_snapcaster_flashback || yawgmoth_active || can_retrace || hogaak_from_graveyard;
 
                         if !can_cast_from_gyd {
+                            continue;
+                        }
+
+                        // Hogaak: special handling — uses convoke + delve, no mana
+                        if hogaak_from_graveyard {
+                            let creature_count = self.battlefield.iter()
+                                .filter(|p| p.controller == player_id && p.is_creature() && !p.tapped)
+                                .count();
+                            // Graveyard count minus 1 (Hogaak itself is in the graveyard)
+                            let graveyard_count = self.players[player_id as usize].graveyard.len().saturating_sub(1);
+                            if creature_count + graveyard_count >= 7 {
+                                actions.push(Action::CastSpell {
+                                    card_id,
+                                    targets: vec![],
+                                    x_value: 0,
+                                    from_graveyard: true,
+                                    from_library_top: false,
+                                    alt_cost: None,
+                                    modes: vec![],
+                                });
+                            }
                             continue;
                         }
 
@@ -931,6 +977,17 @@ impl GameState {
                 .filter(|p| p.controller == _controller && p.is_artifact())
                 .count() as u32;
             generic_reduction += artifact_count;
+        }
+
+        // Delve: exile cards from graveyard to reduce generic mana cost.
+        // Applies to Dig Through Time, Treasure Cruise, and Hogaak.
+        let has_delve = matches!(
+            def.name,
+            CardName::DigThroughTime | CardName::TreasureCruise | CardName::HogaakArisenNecropolis
+        );
+        if has_delve {
+            let graveyard_count = self.players[_controller as usize].graveyard.len() as u32;
+            generic_reduction += graveyard_count;
         }
 
         // Apply increases then reductions to generic, keeping it non-negative.
@@ -1717,6 +1774,15 @@ impl GameState {
             }
         }
 
+        // Necropotence: pay 1 life, draw a card (simplified approximation, no tap required).
+        // Can activate multiple times as long as you have life.
+        if perm.card_name == CardName::Necropotence {
+            let player = &self.players[perm.controller as usize];
+            if player.life >= 2 { // require at least 2 life so we don't suicide
+                abilities.push((0, vec![]));
+            }
+        }
+
         // Walking Ballista: {4}: Put a +1/+1 counter on Walking Ballista (ability_index 0)
         if perm.card_name == CardName::WalkingBallista {
             let player = &self.players[perm.controller as usize];
@@ -1964,6 +2030,38 @@ impl GameState {
                     // -7: Create emblem
                     if perm.loyalty >= 7 {
                         abilities.push((2, vec![]));
+                    }
+                }
+                CardName::MinscAndBooTimelessHeroes => {
+                    // +1: Create Boo (1/1 Hamster with trample and haste)
+                    abilities.push((0, vec![]));
+                    // -2: Target creature you control gets +X/+0 and trample (X = its power)
+                    if perm.loyalty >= 2 {
+                        for target in &self.battlefield {
+                            if target.is_creature() && target.controller == perm.controller {
+                                abilities.push((1, vec![Target::Object(target.id)]));
+                            }
+                        }
+                    }
+                    // -6: Sacrifice a creature, deal damage equal to its power, draw that many cards
+                    if perm.loyalty >= 6 {
+                        for target in &self.battlefield {
+                            if target.is_creature() && target.controller == perm.controller {
+                                abilities.push((2, vec![Target::Object(target.id)]));
+                            }
+                        }
+                    }
+                }
+                CardName::CometStellarPup => {
+                    // 0: Simplified — create two 1/1 tokens
+                    abilities.push((0, vec![]));
+                }
+                CardName::DovinHandOfControl => {
+                    // -1: Prevent damage from/to target permanent (simplified: no-op)
+                    if perm.loyalty >= 1 {
+                        for target in &self.battlefield {
+                            abilities.push((0, vec![Target::Object(target.id)]));
+                        }
                     }
                 }
                 _ => {}

@@ -87,7 +87,37 @@ impl GameState {
                     if let Some(def) = find_card(db, cn) {
                         // Determine whether we're paying an alternate cost or normal mana cost.
                         let is_artifact = def.card_types.contains(&CardType::Artifact);
-                        let paid = if let Some(alt) = alt_cost {
+                        let paid = if cn == CardName::HogaakArisenNecropolis {
+                            // Hogaak can't spend mana to cast. Pay with convoke + delve.
+                            // Simplified: tap up to 7 untapped creatures, exile rest from graveyard.
+                            let mut remaining = 7u32;
+                            // Convoke: tap untapped creatures
+                            let creature_ids: Vec<ObjectId> = self.battlefield.iter()
+                                .filter(|p| p.controller == player_id && p.is_creature() && !p.tapped)
+                                .map(|p| p.id)
+                                .collect();
+                            for cid in creature_ids {
+                                if remaining == 0 { break; }
+                                if let Some(perm) = self.find_permanent_mut(cid) {
+                                    perm.tapped = true;
+                                    remaining -= 1;
+                                }
+                            }
+                            // Delve: exile from graveyard for the rest
+                            let gy = &mut self.players[player_id as usize].graveyard;
+                            let to_exile = (remaining as usize).min(gy.len());
+                            let mut exiled_cards = Vec::new();
+                            for _ in 0..to_exile {
+                                if let Some(card) = gy.pop() {
+                                    exiled_cards.push(card);
+                                }
+                            }
+                            remaining -= to_exile as u32;
+                            for card in exiled_cards {
+                                self.exile.push((card, self.card_name_for_id(card).unwrap_or(CardName::Plains), player_id));
+                            }
+                            remaining == 0
+                        } else if let Some(alt) = alt_cost {
                             self.pay_alt_cost(player_id, *card_id, alt)
                         } else if *from_graveyard {
                             // Flashback / Yawgmoth's Will: pay the flashback cost.
@@ -168,6 +198,30 @@ impl GameState {
                                 }
                             } else {
                                 self.players[player_id as usize].remove_from_hand(*card_id);
+                            }
+                            // Delve: exile cards from graveyard as part of the cost.
+                            // The effective_cost already reduced the generic cost, so we exile
+                            // the same number of cards that offset the generic mana.
+                            let has_delve = matches!(cn,
+                                CardName::DigThroughTime | CardName::TreasureCruise | CardName::HogaakArisenNecropolis
+                            );
+                            if has_delve {
+                                // How many cards were delved? = original generic cost - effective generic cost
+                                let original_generic = def.mana_cost.generic as u32;
+                                let effective_generic = self.effective_cost(def, player_id).generic as u32;
+                                let delved = original_generic.saturating_sub(effective_generic);
+                                let gy = &mut self.players[player_id as usize].graveyard;
+                                let to_exile = (delved as usize).min(gy.len());
+                                let mut exiled_cards = Vec::new();
+                                for _ in 0..to_exile {
+                                    if let Some(card) = gy.pop() {
+                                        exiled_cards.push(card);
+                                    }
+                                }
+                                for card in exiled_cards {
+                                    let cn_for_exile = self.card_name_for_id(card).unwrap_or(CardName::Plains);
+                                    self.exile.push((card, cn_for_exile, player_id));
+                                }
                             }
                             // Check static can't-be-countered (e.g., Abrupt Decay)
                             let mut uncounterable = is_uncounterable(cn);
@@ -1160,6 +1214,88 @@ impl GameState {
                                     source_id: permanent_id,
                                     source_name: card_name,
                                     effect: ActivatedEffect::KayaUltimate,
+                                },
+                                controller,
+                                targets.to_vec(),
+                            );
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            CardName::MinscAndBooTimelessHeroes => {
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.loyalty_activated_this_turn = true;
+                    match ability_index {
+                        0 => {
+                            perm.loyalty += 1;
+                            self.stack.push(
+                                StackItemKind::ActivatedAbility {
+                                    source_id: permanent_id,
+                                    source_name: card_name,
+                                    effect: ActivatedEffect::MinscCreateBoo,
+                                },
+                                controller,
+                                vec![],
+                            );
+                        }
+                        1 => {
+                            perm.loyalty -= 2;
+                            self.stack.push(
+                                StackItemKind::ActivatedAbility {
+                                    source_id: permanent_id,
+                                    source_name: card_name,
+                                    effect: ActivatedEffect::MinscPump,
+                                },
+                                controller,
+                                targets.to_vec(),
+                            );
+                        }
+                        2 => {
+                            perm.loyalty -= 6;
+                            self.stack.push(
+                                StackItemKind::ActivatedAbility {
+                                    source_id: permanent_id,
+                                    source_name: card_name,
+                                    effect: ActivatedEffect::MinscUltimate,
+                                },
+                                controller,
+                                targets.to_vec(),
+                            );
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            CardName::CometStellarPup => {
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.loyalty_activated_this_turn = true;
+                    // 0 ability: no loyalty change
+                    self.stack.push(
+                        StackItemKind::ActivatedAbility {
+                            source_id: permanent_id,
+                            source_name: card_name,
+                            effect: ActivatedEffect::CometCreateTokens,
+                        },
+                        controller,
+                        vec![],
+                    );
+                }
+            }
+
+            CardName::DovinHandOfControl => {
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.loyalty_activated_this_turn = true;
+                    match ability_index {
+                        0 => {
+                            perm.loyalty -= 1;
+                            self.stack.push(
+                                StackItemKind::ActivatedAbility {
+                                    source_id: permanent_id,
+                                    source_name: card_name,
+                                    effect: ActivatedEffect::DovinPrevent,
                                 },
                                 controller,
                                 targets.to_vec(),

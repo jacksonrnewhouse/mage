@@ -251,6 +251,23 @@ impl GameState {
             ));
         }
 
+        // Mystic Remora: whenever an opponent casts a noncreature spell, draw a card
+        // (simplified — opponents rarely pay the {4} cumulative upkeep tax)
+        let remora_triggers: Vec<(ObjectId, PlayerId)> = self
+            .battlefield
+            .iter()
+            .filter(|p| p.card_name == CardName::MysticRemora && p.controller != caster)
+            .map(|p| (p.id, p.controller))
+            .collect();
+        for (source_id, controller) in remora_triggers {
+            triggers.push((
+                source_id,
+                CardName::MysticRemora,
+                TriggeredEffect::MysticRemoraOpponentCast,
+                controller,
+            ));
+        }
+
         for (source_id, source_name, effect, controller) in triggers {
             self.stack.push(
                 StackItemKind::TriggeredAbility {
@@ -295,7 +312,7 @@ impl GameState {
     /// Called after any spell is pushed to the stack.
     pub(crate) fn check_lavinia_trigger(&mut self, caster: PlayerId, spell_id: ObjectId, mana_spent: bool) {
         if mana_spent {
-            return; // Lavinia and Boromir only trigger on free spells
+            return; // Lavinia, Boromir, and Roiling Vortex only trigger on free spells
         }
         // Lavinia, Azorius Renegade
         let lavinia_triggers: Vec<(ObjectId, PlayerId)> = self
@@ -331,6 +348,25 @@ impl GameState {
                 },
                 controller,
                 vec![Target::Object(spell_id)],
+            );
+        }
+        // Roiling Vortex: whenever a player casts a spell without paying its mana cost,
+        // deal 5 damage to that player.
+        let vortex_triggers: Vec<(ObjectId, PlayerId)> = self
+            .battlefield
+            .iter()
+            .filter(|p| p.card_name == CardName::RoilingVortex)
+            .map(|p| (p.id, p.controller))
+            .collect();
+        for (source_id, controller) in vortex_triggers {
+            self.stack.push(
+                StackItemKind::TriggeredAbility {
+                    source_id,
+                    source_name: CardName::RoilingVortex,
+                    effect: TriggeredEffect::RoilingVortexFreeCast { target_player: caster },
+                },
+                controller,
+                vec![Target::Player(caster)],
             );
         }
     }

@@ -41,6 +41,8 @@ pub struct Player {
     /// to put the companion into their hand.
     /// `None` means no companion, or the companion has already been moved to hand.
     pub companion: Option<ObjectId>,
+    /// Necropotence: skip draw step, discards are exiled instead of going to graveyard.
+    pub necropotence_active: bool,
 }
 
 impl Player {
@@ -67,6 +69,7 @@ impl Player {
             protection_from_everything: false,
             cards_discarded_this_turn: 0,
             companion: None,
+            necropotence_active: false,
         }
     }
 

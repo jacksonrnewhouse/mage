@@ -165,6 +165,18 @@ pub enum TriggeredEffect {
     ChaliceCounter { spell_id: ObjectId },
     /// Eidolon of the Great Revel: whenever a player casts a spell with MV 3 or less, deal 2 damage to that player.
     EidolonDamage { target_player: PlayerId },
+    /// Animate Dead ETB: return target creature from any graveyard to the battlefield under your control with -1/-0.
+    AnimateDeadETB,
+    /// Mystic Remora: whenever an opponent casts a noncreature spell, draw a card.
+    MysticRemoraOpponentCast,
+    /// Dress Down ETB: draw a card.
+    DressDownETB,
+    /// Dress Down: sacrifice at the beginning of the next end step.
+    DressDownSacrifice { permanent_id: ObjectId },
+    /// Roiling Vortex upkeep: deal 1 damage to each player.
+    RoilingVortexUpkeep,
+    /// Roiling Vortex: whenever a player casts a spell without paying its mana cost, deal 5 damage to that player.
+    RoilingVortexFreeCast { target_player: PlayerId },
 }
 
 /// Activated ability effects.
@@ -270,6 +282,18 @@ pub enum ActivatedEffect {
     KrarkClanIronworksSacrifice,
     /// Engineered Explosives: {2}, Sacrifice: Destroy each nonland permanent with MV equal to charge counters.
     EngineeredExplosivesDestroy { charge_counters: u32 },
+    /// Minsc & Boo +1: Create Boo, a legendary 1/1 red Hamster creature token with trample and haste.
+    MinscCreateBoo,
+    /// Minsc & Boo -2: Target creature gets +X/+0 and gains trample until end of turn, where X is its power.
+    MinscPump,
+    /// Minsc & Boo -6: Sacrifice a creature, deal damage equal to its power, draw that many cards.
+    MinscUltimate,
+    /// Comet, Stellar Pup 0: Simplified — create two 1/1 tokens.
+    CometCreateTokens,
+    /// Dovin, Hand of Control -1: Prevent damage from/to target permanent (simplified: no-op).
+    DovinPrevent,
+    /// Necropotence: pay 1 life, draw a card (simplified approximation).
+    NecropotencePayLife,
 }
 
 /// The game stack.

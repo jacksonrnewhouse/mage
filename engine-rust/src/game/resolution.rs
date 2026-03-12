@@ -253,11 +253,8 @@ impl GameState {
                 // Remand controller draws a card regardless of whether the spell was countered
                 self.draw_cards(controller, 1);
             }
-            CardName::MentalMisstep | CardName::Flusterstorm | CardName::Daze
-            | CardName::ManaLeak
-            | CardName::SpellPierce | CardName::MysticalDispute | CardName::ConsignToMemory => {
-                // Counter unless controller pays - simplified: just counter
-                // Also respects can't-be-countered flag
+            CardName::MentalMisstep => {
+                // Hard counter: counter target spell with mana value 1
                 if let Some(Target::Object(spell_id)) = targets.first() {
                     let is_uncounterable = self.stack.items()
                         .iter()
@@ -268,6 +265,103 @@ impl GameState {
                         if let Some(item) = self.stack.remove(*spell_id) {
                             self.route_countered_spell(item);
                         }
+                    }
+                }
+            }
+            CardName::SpellPierce | CardName::ManaLeak | CardName::Daze
+            | CardName::MysticalDispute | CardName::Flusterstorm => {
+                // Soft counters: "counter unless controller pays {X}"
+                // Simplified for game tree search: auto-pay if opponent has enough mana, else counter.
+                let tax = match card_name {
+                    CardName::SpellPierce => 2u16,
+                    CardName::ManaLeak => 3,
+                    CardName::MysticalDispute => 3,
+                    CardName::Daze => 1,
+                    CardName::Flusterstorm => 1,
+                    _ => unreachable!(),
+                };
+                if let Some(Target::Object(spell_id)) = targets.first() {
+                    let spell_info = self.stack.items()
+                        .iter()
+                        .find(|item| item.id == *spell_id)
+                        .map(|item| (item.cant_be_countered, item.controller));
+                    if let Some((is_uncounterable, spell_controller)) = spell_info {
+                        if !is_uncounterable {
+                            // Count opponent's available mana: mana pool + untapped lands
+                            let pool_mana = self.players[spell_controller as usize].mana_pool.total();
+                            let untapped_land_count = self.battlefield.iter()
+                                .filter(|p| p.controller == spell_controller && !p.tapped && p.is_land())
+                                .count() as u16;
+                            let available = pool_mana + untapped_land_count;
+                            if available < tax {
+                                // Can't pay — counter the spell
+                                if let Some(item) = self.stack.remove(*spell_id) {
+                                    self.route_countered_spell(item);
+                                }
+                            }
+                            // If they can pay, the spell is NOT countered (auto-pay simplification)
+                        }
+                    }
+                }
+                // Storm: Flusterstorm has storm — push copies
+                if card_name == CardName::Flusterstorm && !is_copy {
+                    let storm = self.storm_count;
+                    let template = crate::stack::StackItem {
+                        id: 0,
+                        kind: crate::stack::StackItemKind::Spell {
+                            card_name: CardName::Flusterstorm,
+                            card_id: 0,
+                            cast_via_evoke: false,
+                        },
+                        controller,
+                        targets: targets.to_vec(),
+                        cant_be_countered: false,
+                        x_value: 0,
+                        cast_from_graveyard: false,
+                        cast_as_adventure: false,
+                        modes: vec![],
+                        is_copy: false,
+                    };
+                    for _ in 0..storm {
+                        self.stack.push_copy(&template);
+                    }
+                }
+            }
+            CardName::ConsignToMemory => {
+                // Hard counter with Storm
+                if let Some(Target::Object(spell_id)) = targets.first() {
+                    let is_uncounterable = self.stack.items()
+                        .iter()
+                        .find(|item| item.id == *spell_id)
+                        .map(|item| item.cant_be_countered)
+                        .unwrap_or(false);
+                    if !is_uncounterable {
+                        if let Some(item) = self.stack.remove(*spell_id) {
+                            self.route_countered_spell(item);
+                        }
+                    }
+                }
+                // Storm: push storm_count copies onto the stack
+                if !is_copy {
+                    let storm = self.storm_count;
+                    let template = crate::stack::StackItem {
+                        id: 0,
+                        kind: crate::stack::StackItemKind::Spell {
+                            card_name: CardName::ConsignToMemory,
+                            card_id: 0,
+                            cast_via_evoke: false,
+                        },
+                        controller,
+                        targets: targets.to_vec(),
+                        cant_be_countered: false,
+                        x_value: 0,
+                        cast_from_graveyard: false,
+                        cast_as_adventure: false,
+                        modes: vec![],
+                        is_copy: false,
+                    };
+                    for _ in 0..storm {
+                        self.stack.push_copy(&template);
                     }
                 }
             }
@@ -2360,6 +2454,93 @@ impl GameState {
                 self.draw_cards(controller, 4);
             }
 
+            // Necropotence: set the necropotence_active flag on the controller.
+            // This skips their draw step and exiles discards instead of sending to graveyard.
+            CardName::Necropotence => {
+                self.players[controller as usize].necropotence_active = true;
+            }
+
+            // Animate Dead: return target creature from any graveyard to the battlefield
+            // under your control with -1/-0. Simplified as a Reanimate variant.
+            CardName::AnimateDead => {
+                // Find the best creature in any graveyard to reanimate
+                let db_local = crate::card::build_card_db();
+                let mut target_id: Option<ObjectId> = None;
+                let mut target_pid: Option<usize> = None;
+                for pid in 0..self.num_players as usize {
+                    for &gid in &self.players[pid].graveyard {
+                        if let Some(cn) = self.card_name_for_id(gid) {
+                            if let Some(def) = find_card(&db_local, cn) {
+                                if def.card_types.iter().any(|&t| t == CardType::Creature) {
+                                    target_id = Some(gid);
+                                    target_pid = Some(pid);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if target_id.is_some() { break; }
+                }
+                if let (Some(card_id), Some(pid)) = (target_id, target_pid) {
+                    let cage_active = self.grafdiggers_cage_active();
+                    let priest_active = self.containment_priest_active();
+                    if let Some(pos) = self.players[pid].graveyard.iter().position(|&id| id == card_id) {
+                        self.players[pid].graveyard.remove(pos);
+                        let cn = self.card_name_for_id(card_id).unwrap_or(CardName::Plains);
+                        if cage_active || priest_active {
+                            self.exile.push((card_id, cn, pid as PlayerId));
+                        } else if let Some(def) = find_card(&db_local, cn) {
+                            let mut perm = Permanent::new(
+                                card_id, cn, controller, pid as PlayerId,
+                                def.power, def.toughness, def.loyalty, def.keywords, def.card_types,
+                            );
+                            perm.creature_types = def.creature_types.to_vec();
+                            perm.colors = def.color_identity.to_vec();
+                            // Apply -1/-0 from Animate Dead
+                            perm.power_mod -= 1;
+                            self.battlefield.push(perm);
+                            self.handle_etb(cn, card_id, controller);
+                        }
+                    }
+                }
+            }
+
+            // Mystic Remora: no ETB effect itself; the cast trigger is handled in triggers.rs.
+            // Just register it on the battlefield (already done by the spell resolution above).
+            CardName::MysticRemora => {}
+
+            // Dress Down: draw a card on ETB, and sacrifice at the beginning of the next end step.
+            CardName::DressDown => {
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: _card_id,
+                        source_name: card_name,
+                        effect: TriggeredEffect::DressDownETB,
+                    },
+                    controller,
+                    vec![],
+                );
+                // Register delayed trigger to sacrifice at next end step
+                self.add_delayed_trigger(crate::types::DelayedTrigger {
+                    condition: crate::types::DelayedTriggerCondition::AtBeginningOfNextEndStep,
+                    effect: TriggeredEffect::DressDownSacrifice { permanent_id: _card_id },
+                    controller,
+                    fires_once: true,
+                });
+            }
+
+            // Roiling Vortex: register recurring upkeep trigger to deal 1 damage to each player.
+            CardName::RoilingVortex => {
+                self.add_delayed_trigger(crate::types::DelayedTrigger {
+                    condition: crate::types::DelayedTriggerCondition::AtBeginningOfUpkeep {
+                        player: controller,
+                    },
+                    effect: TriggeredEffect::RoilingVortexUpkeep,
+                    controller,
+                    fires_once: false,
+                });
+            }
+
             _ => {}
         }
     }
@@ -3150,6 +3331,39 @@ impl GameState {
                 self.players[target_player as usize].life -= 2;
             }
 
+            TriggeredEffect::AnimateDeadETB => {
+                // Handled inline in handle_etb_with_x for AnimateDead
+            }
+
+            TriggeredEffect::MysticRemoraOpponentCast => {
+                // Mystic Remora: draw a card (simplified — opponents rarely pay 4)
+                self.draw_cards(controller, 1);
+            }
+
+            TriggeredEffect::DressDownETB => {
+                // Dress Down ETB: draw a card
+                self.draw_cards(controller, 1);
+            }
+
+            TriggeredEffect::DressDownSacrifice { permanent_id } => {
+                // Dress Down: sacrifice at the beginning of the next end step
+                if self.find_permanent(permanent_id).is_some() {
+                    self.remove_permanent_to_zone(permanent_id, DestinationZone::Graveyard);
+                }
+            }
+
+            TriggeredEffect::RoilingVortexUpkeep => {
+                // Roiling Vortex: deal 1 damage to each player
+                for pid in 0..self.num_players {
+                    self.players[pid as usize].life -= 1;
+                }
+            }
+
+            TriggeredEffect::RoilingVortexFreeCast { target_player } => {
+                // Roiling Vortex: deal 5 damage to the player who cast a spell without paying its mana cost
+                self.players[target_player as usize].life -= 5;
+            }
+
             _ => {}
         }
         let _ = db; // suppress unused warning when db not used in all arms
@@ -3401,6 +3615,117 @@ impl GameState {
                     self.players[*target_player as usize].life -= cards_in_exile;
                     self.players[controller as usize].life += cards_in_exile;
                 }
+            }
+            ActivatedEffect::MinscCreateBoo => {
+                // Minsc & Boo +1: Create Boo, a legendary 1/1 red Hamster with trample and haste.
+                let token_id = self.new_object_id();
+                let mut kw = Keywords::empty();
+                kw.add(Keyword::Trample);
+                kw.add(Keyword::Haste);
+                let token = Permanent {
+                    id: token_id,
+                    card_name: card_name_for_token(),
+                    controller,
+                    owner: controller,
+                    tapped: false,
+                    base_power: 1,
+                    base_toughness: 1,
+                    power_mod: 0,
+                    toughness_mod: 0,
+                    damage: 0,
+                    keywords: kw,
+                    counters: Counters::default(),
+                    entered_this_turn: true,
+                    attacked_this_turn: false,
+                    doesnt_untap: false,
+                    loyalty: 0,
+                    loyalty_activated_this_turn: false,
+                    card_types: vec![CardType::Creature],
+                    creature_types: vec![CreatureType::Hamster],
+                    cavern_creature_type: None,
+                    protections: Vec::new(),
+                    colors: vec![Color::Red],
+                    transformed: false,
+                    is_token: true,
+                    attached_to: None,
+                    attachments: Vec::new(),
+                };
+                self.battlefield.push(token);
+            }
+            ActivatedEffect::MinscPump => {
+                // Minsc & Boo -2: Target creature gets +X/+0 and trample until EOT, where X = its power.
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    let power = self.find_permanent(*target_id).map(|p| p.power()).unwrap_or(0);
+                    if power > 0 {
+                        self.temporary_effects.push(TemporaryEffect::ModifyPT {
+                            target: *target_id,
+                            power: power,
+                            toughness: 0,
+                        });
+                        if let Some(perm) = self.find_permanent_mut(*target_id) {
+                            perm.power_mod += power;
+                        }
+                    }
+                    self.temporary_effects.push(TemporaryEffect::GrantKeyword {
+                        target: *target_id,
+                        keyword: Keyword::Trample,
+                    });
+                    if let Some(perm) = self.find_permanent_mut(*target_id) {
+                        perm.keywords.add(Keyword::Trample);
+                    }
+                }
+            }
+            ActivatedEffect::MinscUltimate => {
+                // Minsc & Boo -6: Sacrifice a creature (targets[0]), deal damage equal to its power,
+                // draw that many cards.
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    let power = self.find_permanent(*target_id).map(|p| p.power()).unwrap_or(0);
+                    self.destroy_permanent(*target_id);
+                    if power > 0 {
+                        let opponent = self.opponent(controller);
+                        self.players[opponent as usize].life -= power as i32;
+                        self.draw_cards(controller, power as usize);
+                    }
+                }
+            }
+            ActivatedEffect::CometCreateTokens => {
+                // Comet, Stellar Pup 0: Simplified — create two 1/1 tokens.
+                for _ in 0..2 {
+                    let token_id = self.new_object_id();
+                    let token = Permanent {
+                        id: token_id,
+                        card_name: card_name_for_token(),
+                        controller,
+                        owner: controller,
+                        tapped: false,
+                        base_power: 1,
+                        base_toughness: 1,
+                        power_mod: 0,
+                        toughness_mod: 0,
+                        damage: 0,
+                        keywords: Keywords::empty(),
+                        counters: Counters::default(),
+                        entered_this_turn: true,
+                        attacked_this_turn: false,
+                        doesnt_untap: false,
+                        loyalty: 0,
+                        loyalty_activated_this_turn: false,
+                        card_types: vec![CardType::Creature],
+                        creature_types: Vec::new(),
+                        cavern_creature_type: None,
+                        protections: Vec::new(),
+                        colors: Vec::new(),
+                        transformed: false,
+                        is_token: true,
+                        attached_to: None,
+                        attachments: Vec::new(),
+                    };
+                    self.battlefield.push(token);
+                }
+            }
+            ActivatedEffect::DovinPrevent => {
+                // Dovin, Hand of Control -1: Prevent damage from/to target permanent.
+                // Simplified: no-op (damage prevention is hard to model).
             }
             ActivatedEffect::PlaneswalkerAbility { .. } => {
                 // Generic planeswalker ability - handled by specific variants above
@@ -3721,6 +4046,13 @@ impl GameState {
                 for id in to_destroy {
                     self.destroy_permanent(id);
                 }
+            }
+
+            ActivatedEffect::NecropotencePayLife => {
+                // Necropotence: pay 1 life, draw a card (simplified approximation).
+                // The actual card exiles from library and puts into hand at end step,
+                // but for game tree search, drawing immediately is a reasonable model.
+                self.draw_cards(controller, 1);
             }
         }
     }

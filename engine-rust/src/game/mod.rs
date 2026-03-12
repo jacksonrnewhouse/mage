@@ -387,7 +387,9 @@ impl GameState {
             (Phase::Beginning, Some(Step::Upkeep)) => {
                 self.step = Some(Step::Draw);
                 // Active player draws a card (skip on turn 1 for first player in 2-player)
-                if self.turn_number > 1 || self.active_player != 0 {
+                // Necropotence: skip the draw step entirely
+                let skip_draw = self.players[self.active_player as usize].necropotence_active;
+                if !skip_draw && (self.turn_number > 1 || self.active_player != 0) {
                     let active = self.active_player;
                     self.draw_cards(active, 1);
                 }
@@ -888,6 +890,10 @@ impl GameState {
                     reason: ChoiceReason::MadnessCast { card_id, madness_cost },
                 },
             });
+        } else if self.players[owner as usize].necropotence_active {
+            // Necropotence replacement: discard goes to exile instead of graveyard.
+            let card_name = self.card_name_for_id(card_id).unwrap_or(CardName::Plains);
+            self.exile.push((card_id, card_name, owner));
         } else {
             // Normal discard: apply graveyard replacement effects (Rest in Peace, etc.)
             let card_name = self.card_name_for_id(card_id).unwrap_or(CardName::Plains);

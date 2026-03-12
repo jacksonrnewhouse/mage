@@ -119,6 +119,7 @@ pub enum Keyword {
     Storm = 1 << 19,
     Cascade = 1 << 20,
     Dredge = 1 << 21,
+    Delve = 1 << 22,
 }
 
 /// Compact bitfield for keyword abilities on a permanent.
@@ -212,6 +213,7 @@ pub enum CreatureType {
     Dog,
     Archon,
     Dryad,
+    Hamster,
 }
 
 impl CreatureType {
@@ -278,6 +280,7 @@ impl CreatureType {
         CreatureType::Dog,
         CreatureType::Archon,
         CreatureType::Dryad,
+        CreatureType::Hamster,
     ];
 }
 
