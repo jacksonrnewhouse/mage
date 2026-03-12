@@ -2473,14 +2473,37 @@ impl GameState {
                     self.create_treasure_token(pid);
                 }
             }
-            // Loran of the Third Path: destroy artifact or enchantment
-            CardName::LoranOfTheThirdPath => {
+            // Loran of the Third Path / Witch Enchanter: destroy artifact or enchantment an opponent controls
+            CardName::LoranOfTheThirdPath | CardName::WitchEnchanter => {
                 let targets: Vec<ObjectId> = self.battlefield.iter()
                     .filter(|p| (p.is_artifact() || p.is_enchantment()) && p.controller != controller)
                     .map(|p| p.id)
                     .collect();
                 if let Some(&target_id) = targets.first() {
                     self.destroy_permanent(target_id);
+                }
+            }
+            // Samwise the Stouthearted: return target permanent card from your graveyard to your hand
+            CardName::SamwiseTheStouthearted => {
+                let pid = controller as usize;
+                let db_local = crate::card::build_card_db();
+                // Find a permanent card in our graveyard to return to hand
+                // (Simplified: ignores the "put there from the battlefield this turn" restriction)
+                let target: Option<usize> = self.players[pid].graveyard.iter().enumerate()
+                    .find(|(_, &id)| {
+                        self.card_name_for_id(id).map_or(false, |cn| {
+                            crate::card::find_card(&db_local, cn).map_or(false, |d| {
+                                d.card_types.iter().any(|t| matches!(t,
+                                    CardType::Creature | CardType::Artifact | CardType::Enchantment
+                                    | CardType::Planeswalker | CardType::Land))
+                            })
+                        })
+                    })
+                    .map(|(i, _)| i);
+                if let Some(pos) = target {
+                    let card_id = self.players[pid].graveyard.remove(pos);
+                    self.players[pid].hand.push(card_id);
+                    self.check_kishla_skimmer_trigger(controller);
                 }
             }
             // Agent of Treachery: gain control of target permanent on ETB
