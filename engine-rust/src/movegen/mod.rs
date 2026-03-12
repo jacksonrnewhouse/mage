@@ -8,6 +8,7 @@ use crate::action::*;
 use crate::card::*;
 use crate::game::*;
 use crate::mana::*;
+use crate::permanent::Permanent;
 use crate::stack::*;
 use crate::types::*;
 
@@ -1463,10 +1464,46 @@ impl GameState {
             | CardName::DryadArbor
             // Hideaway lands producing colored mana
             | CardName::ShelldockIsle
-            | CardName::MosswortBridge
+            | CardName::MosswortBridge => {
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.tapped = true;
+                }
+                self.players[controller as usize]
+                    .mana_pool
+                    .add(color_choice, 1);
+                true
+            }
+
+            // Forbidden Orchard: {T}: Add one mana of any color.
+            // Opponent gets a 1/1 colorless Spirit creature token.
+            CardName::ForbiddenOrchard => {
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.tapped = true;
+                }
+                self.players[controller as usize]
+                    .mana_pool
+                    .add(color_choice, 1);
+                // Create a 1/1 colorless Spirit creature token for the opponent
+                let opponent = self.opponent(controller);
+                let token_id = self.new_object_id();
+                let mut token = Permanent::new(
+                    token_id,
+                    card_name_for_token(),
+                    opponent,
+                    opponent,
+                    Some(1),
+                    Some(1),
+                    None,
+                    Keywords::empty(),
+                    &[CardType::Creature],
+                );
+                token.is_token = true;
+                self.battlefield.push(token);
+                true
+            }
+
             // Any-color mana producers
-            | CardName::ForbiddenOrchard
-            | CardName::Gleemox
+            CardName::Gleemox
             | CardName::ChromeMox
             | CardName::MoxDiamond
             | CardName::DelightedHalfling => {
