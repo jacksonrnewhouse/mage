@@ -163,6 +163,8 @@ pub enum TriggeredEffect {
     OkoExchange,
     /// Chalice of the Void: whenever a player casts a spell with mana value equal to charge counters, counter it.
     ChaliceCounter { spell_id: ObjectId },
+    /// Eidolon of the Great Revel: whenever a player casts a spell with MV 3 or less, deal 2 damage to that player.
+    EidolonDamage { target_player: PlayerId },
 }
 
 /// Activated ability effects.
@@ -256,6 +258,18 @@ pub enum ActivatedEffect {
     HideawayActivated { land_id: ObjectId },
     /// Griselbrand: pay 7 life, draw 7 cards.
     GriselbrandDraw,
+    /// Walking Ballista: {4}: Put a +1/+1 counter on Walking Ballista.
+    WalkingBallistaAddCounter { ballista_id: ObjectId },
+    /// Walking Ballista: Remove a +1/+1 counter: deal 1 damage to any target.
+    WalkingBallistaPing { ballista_id: ObjectId },
+    /// Time Vault: {T}: Take an extra turn after this one.
+    TimeVaultExtraTurn,
+    /// Time Vault: Skip your next turn: Untap Time Vault.
+    TimeVaultUntap { vault_id: ObjectId },
+    /// Krark-Clan Ironworks: Sacrifice an artifact: Add {C}{C}. (mana ability, resolved at activation)
+    KrarkClanIronworksSacrifice,
+    /// Engineered Explosives: {2}, Sacrifice: Destroy each nonland permanent with MV equal to charge counters.
+    EngineeredExplosivesDestroy { charge_counters: u32 },
 }
 
 /// The game stack.

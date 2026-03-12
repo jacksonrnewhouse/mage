@@ -117,6 +117,10 @@ impl GameState {
                 // Mark it in adventure_exiled so the creature half can be cast later.
                 self.exile.push((card_id, card_name, controller));
                 self.adventure_exiled.push((card_id, controller));
+            } else if card_name == CardName::GreenSunsZenith {
+                // Green Sun's Zenith: shuffle into library instead of going to graveyard.
+                // Approximation: put on bottom of library.
+                self.players[controller as usize].library.insert(0, card_id);
             } else {
                 // Apply graveyard-replacement effects (Rest in Peace).
                 self.send_to_graveyard(card_id, card_name, controller);
@@ -1127,6 +1131,36 @@ impl GameState {
                             .map(|def| {
                                 def.card_types.contains(&CardType::Creature)
                                     && def.color_identity.contains(&Color::Green)
+                            })
+                            .unwrap_or(false)
+                    })
+                    .copied()
+                    .collect();
+                if !searchable.is_empty() {
+                    self.pending_choice = Some(PendingChoice {
+                        player: controller,
+                        kind: ChoiceKind::ChooseFromList {
+                            options: searchable,
+                            reason: ChoiceReason::GenericSearch,
+                        },
+                    });
+                }
+            }
+
+            // Green Sun's Zenith: search library for a green creature card with MV <= X,
+            // put it onto the battlefield. GSZ is then shuffled into the library (not graveyard).
+            // The shuffle-into-library is handled in resolve_spell via the gsz_shuffle_back flag.
+            CardName::GreenSunsZenith => {
+                let searchable: Vec<ObjectId> = self.players[controller as usize]
+                    .library
+                    .iter()
+                    .filter(|&&id| {
+                        self.card_name_for_id(id)
+                            .and_then(|cn| find_card(db, cn))
+                            .map(|def| {
+                                def.card_types.contains(&CardType::Creature)
+                                    && def.color_identity.contains(&Color::Green)
+                                    && def.mana_cost.cmc() <= x_value
                             })
                             .unwrap_or(false)
                     })
@@ -2309,6 +2343,23 @@ impl GameState {
                 self.take_initiative(controller);
             }
 
+            // Endurance: target player shuffles their graveyard into their library.
+            // Simplified: move all cards from opponent's graveyard to the bottom of their library.
+            CardName::Endurance => {
+                let target_player = self.opponent(controller);
+                let graveyard = std::mem::take(&mut self.players[target_player as usize].graveyard);
+                // Insert at the bottom of the library (index 0 = bottom)
+                for card_id in graveyard {
+                    self.players[target_player as usize].library.insert(0, card_id);
+                }
+            }
+
+            // Atraxa, Grand Unifier: reveal top 10, put one of each card type into hand, rest on bottom.
+            // Simplified for game tree search: draw 4 cards (typical yield is 3-5 cards).
+            CardName::AtraxaGrandUnifier => {
+                self.draw_cards(controller, 4);
+            }
+
             _ => {}
         }
     }
@@ -3094,6 +3145,11 @@ impl GameState {
                 }
             }
 
+            TriggeredEffect::EidolonDamage { target_player } => {
+                // Eidolon of the Great Revel deals 2 damage to the player who cast the spell
+                self.players[target_player as usize].life -= 2;
+            }
+
             _ => {}
         }
         let _ = db; // suppress unused warning when db not used in all arms
@@ -3613,6 +3669,57 @@ impl GameState {
                             self.reset_priority_passes();
                         }
                     }
+                }
+            }
+
+            // === Walking Ballista ===
+            ActivatedEffect::WalkingBallistaAddCounter { ballista_id } => {
+                // Put a +1/+1 counter on Walking Ballista
+                if let Some(perm) = self.find_permanent_mut(ballista_id) {
+                    perm.counters.add(CounterType::PlusOnePlusOne, 1);
+                }
+            }
+            ActivatedEffect::WalkingBallistaPing { ballista_id: _ } => {
+                // Deal 1 damage to target (counter already removed at activation)
+                if let Some(&target) = targets.first() {
+                    self.deal_damage_to_target(target, 1, controller);
+                }
+            }
+
+            // === Time Vault ===
+            ActivatedEffect::TimeVaultExtraTurn => {
+                // Take an extra turn after this one
+                self.players[controller as usize].extra_turns += 1;
+            }
+            ActivatedEffect::TimeVaultUntap { vault_id } => {
+                // Untap Time Vault (skip turn cost already paid at activation)
+                if let Some(perm) = self.find_permanent_mut(vault_id) {
+                    perm.tapped = false;
+                }
+            }
+
+            // === Krark-Clan Ironworks ===
+            ActivatedEffect::KrarkClanIronworksSacrifice => {
+                // Mana ability — resolved at activation time, nothing to do here
+            }
+
+            // === Engineered Explosives ===
+            ActivatedEffect::EngineeredExplosivesDestroy { charge_counters } => {
+                // Destroy each nonland permanent with mana value equal to charge_counters
+                let to_destroy: Vec<ObjectId> = self.battlefield.iter()
+                    .filter(|p| {
+                        if p.is_land() {
+                            return false;
+                        }
+                        let mv = find_card(db, p.card_name)
+                            .map(|d| d.mana_cost.cmc() as u32)
+                            .unwrap_or(0);
+                        mv == charge_counters
+                    })
+                    .map(|p| p.id)
+                    .collect();
+                for id in to_destroy {
+                    self.destroy_permanent(id);
                 }
             }
         }

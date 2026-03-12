@@ -195,6 +195,8 @@ impl GameState {
                             self.check_lavinia_trigger(player_id, spell_id, mana_was_spent);
                             // Chalice of the Void: counter spells with MV equal to charge counters.
                             self.check_chalice_trigger(spell_id, def.mana_cost.cmc());
+                            // Eidolon of the Great Revel: deal 2 to caster if MV <= 3.
+                            self.check_eidolon_trigger(player_id, def.mana_cost.cmc());
                             self.players[player_id as usize].spells_cast_this_turn += 1;
                             if !def.card_types.contains(&CardType::Artifact) {
                                 self.players[player_id as usize].nonartifact_spells_cast_this_turn += 1;
@@ -292,6 +294,18 @@ impl GameState {
                     if n > 0 {
                         self.trigger_annihilator(defending_player, n);
                     }
+                    // Archon of Cruelty: when it attacks, trigger the same effect as its ETB.
+                    if cn == CardName::ArchonOfCruelty {
+                        self.stack.push(
+                            crate::stack::StackItemKind::TriggeredAbility {
+                                source_id: *creature_id,
+                                source_name: CardName::ArchonOfCruelty,
+                                effect: crate::stack::TriggeredEffect::ArchonOfCrueltyTrigger,
+                            },
+                            self.active_player,
+                            vec![crate::types::Target::Player(defending_player)],
+                        );
+                    }
                 }
             }
 
@@ -388,6 +402,7 @@ impl GameState {
                                 let adventure_spell_id = top_item.id;
                                 self.check_chalice_trigger(adventure_spell_id, adv.cost.cmc());
                             }
+                            self.check_eidolon_trigger(player_id, adv.cost.cmc());
                             self.players[player_id as usize].spells_cast_this_turn += 1;
                             self.players[player_id as usize].nonartifact_spells_cast_this_turn += 1;
                             self.players[player_id as usize].noncreature_spells_cast_this_turn += 1;
@@ -432,6 +447,7 @@ impl GameState {
                         );
                         // Chalice of the Void: counter spells with MV equal to charge counters.
                         self.check_chalice_trigger(spell_id, def.mana_cost.cmc());
+                        self.check_eidolon_trigger(player_id, def.mana_cost.cmc());
                         self.players[player_id as usize].spells_cast_this_turn += 1;
                         if !def.card_types.contains(&CardType::Artifact) {
                             self.players[player_id as usize].nonartifact_spells_cast_this_turn += 1;
@@ -526,6 +542,30 @@ impl GameState {
                         targets.to_vec(),
                     );
                     self.reset_priority_passes();
+                }
+            }
+            // 2 = Spirit Guide exile (mana ability, doesn't use stack)
+            2 => {
+                match card_name {
+                    CardName::ElvishSpiritGuide => {
+                        // Exile from hand, add {G}
+                        if !self.players[player_id as usize].remove_from_hand(card_id) {
+                            return;
+                        }
+                        self.exile.push((card_id, card_name, player_id));
+                        self.players[player_id as usize].mana_pool.add(Some(Color::Green), 1);
+                        // Mana ability: no stack, no priority reset needed
+                    }
+                    CardName::SimianSpiritGuide => {
+                        // Exile from hand, add {R}
+                        if !self.players[player_id as usize].remove_from_hand(card_id) {
+                            return;
+                        }
+                        self.exile.push((card_id, card_name, player_id));
+                        self.players[player_id as usize].mana_pool.add(Some(Color::Red), 1);
+                        // Mana ability: no stack, no priority reset needed
+                    }
+                    _ => {}
                 }
             }
             _ => {}
@@ -1171,6 +1211,119 @@ impl GameState {
                 );
             }
 
+            // Walking Ballista: {4}: Put a +1/+1 counter on Walking Ballista (ability_index 0)
+            CardName::WalkingBallista if ability_index == 0 => {
+                let cost = crate::mana::ManaCost::generic(4);
+                if !self.players[controller as usize].mana_pool.pay(&cost) {
+                    return;
+                }
+                self.stack.push(
+                    StackItemKind::ActivatedAbility {
+                        source_id: permanent_id,
+                        source_name: card_name,
+                        effect: ActivatedEffect::WalkingBallistaAddCounter { ballista_id: permanent_id },
+                    },
+                    controller,
+                    vec![],
+                );
+                self.reset_priority_passes();
+            }
+            // Walking Ballista: Remove a +1/+1 counter: deal 1 damage to any target (ability_index 1)
+            CardName::WalkingBallista if ability_index == 1 => {
+                // Remove a +1/+1 counter as cost
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    let count = perm.counters.get(CounterType::PlusOnePlusOne);
+                    if count == 0 {
+                        return;
+                    }
+                    perm.counters.remove(CounterType::PlusOnePlusOne, 1);
+                }
+                self.stack.push(
+                    StackItemKind::ActivatedAbility {
+                        source_id: permanent_id,
+                        source_name: card_name,
+                        effect: ActivatedEffect::WalkingBallistaPing { ballista_id: permanent_id },
+                    },
+                    controller,
+                    targets.to_vec(),
+                );
+                self.reset_priority_passes();
+            }
+
+            // Time Vault: {T}: Take an extra turn after this one (ability_index 0)
+            CardName::TimeVault if ability_index == 0 => {
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.tapped = true;
+                }
+                self.stack.push(
+                    StackItemKind::ActivatedAbility {
+                        source_id: permanent_id,
+                        source_name: card_name,
+                        effect: ActivatedEffect::TimeVaultExtraTurn,
+                    },
+                    controller,
+                    vec![],
+                );
+                self.reset_priority_passes();
+            }
+            // Time Vault: Skip your next turn: Untap Time Vault (ability_index 1)
+            CardName::TimeVault if ability_index == 1 => {
+                // Cost: skip your next turn (modeled as giving the opponent an extra turn)
+                let opponent = self.opponent(controller);
+                self.players[opponent as usize].extra_turns += 1;
+                self.stack.push(
+                    StackItemKind::ActivatedAbility {
+                        source_id: permanent_id,
+                        source_name: card_name,
+                        effect: ActivatedEffect::TimeVaultUntap { vault_id: permanent_id },
+                    },
+                    controller,
+                    vec![],
+                );
+                self.reset_priority_passes();
+            }
+
+            // Krark-Clan Ironworks: Sacrifice an artifact: Add {C}{C} (ability_index 0)
+            // This is a mana ability, so it resolves immediately (doesn't use the stack).
+            CardName::KrarkClanIronworks if ability_index == 0 => {
+                if let Some(Target::Object(artifact_id)) = targets.first() {
+                    let artifact_id = *artifact_id;
+                    // Verify the artifact exists and is controlled by this player
+                    let valid = self.find_permanent(artifact_id)
+                        .map(|p| p.is_artifact() && p.controller == controller)
+                        .unwrap_or(false);
+                    if valid {
+                        self.destroy_permanent(artifact_id);
+                        self.players[controller as usize].mana_pool.colorless += 2;
+                    }
+                }
+                self.reset_priority_passes();
+            }
+
+            // Engineered Explosives: {2}, Sacrifice: Destroy each nonland permanent with MV equal to charge counters (ability_index 0)
+            CardName::EngineeredExplosives if ability_index == 0 => {
+                let cost = crate::mana::ManaCost::generic(2);
+                if !self.players[controller as usize].mana_pool.pay(&cost) {
+                    return;
+                }
+                // Read charge counters before sacrificing
+                let charge_counters = self.find_permanent(permanent_id)
+                    .map(|p| p.counters.get(CounterType::Charge) as u32)
+                    .unwrap_or(0);
+                // Sacrifice Engineered Explosives
+                self.destroy_permanent(permanent_id);
+                self.stack.push(
+                    StackItemKind::ActivatedAbility {
+                        source_id: permanent_id,
+                        source_name: card_name,
+                        effect: ActivatedEffect::EngineeredExplosivesDestroy { charge_counters },
+                    },
+                    controller,
+                    vec![],
+                );
+                self.reset_priority_passes();
+            }
+
             _ => {}
         }
     }
@@ -1438,6 +1591,29 @@ impl GameState {
                     return false;
                 }
                 self.players[player_id as usize].life -= 4;
+                true
+            }
+            AltCost::Daze { island_id } => {
+                // Return an Island you control to its owner's hand.
+                self.remove_permanent_to_zone(*island_id, DestinationZone::Hand);
+                true
+            }
+            AltCost::Gush { island_id1, island_id2 } => {
+                // Return two Islands you control to their owner's hand.
+                self.remove_permanent_to_zone(*island_id1, DestinationZone::Hand);
+                self.remove_permanent_to_zone(*island_id2, DestinationZone::Hand);
+                true
+            }
+            AltCost::ForceOfVigor { exile_id } => {
+                // Exile a green card from hand.
+                let player = &self.players[player_id as usize];
+                let exile_in_hand = player.hand.contains(exile_id);
+                if !exile_in_hand {
+                    return false;
+                }
+                self.players[player_id as usize].remove_from_hand(*exile_id);
+                let exile_name = self.card_name_for_id(*exile_id).unwrap_or(CardName::Plains);
+                self.exile.push((*exile_id, exile_name, player_id));
                 true
             }
         }

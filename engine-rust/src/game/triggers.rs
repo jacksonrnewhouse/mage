@@ -334,4 +334,30 @@ impl GameState {
             );
         }
     }
+
+    /// Check Eidolon of the Great Revel triggered ability: whenever a player casts a spell
+    /// with mana value 3 or less, Eidolon deals 2 damage to that player.
+    /// Called after any spell is pushed to the stack.
+    pub(crate) fn check_eidolon_trigger(&mut self, caster: PlayerId, spell_cmc: u8) {
+        if spell_cmc > 3 {
+            return;
+        }
+        let eidolon_triggers: Vec<(ObjectId, PlayerId)> = self
+            .battlefield
+            .iter()
+            .filter(|p| p.card_name == CardName::EidolonOfTheGreatRevel)
+            .map(|p| (p.id, p.controller))
+            .collect();
+        for (source_id, controller) in eidolon_triggers {
+            self.stack.push(
+                StackItemKind::TriggeredAbility {
+                    source_id,
+                    source_name: CardName::EidolonOfTheGreatRevel,
+                    effect: TriggeredEffect::EidolonDamage { target_player: caster },
+                },
+                controller,
+                vec![Target::Player(caster)],
+            );
+        }
+    }
 }
