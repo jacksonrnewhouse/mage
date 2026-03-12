@@ -487,6 +487,51 @@ impl GameState {
                             );
                         }
                     }
+                    // Zhao, the Moon Slayer: when it attacks, exile top card of library, may play it this turn.
+                    if cn == CardName::ZhaoTheMoonSlayer {
+                        self.stack.push(
+                            crate::stack::StackItemKind::TriggeredAbility {
+                                source_id: *creature_id,
+                                source_name: CardName::ZhaoTheMoonSlayer,
+                                effect: crate::stack::TriggeredEffect::ZhaoAttackExile,
+                            },
+                            self.active_player,
+                            vec![],
+                        );
+                    }
+                    // Gut, True Soul Zealot: whenever you attack, may sacrifice creature/artifact
+                    // to create a 4/1 black Skeleton token with menace tapped and attacking.
+                    if cn == CardName::GutTrueSoulZealot {
+                        // Check if there's another creature or artifact to sacrifice
+                        let has_sac_target = self.battlefield.iter().any(|p| {
+                            p.controller == self.active_player
+                                && p.id != *creature_id
+                                && (p.is_creature() || p.is_artifact())
+                        });
+                        if has_sac_target {
+                            self.stack.push(
+                                crate::stack::StackItemKind::TriggeredAbility {
+                                    source_id: *creature_id,
+                                    source_name: CardName::GutTrueSoulZealot,
+                                    effect: crate::stack::TriggeredEffect::GutAttackToken,
+                                },
+                                self.active_player,
+                                vec![],
+                            );
+                        }
+                    }
+                    // Caves of Chaos Adventurer: when it attacks, exile top card of library, may play it this turn.
+                    if cn == CardName::CavesOfChaosAdventurer {
+                        self.stack.push(
+                            crate::stack::StackItemKind::TriggeredAbility {
+                                source_id: *creature_id,
+                                source_name: CardName::CavesOfChaosAdventurer,
+                                effect: crate::stack::TriggeredEffect::CavesOfChaosAttackExile,
+                            },
+                            self.active_player,
+                            vec![],
+                        );
+                    }
                     // Seasoned Dungeoneer: when it attacks, target attacking creature explores
                     // and gains protection from creatures until end of turn.
                     if cn == CardName::SeasonedDungeoneer {

@@ -233,6 +233,18 @@ pub enum TriggeredEffect {
     /// White Plume Adventurer: at the beginning of each opponent's upkeep, untap a creature
     /// you control. If you've completed a dungeon, untap all creatures you control instead.
     WhitePlumeAdventurerUntap,
+    /// Seasoned Pyromancer ETB: discard 2, draw 2, create 1/1 tokens for nonland discards.
+    SeasonedPyromancerETB,
+    /// Broadside Bombardiers: deals 3 damage to any target (ETB or dies).
+    BroadsideBombardiersDamage,
+    /// Pyrogoyf dies: deals damage equal to its power to any target.
+    PyrogoyfDeath { power: i16 },
+    /// Gut, True Soul Zealot: attack trigger — sacrifice creature/artifact, create 4/1 skeleton token.
+    GutAttackToken,
+    /// Caves of Chaos Adventurer: attack trigger — exile top card, may play it this turn.
+    CavesOfChaosAttackExile,
+    /// Zhao, the Moon Slayer: attack trigger — exile top card, may play it this turn.
+    ZhaoAttackExile,
 }
 
 /// Activated ability effects.

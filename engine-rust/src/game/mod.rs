@@ -803,6 +803,9 @@ impl GameState {
             }
         }
 
+        // Capture last-known power before removal (needed for Pyrogoyf dies trigger).
+        let last_known_power = self.find_permanent(id).map(|p| p.power()).unwrap_or(0);
+
         let perm = self.remove_permanent(id)?;
         let perm_id = perm.id;
         let perm_name = perm.card_name;
@@ -840,7 +843,7 @@ impl GameState {
 
         // Check dies triggers (only when actually going to graveyard)
         if actual_destination == DestinationZone::Graveyard {
-            self.check_dies_triggers(perm_id, perm_name, controller, is_artifact);
+            self.check_dies_triggers(perm_id, perm_name, controller, is_artifact, last_known_power);
         }
 
         // Fire Skullclamp trigger: when equipped creature dies (goes to graveyard), draw 2.

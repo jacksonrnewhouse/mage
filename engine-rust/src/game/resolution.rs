@@ -2508,6 +2508,46 @@ impl GameState {
                     self.remove_permanent_to_zone(tid, DestinationZone::Exile);
                 }
             }
+            // Seasoned Pyromancer: discard 2, draw 2, create tokens for nonland discards
+            CardName::SeasonedPyromancer => {
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: _card_id,
+                        source_name: card_name,
+                        effect: TriggeredEffect::SeasonedPyromancerETB,
+                    },
+                    controller,
+                    vec![],
+                );
+            }
+            // Caves of Chaos Adventurer: take the initiative on ETB
+            CardName::CavesOfChaosAdventurer => {
+                self.take_initiative(controller);
+            }
+            // Broadside Bombardiers: deal 3 damage to any target on ETB
+            CardName::BroadsideBombardiers => {
+                let opp = self.opponent(controller);
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: _card_id,
+                        source_name: card_name,
+                        effect: TriggeredEffect::BroadsideBombardiersDamage,
+                    },
+                    controller,
+                    vec![Target::Player(opp)],
+                );
+            }
+            // Avalanche of Sector 7: deal damage equal to its power to target creature/planeswalker
+            CardName::AvalancheOfSector7 => {
+                let power = self.find_permanent(_card_id).map(|p| p.power()).unwrap_or(3);
+                let opp = self.opponent(controller);
+                let target: Option<ObjectId> = self.battlefield.iter()
+                    .find(|p| p.controller == opp && (p.is_creature() || p.card_types.contains(&CardType::Planeswalker)))
+                    .map(|p| p.id);
+                if let Some(tid) = target {
+                    self.deal_damage_to_target(Target::Object(tid), power as u16, controller);
+                }
+            }
             // Mana Vault / Grim Monolith / Time Vault: set doesnt_untap flag
             CardName::ManaVault | CardName::GrimMonolith | CardName::TimeVault => {
                 if let Some(perm) = self.find_permanent_mut(_card_id) {
@@ -4477,6 +4517,111 @@ impl GameState {
                         perm.tapped = false;
                     }
                 }
+            }
+
+            TriggeredEffect::SeasonedPyromancerETB => {
+                // Discard 2 cards, then draw 2. For each nonland card discarded, create a 1/1 Elemental.
+                let pid = controller as usize;
+                let mut nonland_count = 0u8;
+                // Discard up to 2 cards
+                for _ in 0..2 {
+                    if let Some(card_id) = self.players[pid].hand.pop() {
+                        let is_land = self.card_name_for_id(card_id)
+                            .and_then(|cn| find_card(db, cn))
+                            .map(|def| def.card_types.contains(&CardType::Land))
+                            .unwrap_or(false);
+                        if !is_land {
+                            nonland_count += 1;
+                        }
+                        self.players[pid].graveyard.push(card_id);
+                        self.check_emrakul_graveyard_shuffle(controller);
+                    }
+                }
+                // Draw 2 cards
+                self.draw_cards(controller, 2);
+                // Create 1/1 red Elemental tokens for each nonland discarded
+                for _ in 0..nonland_count {
+                    let token_id = self.new_object_id();
+                    let mut token = Permanent::new(
+                        token_id,
+                        card_name_for_token(),
+                        controller,
+                        controller,
+                        Some(1),
+                        Some(1),
+                        None,
+                        Keywords::empty(),
+                        &[CardType::Creature],
+                    );
+                    token.is_token = true;
+                    token.colors = vec![Color::Red];
+                    self.battlefield.push(token);
+                }
+            }
+
+            TriggeredEffect::BroadsideBombardiersDamage => {
+                // Deal 3 damage to any target (ETB or dies)
+                if let Some(target) = targets.first() {
+                    self.deal_damage_to_target(*target, 3, controller);
+                }
+            }
+
+            TriggeredEffect::PyrogoyfDeath { power } => {
+                // When Pyrogoyf dies, deal damage equal to its last-known power to any target.
+                if power > 0 {
+                    if let Some(target) = targets.first() {
+                        self.deal_damage_to_target(*target, power as u16, controller);
+                    }
+                }
+            }
+
+            TriggeredEffect::GutAttackToken => {
+                // Gut: sacrifice another creature or artifact to create a 4/1 skeleton token.
+                // Simplified: sacrifice the first eligible permanent and create the token.
+                let sac_target = self.battlefield.iter()
+                    .find(|p| {
+                        p.controller == controller
+                            && (p.is_creature() || p.is_artifact())
+                            && p.card_name != CardName::GutTrueSoulZealot
+                    })
+                    .map(|p| p.id);
+                if let Some(sac_id) = sac_target {
+                    self.destroy_permanent(sac_id);
+                    // Create 4/1 black Skeleton token with menace, tapped and attacking
+                    let token_id = self.new_object_id();
+                    let mut kws = Keywords::empty();
+                    kws.add(Keyword::Menace);
+                    let mut token = Permanent::new(
+                        token_id,
+                        card_name_for_token(),
+                        controller,
+                        controller,
+                        Some(4),
+                        Some(1),
+                        None,
+                        kws,
+                        &[CardType::Creature],
+                    );
+                    token.is_token = true;
+                    token.colors = vec![Color::Black];
+                    token.tapped = true;
+                    self.battlefield.push(token);
+                    // Also declare the token as attacking
+                    let defending_player = self.opponent(controller);
+                    self.attackers.push((token_id, defending_player));
+                }
+            }
+
+            TriggeredEffect::CavesOfChaosAttackExile | TriggeredEffect::ZhaoAttackExile => {
+                // Exile the top card of your library. You may play it this turn.
+                // Simplified: draw a card (approximation of the exile-and-play effect).
+                let pid = controller as usize;
+                if let Some(card_id) = self.players[pid].library.pop() {
+                    // Put into hand to approximate "may play this turn"
+                    self.players[pid].hand.push(card_id);
+                }
+                // For Zhao: also put a +1/+1 counter when playing from exile
+                // (simplified: we skip the counter since we're approximating as draw)
             }
 
             _ => {}

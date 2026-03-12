@@ -14,6 +14,7 @@ impl GameState {
         died_name: CardName,
         controller: PlayerId,
         is_artifact: bool,
+        last_known_power: i16,
     ) {
         // --- Triggers on the dying permanent itself ---
         match died_name {
@@ -84,6 +85,34 @@ impl GameState {
                     },
                     controller,
                     vec![],
+                );
+            }
+            CardName::BroadsideBombardiers => {
+                // When Broadside Bombardiers dies, it deals 3 damage to any target.
+                let opp = self.opponent(controller);
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: died_id,
+                        source_name: died_name,
+                        effect: TriggeredEffect::BroadsideBombardiersDamage,
+                    },
+                    controller,
+                    vec![Target::Player(opp)],
+                );
+            }
+            CardName::Pyrogoyf => {
+                // When Pyrogoyf dies, it deals damage equal to its power to any target.
+                // Use last-known power; Pyrogoyf is now in the graveyard so graveyard type
+                // count has changed, but we use the power it had when it was last on the battlefield.
+                let opp = self.opponent(controller);
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: died_id,
+                        source_name: died_name,
+                        effect: TriggeredEffect::PyrogoyfDeath { power: last_known_power },
+                    },
+                    controller,
+                    vec![Target::Player(opp)],
                 );
             }
             _ => {}
