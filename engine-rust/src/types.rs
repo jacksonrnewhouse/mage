@@ -220,6 +220,7 @@ pub enum CreatureType {
     Hamster,
     Incarnation,
     Lhurgoyf,
+    Pest,
 }
 
 impl CreatureType {

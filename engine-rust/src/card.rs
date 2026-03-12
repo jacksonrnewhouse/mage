@@ -542,6 +542,8 @@ pub enum CardName {
     ThopterToken,
     /// Represents an Eldrazi Spawn token (0/1 colorless creature: "Sacrifice: Add {C}.")
     EldraziSpawnToken,
+    /// Represents a Pest token (1/1 black and green creature: "When this creature dies, you gain 1 life.")
+    PestToken,
 
     // Sentinel value for array sizing
     _Count,

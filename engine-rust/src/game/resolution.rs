@@ -1109,8 +1109,7 @@ impl GameState {
             | CardName::MoltenCollapse | CardName::FatalPush
             | CardName::BitterTriumph | CardName::SnuffOut
             | CardName::UntimelyMalfunction | CardName::Crash | CardName::CouncilsJudgment
-            | CardName::SunderingEruption
-            | CardName::PestControl => {
+            | CardName::SunderingEruption => {
                 // Nature's Claim: destroyed permanent's controller gains 4 life
                 let target_controller = if card_name == CardName::NaturesClaim {
                     if let Some(Target::Object(target_id)) = targets.first() {
@@ -1744,6 +1743,40 @@ impl GameState {
                         }
                         _ => {}
                     }
+                }
+            }
+
+            CardName::PestControl => {
+                // Choose one:
+                //   Mode 0: Destroy target artifact or enchantment
+                //   Mode 1: Create two 1/1 black and green Pest creature tokens
+                match modes.first().copied().unwrap_or(0) {
+                    0 => {
+                        if let Some(Target::Object(target_id)) = targets.first() {
+                            self.destroy_permanent(*target_id);
+                        }
+                    }
+                    1 => {
+                        for _ in 0..2 {
+                            let token_id = self.new_object_id();
+                            let mut token = crate::permanent::Permanent::new(
+                                token_id,
+                                CardName::PestToken,
+                                controller,
+                                controller,
+                                Some(1),
+                                Some(1),
+                                None,
+                                Keywords::empty(),
+                                &[CardType::Creature],
+                            );
+                            token.is_token = true;
+                            token.creature_types = vec![CreatureType::Pest];
+                            token.colors = vec![Color::Black, Color::Green];
+                            self.battlefield.push(token);
+                        }
+                    }
+                    _ => {}
                 }
             }
 
