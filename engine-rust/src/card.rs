@@ -2194,9 +2194,9 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(CT(&[CreatureType::Human, CreatureType::Soldier]) LaviniaAzoriusRenegade, "Lavinia, Azorius Renegade", ManaCost { white: 1, blue: 1, ..c }, &[Creature], &[Legendary],
         Some(2), Some(2), None, kw(), &[White, Blue],
         "Each opponent can't cast noncreature spells with mana value greater than the number of lands that player controls. Whenever an opponent casts a spell, if no mana was spent to cast it, counter that spell.");
-    card!(MakdeeAndItlaSkysnarers, "Makdee and Itla, Skysnarers", ManaCost { white: 1, blue: 1, generic: 2, ..c }, &[Creature], &[Legendary],
-        Some(3), Some(4), None, flying(), &[White, Blue],
-        "Flying. Whenever Makdee and Itla attacks, exile up to one target nonland permanent an opponent controls until Makdee and Itla leaves the battlefield.");
+    card!(MakdeeAndItlaSkysnarers, "Makdee and Itla, Skysnarers", ManaCost { white: 1, generic: 1, ..c }, &[Creature], &[Legendary],
+        Some(2), Some(2), None, flying(), &[White, Blue],
+        "Flying. Venom Blast — Artifacts and creatures your opponents control enter tapped.");
     card!(DovinHandOfControl, "Dovin, Hand of Control", ManaCost { generic: 2, white: 1, ..c }, &[Planeswalker], &[Legendary],
         None, None, Some(5), kw(), &[White, Blue],
         "Artifact, instant, and sorcery spells your opponents cast cost {1} more to cast. -1: Until your next turn, prevent all damage that would be dealt to and dealt by target permanent.");

@@ -3277,6 +3277,7 @@ pub fn is_uncounterable(name: CardName) -> bool {
     matches!(
         name,
         CardName::AbruptDecay
+            | CardName::EmrakulTheAeonsTorn
     )
 }
 

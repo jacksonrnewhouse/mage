@@ -1513,15 +1513,15 @@
   },
   {
     "name": "Makdee and Itla, Skysnarers",
-    "mana_cost": "{2}{W}{U}",
-    "type_line": "Legendary Creature",
-    "oracle_text": "Flying. Whenever Makdee and Itla attacks, exile up to one target nonland permanent an opponent controls until Makdee and Itla leaves the battlefield.",
-    "power": "3",
-    "toughness": "4",
+    "mana_cost": "{1}{W/U}",
+    "type_line": "Legendary Creature \u2014 Spider Human Hero",
+    "oracle_text": "Flying\nVenom Blast \u2014 Artifacts and creatures your opponents control enter tapped.",
+    "power": "2",
+    "toughness": "2",
     "keywords": [
       "Flying"
     ],
-    "_source": "manual (not on Scryfall)"
+    "_source": "Scryfall (Spider-Woman, Stunning Savior - OM1/145)"
   },
   {
     "name": "Mana Crypt",
