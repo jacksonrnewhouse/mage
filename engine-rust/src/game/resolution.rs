@@ -2169,6 +2169,16 @@ impl GameState {
                     vec![],
                 );
             }
+            // Mai, Scornful Striker: each player mills 2 cards on ETB
+            CardName::MaiScornfulStriker => {
+                for pid in 0..self.players.len() {
+                    for _ in 0..2 {
+                        if let Some(id) = self.players[pid].library.pop() {
+                            self.players[pid].graveyard.push(id);
+                        }
+                    }
+                }
+            }
             // Emry, Lurker of the Loch: mill 4 cards on ETB
             CardName::EmryLurkerOfTheLoch => {
                 for _ in 0..4 {
