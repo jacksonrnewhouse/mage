@@ -180,6 +180,8 @@ pub enum TriggeredEffect {
     DressDownETB,
     /// Dress Down: sacrifice at the beginning of the next end step.
     DressDownSacrifice { permanent_id: ObjectId },
+    /// Underworld Breach: sacrifice at the beginning of the end step.
+    UnderworldBreachSacrifice { permanent_id: ObjectId },
     /// Roiling Vortex upkeep: deal 1 damage to each player.
     RoilingVortexUpkeep,
     /// Roiling Vortex: whenever a player casts a spell without paying its mana cost, deal 5 damage to that player.

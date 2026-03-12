@@ -126,13 +126,54 @@ impl GameState {
                         } else if let Some(alt) = alt_cost {
                             self.pay_alt_cost(player_id, *card_id, alt)
                         } else if *from_graveyard {
-                            // Flashback / Yawgmoth's Will: pay the flashback cost.
+                            // Flashback / Yawgmoth's Will / Underworld Breach escape: pay the cost.
                             let base_cost = def.flashback_cost.unwrap_or(def.mana_cost);
                             let taxed = self.effective_cost_with_base(def, player_id, base_cost);
-                            if is_artifact {
+                            let mana_paid = if is_artifact {
                                 self.players[player_id as usize].mana_pool.pay_for_artifact(&taxed)
                             } else {
                                 self.players[player_id as usize].mana_pool.pay(&taxed)
+                            };
+                            if mana_paid {
+                                // Underworld Breach escape: exile 3 other cards from graveyard as additional cost.
+                                // Only applies when Breach is the source enabling the graveyard cast
+                                // (not flashback, Yawgmoth's Will, Snapcaster, retrace, Emry, or Lurrus).
+                                let has_own_flashback = def.flashback_cost.is_some();
+                                let has_snapcaster = self.snapcaster_flashback_cards.contains(card_id);
+                                let yawgmoth_active = self.players[player_id as usize].yawgmoth_will_active;
+                                let breach_active = self.battlefield.iter().any(|p| {
+                                    p.card_name == CardName::UnderworldBreach && p.controller == player_id
+                                });
+                                let emry_cast = self.emry_castable_artifacts.contains(card_id);
+                                let lurrus_active = self.battlefield.iter().any(|p| {
+                                    p.card_name == CardName::LurrusOfTheDreamDen && p.controller == player_id
+                                }) && def.mana_cost.cmc() <= 2;
+                                let needs_escape_exile = breach_active
+                                    && !has_own_flashback
+                                    && !has_snapcaster
+                                    && !yawgmoth_active
+                                    && !emry_cast
+                                    && !lurrus_active;
+                                if needs_escape_exile {
+                                    // Exile 3 other cards from graveyard (not the card being cast)
+                                    let gy = &mut self.players[player_id as usize].graveyard;
+                                    let mut exiled_cards = Vec::new();
+                                    let mut i = 0;
+                                    while exiled_cards.len() < 3 && i < gy.len() {
+                                        if gy[i] != *card_id {
+                                            let card = gy.remove(i);
+                                            exiled_cards.push(card);
+                                        } else {
+                                            i += 1;
+                                        }
+                                    }
+                                    for card in exiled_cards {
+                                        self.exile.push((card, self.card_name_for_id(card).unwrap_or(CardName::Plains), player_id));
+                                    }
+                                }
+                                true
+                            } else {
+                                false
                             }
                         } else if *from_library_top {
                             // Casting from top of library.

@@ -3080,6 +3080,18 @@ impl GameState {
                 });
             }
 
+            // Underworld Breach: at the beginning of the end step, sacrifice this enchantment.
+            // Register a delayed trigger on ETB to sacrifice at the next end step.
+            CardName::UnderworldBreach => {
+                self.add_delayed_trigger(crate::types::DelayedTrigger {
+                    condition: crate::types::DelayedTriggerCondition::AtBeginningOfNextEndStep,
+                    effect: TriggeredEffect::UnderworldBreachSacrifice { permanent_id: _card_id },
+                    controller,
+                    fires_once: true,
+                    source_id: None,
+                });
+            }
+
             // Cryogen Relic: when this artifact enters the battlefield, draw a card.
             CardName::CryogenRelic => {
                 self.stack.push(
@@ -4043,6 +4055,13 @@ impl GameState {
 
             TriggeredEffect::DressDownSacrifice { permanent_id } => {
                 // Dress Down: sacrifice at the beginning of the next end step
+                if self.find_permanent(permanent_id).is_some() {
+                    self.remove_permanent_to_zone(permanent_id, DestinationZone::Graveyard);
+                }
+            }
+
+            TriggeredEffect::UnderworldBreachSacrifice { permanent_id } => {
+                // Underworld Breach: sacrifice at the beginning of the end step
                 if self.find_permanent(permanent_id).is_some() {
                     self.remove_permanent_to_zone(permanent_id, DestinationZone::Graveyard);
                 }

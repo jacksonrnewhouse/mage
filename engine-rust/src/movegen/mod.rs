@@ -353,7 +353,18 @@ impl GameState {
                                 || def.card_types.contains(&CardType::Artifact)
                                 || def.card_types.contains(&CardType::Enchantment)
                                 || def.card_types.contains(&CardType::Planeswalker));
-                        let can_cast_from_gyd = has_own_flashback || has_snapcaster_flashback || yawgmoth_active || can_retrace || hogaak_from_graveyard || emry_castable || lurrus_castable;
+                        // Underworld Breach: each nonland card in your graveyard has escape.
+                        // Escape cost = card's mana cost + exile 3 other cards from graveyard.
+                        // Need at least 3 OTHER cards in graveyard (besides the card being cast).
+                        let underworld_breach_active = self.battlefield.iter().any(|p| {
+                            p.card_name == CardName::UnderworldBreach && p.controller == player_id
+                        });
+                        let breach_castable = underworld_breach_active
+                            && !def.card_types.contains(&CardType::Land)
+                            && self.players[player_id as usize].graveyard.iter()
+                                .filter(|&&id| id != card_id)
+                                .count() >= 3;
+                        let can_cast_from_gyd = has_own_flashback || has_snapcaster_flashback || yawgmoth_active || can_retrace || hogaak_from_graveyard || emry_castable || lurrus_castable || breach_castable;
 
                         if !can_cast_from_gyd {
                             continue;

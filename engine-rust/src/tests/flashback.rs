@@ -353,3 +353,222 @@ fn test_snapcaster_flashback_cleared_at_end_of_turn() {
         "Snapcaster flashback grants should be cleared at end of turn"
     );
 }
+
+/// Test: Underworld Breach allows casting nonland spells from graveyard via escape
+/// (card's mana cost + exile 3 other cards from graveyard).
+#[test]
+fn test_underworld_breach_enables_escape_casting() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // Put Underworld Breach on the battlefield for player 0
+    let breach_id = state.new_object_id();
+    state.card_registry.push((breach_id, CardName::UnderworldBreach));
+    use crate::permanent::Permanent;
+    let perm = Permanent::new(
+        breach_id, CardName::UnderworldBreach, 0, 0, None, None, None,
+        crate::types::Keywords::empty(), &[CardType::Enchantment],
+    );
+    state.battlefield.push(perm);
+
+    // Put a Lightning Bolt in the graveyard
+    let bolt_id = state.new_object_id();
+    state.card_registry.push((bolt_id, CardName::LightningBolt));
+    state.players[0].graveyard.push(bolt_id);
+
+    // Put 3 other cards in the graveyard (exile fodder)
+    for _ in 0..3 {
+        let filler_id = state.new_object_id();
+        state.card_registry.push((filler_id, CardName::Mountain));
+        state.players[0].graveyard.push(filler_id);
+    }
+
+    state.phase = Phase::PreCombatMain;
+    state.step = None;
+    state.active_player = 0;
+    state.priority_player = 0;
+
+    // Give player 0 {R} for the bolt's mana cost
+    state.players[0].mana_pool.red = 1;
+
+    let actions = state.legal_actions(&db);
+    let can_cast = actions.iter().any(|a| {
+        matches!(a, Action::CastSpell { card_id, from_graveyard, .. }
+            if *card_id == bolt_id && *from_graveyard)
+    });
+    assert!(
+        can_cast,
+        "Lightning Bolt should be castable via escape with Underworld Breach"
+    );
+}
+
+/// Test: Underworld Breach escape requires 3 other cards in graveyard.
+/// With fewer than 3 other cards, escape should not be available.
+#[test]
+fn test_underworld_breach_requires_3_exile_fodder() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // Put Underworld Breach on the battlefield for player 0
+    let breach_id = state.new_object_id();
+    state.card_registry.push((breach_id, CardName::UnderworldBreach));
+    use crate::permanent::Permanent;
+    let perm = Permanent::new(
+        breach_id, CardName::UnderworldBreach, 0, 0, None, None, None,
+        crate::types::Keywords::empty(), &[CardType::Enchantment],
+    );
+    state.battlefield.push(perm);
+
+    // Put a Lightning Bolt in the graveyard
+    let bolt_id = state.new_object_id();
+    state.card_registry.push((bolt_id, CardName::LightningBolt));
+    state.players[0].graveyard.push(bolt_id);
+
+    // Only 2 other cards (need 3)
+    for _ in 0..2 {
+        let filler_id = state.new_object_id();
+        state.card_registry.push((filler_id, CardName::Mountain));
+        state.players[0].graveyard.push(filler_id);
+    }
+
+    state.phase = Phase::PreCombatMain;
+    state.step = None;
+    state.active_player = 0;
+    state.priority_player = 0;
+    state.players[0].mana_pool.red = 1;
+
+    let actions = state.legal_actions(&db);
+    let can_cast = actions.iter().any(|a| {
+        matches!(a, Action::CastSpell { card_id, from_graveyard, .. }
+            if *card_id == bolt_id && *from_graveyard)
+    });
+    assert!(
+        !can_cast,
+        "Lightning Bolt should NOT be castable via escape with only 2 exile fodder cards"
+    );
+}
+
+/// Test: Casting via Underworld Breach escape exiles 3 cards from graveyard and
+/// exiles the cast card after resolution.
+#[test]
+fn test_underworld_breach_escape_exiles_cards() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // Put Underworld Breach on the battlefield for player 0
+    let breach_id = state.new_object_id();
+    state.card_registry.push((breach_id, CardName::UnderworldBreach));
+    use crate::permanent::Permanent;
+    let perm = Permanent::new(
+        breach_id, CardName::UnderworldBreach, 0, 0, None, None, None,
+        crate::types::Keywords::empty(), &[CardType::Enchantment],
+    );
+    state.battlefield.push(perm);
+
+    // Put a Lightning Bolt in the graveyard
+    let bolt_id = state.new_object_id();
+    state.card_registry.push((bolt_id, CardName::LightningBolt));
+    state.players[0].graveyard.push(bolt_id);
+
+    // Put 4 other cards in the graveyard (3 will be exiled as escape cost, 1 remains)
+    let mut filler_ids = Vec::new();
+    for _ in 0..4 {
+        let filler_id = state.new_object_id();
+        state.card_registry.push((filler_id, CardName::Mountain));
+        state.players[0].graveyard.push(filler_id);
+        filler_ids.push(filler_id);
+    }
+
+    state.phase = Phase::PreCombatMain;
+    state.step = None;
+    state.active_player = 0;
+    state.priority_player = 0;
+    state.players[0].mana_pool.red = 1;
+
+    // Graveyard should have 5 cards: bolt + 4 fillers
+    assert_eq!(state.players[0].graveyard.len(), 5);
+
+    // Cast Lightning Bolt via escape targeting player 1
+    state.apply_action(
+        &Action::CastSpell {
+            card_id: bolt_id,
+            targets: vec![Target::Player(1)],
+            x_value: 0,
+            from_graveyard: true,
+            from_library_top: false,
+            alt_cost: None,
+            modes: vec![],
+        },
+        &db,
+    );
+
+    // Bolt should be on the stack, removed from graveyard
+    assert!(
+        !state.players[0].graveyard.contains(&bolt_id),
+        "Bolt should be removed from graveyard when cast"
+    );
+    // 3 cards should have been exiled as escape cost, 1 filler should remain
+    assert_eq!(
+        state.players[0].graveyard.len(), 1,
+        "Should have 1 card remaining in graveyard (4 fillers - 3 exiled)"
+    );
+    // 3 cards should be in exile
+    let exiled_count = state.exile.iter()
+        .filter(|(id, _, _)| filler_ids.contains(id))
+        .count();
+    assert_eq!(exiled_count, 3, "3 filler cards should be exiled as escape cost");
+
+    // Resolve the bolt
+    state.pass_priority(&db);
+    state.pass_priority(&db);
+
+    // The bolt itself should be exiled after resolution (cast from graveyard)
+    let bolt_in_exile = state.exile.iter().any(|(id, _, _)| *id == bolt_id);
+    assert!(bolt_in_exile, "Bolt cast via escape should be exiled after resolving");
+}
+
+/// Test: Underworld Breach sacrifices itself at the beginning of the end step.
+#[test]
+fn test_underworld_breach_sacrifices_at_end_step() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // Simulate Underworld Breach entering the battlefield (via ETB handler)
+    let breach_id = state.new_object_id();
+    state.card_registry.push((breach_id, CardName::UnderworldBreach));
+    use crate::permanent::Permanent;
+    let perm = Permanent::new(
+        breach_id, CardName::UnderworldBreach, 0, 0, None, None, None,
+        crate::types::Keywords::empty(), &[CardType::Enchantment],
+    );
+    state.battlefield.push(perm);
+    // Register the ETB delayed trigger (normally done by handle_etb)
+    state.handle_etb(CardName::UnderworldBreach, breach_id, 0);
+
+    state.phase = Phase::PostCombatMain;
+    state.step = None;
+    state.active_player = 0;
+    state.priority_player = 0;
+
+    // Advance to end step (PostCombatMain -> Ending/End)
+    state.advance_phase();
+
+    // The delayed trigger should have fired and put UnderworldBreachSacrifice on the stack.
+    // Pass priority for both players to resolve it.
+    state.pass_priority(&db);
+    state.pass_priority(&db);
+
+    // Underworld Breach should no longer be on the battlefield
+    let on_bf = state.battlefield.iter().any(|p| p.card_name == CardName::UnderworldBreach);
+    assert!(
+        !on_bf,
+        "Underworld Breach should be sacrificed at the beginning of the end step"
+    );
+
+    // It should be in the graveyard
+    let in_gy = state.players[0].graveyard.contains(&breach_id);
+    assert!(
+        in_gy,
+        "Underworld Breach should go to graveyard after being sacrificed"
+    );
+}
