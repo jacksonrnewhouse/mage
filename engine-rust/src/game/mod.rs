@@ -1383,7 +1383,7 @@ impl GameState {
                     + perm.counters.get(CounterType::PlusOnePlusOne)
                     - perm.counters.get(CounterType::MinusOneMinusOne)
             }
-            _ => perm.power(),
+            _ => perm.power() + self.nettlecyst_bonus(perm),
         }
     }
 
@@ -1406,8 +1406,25 @@ impl GameState {
                     + perm.counters.get(CounterType::PlusOnePlusOne)
                     - perm.counters.get(CounterType::MinusOneMinusOne)
             }
-            _ => perm.toughness(),
+            _ => perm.toughness() + self.nettlecyst_bonus(perm),
         }
+    }
+
+    /// Compute the dynamic P/T bonus from Nettlecyst for a creature.
+    /// Nettlecyst grants +1/+1 for each artifact and/or enchantment the equipped creature's
+    /// controller controls. Returns 0 if the creature has no Nettlecyst attached.
+    fn nettlecyst_bonus(&self, perm: &crate::permanent::Permanent) -> i16 {
+        let has_nettlecyst = perm.attachments.iter().any(|&att_id| {
+            self.find_permanent(att_id)
+                .map_or(false, |p| p.card_name == CardName::Nettlecyst)
+        });
+        if !has_nettlecyst {
+            return 0;
+        }
+        self.battlefield
+            .iter()
+            .filter(|p| p.controller == perm.controller && (p.is_artifact() || p.is_enchantment()))
+            .count() as i16
     }
 
     /// Create a Treasure token controlled by the given player and place it on the battlefield.

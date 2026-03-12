@@ -612,6 +612,8 @@ pub fn equip_cost(card_name: CardName) -> Option<u8> {
         CardName::Batterskull => Some(5),
         CardName::Shadowspear => Some(2),
         CardName::Shuko => Some(0),
+        CardName::LavaspurBoots => Some(1),
+        CardName::Nettlecyst => Some(2),
         _ => None,
     }
 }
@@ -648,6 +650,25 @@ pub fn equipment_bonus(card_name: CardName) -> Option<EquipmentBonus> {
             toughness_mod: 0,
             keywords: kw,
         }),
+        CardName::LavaspurBoots => {
+            kw.add(Keyword::Haste);
+            kw.add(Keyword::Ward);
+            Some(EquipmentBonus {
+                power_mod: 1,
+                toughness_mod: 0,
+                keywords: kw,
+            })
+        }
+        CardName::Nettlecyst => {
+            // Nettlecyst gives +1/+1 for each artifact and/or enchantment you control.
+            // The dynamic bonus is computed in effective_power/effective_toughness;
+            // return a zero-bonus entry so it's recognized as equipment.
+            Some(EquipmentBonus {
+                power_mod: 0,
+                toughness_mod: 0,
+                keywords: kw,
+            })
+        }
         _ => None,
     }
 }
