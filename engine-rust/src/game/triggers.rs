@@ -150,12 +150,71 @@ impl GameState {
         }
     }
 
+    /// Check for draw triggers (Sheoldred, Orcish Bowmasters).
+    /// Called after each individual card draw.
+    pub(crate) fn check_draw_triggers(&mut self, drawing_player: PlayerId) {
+        // Sheoldred, the Apocalypse: controller gains 2 life on own draw,
+        // opponent loses 2 life on opponent draw.
+        let sheoldred_triggers: Vec<(ObjectId, PlayerId)> = self
+            .battlefield
+            .iter()
+            .filter(|p| p.card_name == CardName::SheoldredTheApocalypse)
+            .map(|p| (p.id, p.controller))
+            .collect();
+        for (source_id, controller) in sheoldred_triggers {
+            if drawing_player == controller {
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id,
+                        source_name: CardName::SheoldredTheApocalypse,
+                        effect: TriggeredEffect::SheoldredDraw,
+                    },
+                    controller,
+                    vec![],
+                );
+            } else {
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id,
+                        source_name: CardName::SheoldredTheApocalypse,
+                        effect: TriggeredEffect::SheoldredOpponentDraw,
+                    },
+                    controller,
+                    vec![],
+                );
+            }
+        }
+
+        // Orcish Bowmasters: whenever an opponent draws a card, trigger
+        let bowmasters_triggers: Vec<(ObjectId, PlayerId)> = self
+            .battlefield
+            .iter()
+            .filter(|p| p.card_name == CardName::OrcishBowmasters)
+            .map(|p| (p.id, p.controller))
+            .collect();
+        for (source_id, controller) in bowmasters_triggers {
+            if drawing_player != controller {
+                let opp = drawing_player;
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id,
+                        source_name: CardName::OrcishBowmasters,
+                        effect: TriggeredEffect::OrcishBowmastersOpponentDraw,
+                    },
+                    controller,
+                    vec![Target::Player(opp)],
+                );
+            }
+        }
+    }
+
     /// Check for noncreature spell cast triggers.
     /// Called after a noncreature spell is pushed to the stack.
-    /// Handles Young Pyromancer (1/1 red Elemental) and Monastery Mentor (1/1 white Monk with prowess).
+    /// Handles Young Pyromancer (1/1 red Elemental), Monastery Mentor (1/1 white Monk with prowess),
+    /// and Cindervines (deal 1 damage to opponent when they cast noncreature spell).
     pub(crate) fn check_noncreature_cast_triggers(&mut self, caster: PlayerId) {
         // Collect triggers to fire: (source_id, source_name, effect, controller)
-        let triggers: Vec<(ObjectId, CardName, TriggeredEffect, PlayerId)> = self
+        let mut triggers: Vec<(ObjectId, CardName, TriggeredEffect, PlayerId)> = self
             .battlefield
             .iter()
             .filter(|p| p.controller == caster)
@@ -176,6 +235,22 @@ impl GameState {
             })
             .collect();
 
+        // Cindervines: whenever an opponent casts a noncreature spell, deal 1 damage to them
+        let cindervines_triggers: Vec<(ObjectId, PlayerId)> = self
+            .battlefield
+            .iter()
+            .filter(|p| p.card_name == CardName::Cindervines && p.controller != caster)
+            .map(|p| (p.id, p.controller))
+            .collect();
+        for (source_id, controller) in cindervines_triggers {
+            triggers.push((
+                source_id,
+                CardName::Cindervines,
+                TriggeredEffect::CindervinesDamage { target_player: caster },
+                controller,
+            ));
+        }
+
         for (source_id, source_name, effect, controller) in triggers {
             self.stack.push(
                 StackItemKind::TriggeredAbility {
@@ -185,6 +260,51 @@ impl GameState {
                 },
                 controller,
                 vec![],
+            );
+        }
+    }
+
+    /// Check Lavinia's and Boromir's triggered abilities: whenever an opponent casts a spell,
+    /// if no mana was spent to cast it, counter that spell.
+    /// Called after any spell is pushed to the stack.
+    pub(crate) fn check_lavinia_trigger(&mut self, caster: PlayerId, spell_id: ObjectId, mana_spent: bool) {
+        if mana_spent {
+            return; // Lavinia and Boromir only trigger on free spells
+        }
+        // Lavinia, Azorius Renegade
+        let lavinia_triggers: Vec<(ObjectId, PlayerId)> = self
+            .battlefield
+            .iter()
+            .filter(|p| p.card_name == CardName::LaviniaAzoriusRenegade && p.controller != caster)
+            .map(|p| (p.id, p.controller))
+            .collect();
+        for (source_id, controller) in lavinia_triggers {
+            self.stack.push(
+                StackItemKind::TriggeredAbility {
+                    source_id,
+                    source_name: CardName::LaviniaAzoriusRenegade,
+                    effect: TriggeredEffect::LaviniaCounter { spell_id },
+                },
+                controller,
+                vec![Target::Object(spell_id)],
+            );
+        }
+        // Boromir, Warden of the Tower
+        let boromir_triggers: Vec<(ObjectId, PlayerId)> = self
+            .battlefield
+            .iter()
+            .filter(|p| p.card_name == CardName::BoromirWardenOfTheTower && p.controller != caster)
+            .map(|p| (p.id, p.controller))
+            .collect();
+        for (source_id, controller) in boromir_triggers {
+            self.stack.push(
+                StackItemKind::TriggeredAbility {
+                    source_id,
+                    source_name: CardName::BoromirWardenOfTheTower,
+                    effect: TriggeredEffect::LaviniaCounter { spell_id },
+                },
+                controller,
+                vec![Target::Object(spell_id)],
             );
         }
     }

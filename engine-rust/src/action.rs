@@ -25,6 +25,8 @@ pub enum AltCost {
     /// The remaining mana cost (normal_cost) must still be paid from the mana pool.
     /// `normal_cost` is the reduced mana cost after substituting some pips with life.
     PhyrexianMana { life_paid: u8, normal_cost: crate::mana::ManaCost },
+    /// Snuff Out: pay 4 life (must control a Swamp).
+    SnuffOut,
 }
 
 /// A game action that can be taken by the active/priority player.

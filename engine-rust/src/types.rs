@@ -209,6 +209,9 @@ pub enum CreatureType {
     Nightmare,
     Horror,
     Shark,
+    Dog,
+    Archon,
+    Dryad,
 }
 
 impl CreatureType {
@@ -272,6 +275,9 @@ impl CreatureType {
         CreatureType::Nightmare,
         CreatureType::Horror,
         CreatureType::Shark,
+        CreatureType::Dog,
+        CreatureType::Archon,
+        CreatureType::Dryad,
     ];
 }
 

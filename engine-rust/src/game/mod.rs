@@ -221,6 +221,9 @@ pub enum ChoiceReason {
     /// Passing (choosing no card) is represented by ChooseCard(0) — the engine
     /// uses object ID 0 as a sentinel for "no card".
     ShowAndTellChoose { next_player: Option<PlayerId> },
+    /// Flash: choose a creature card from hand to put onto the battlefield.
+    /// Passing (choosing no card) is represented by ChooseCard(0).
+    FlashPutCreature,
     /// Chrome Mox imprint ETB: choose a nonartifact, nonland card from hand to exile.
     /// mox_id is the Chrome Mox's ObjectId so we can record the imprint link.
     /// Passing (choosing no card) is represented by ChooseCard(0).
@@ -385,10 +388,8 @@ impl GameState {
                 self.step = Some(Step::Draw);
                 // Active player draws a card (skip on turn 1 for first player in 2-player)
                 if self.turn_number > 1 || self.active_player != 0 {
-                    let active = self.active_player as usize;
-                    if let Some(id) = self.players[active].library.pop() {
-                        self.players[active].hand.push(id);
-                    }
+                    let active = self.active_player;
+                    self.draw_cards(active, 1);
                 }
                 self.give_priority_to_active();
             }
@@ -1211,10 +1212,28 @@ impl GameState {
                 // Stop the draw loop; remaining draws will be continued after the choice is resolved.
                 return;
             }
+            // Hullbreacher replacement: if an opponent would draw except the first draw
+            // in their draw step, instead the Hullbreacher's controller creates a Treasure.
+            let hullbreacher_controller = self.battlefield.iter()
+                .find(|p| p.card_name == CardName::Hullbreacher && p.controller != player)
+                .map(|p| p.controller);
+            if let Some(hb_ctrl) = hullbreacher_controller {
+                // "except the first one they draw in each of their draw steps"
+                // This means: replace all non-first draws. The first draw in the draw step
+                // is allowed; subsequent draws (including from spells) are replaced.
+                if self.players[pid].draws_this_turn >= 1 {
+                    self.create_treasure_token(hb_ctrl);
+                    // Still count as a "draw" for turn tracking
+                    self.players[pid].draws_this_turn += 1;
+                    continue;
+                }
+            }
             if let Some(id) = self.players[pid].library.pop() {
                 self.players[pid].hand.push(id);
                 self.players[pid].draws_this_turn += 1;
                 self.players[pid].has_drawn_this_turn = true;
+                // Fire draw triggers (Sheoldred, Orcish Bowmasters)
+                self.check_draw_triggers(player);
             } else {
                 // Can't draw from empty library - player loses
                 self.players[pid].has_lost = true;
@@ -1286,7 +1305,7 @@ impl GameState {
             None => return 0,
         };
         match perm.card_name {
-            CardName::Tarmogoyf => {
+            CardName::Tarmogoyf | CardName::Pyrogoyf => {
                 let count = self.graveyard_card_type_count(db);
                 count + perm.power_mod
                     + perm.counters.get(CounterType::PlusOnePlusOne)
@@ -1303,7 +1322,7 @@ impl GameState {
             None => return 0,
         };
         match perm.card_name {
-            CardName::Tarmogoyf => {
+            CardName::Tarmogoyf | CardName::Pyrogoyf => {
                 let count = self.graveyard_card_type_count(db);
                 count + 1 + perm.toughness_mod
                     + perm.counters.get(CounterType::PlusOnePlusOne)

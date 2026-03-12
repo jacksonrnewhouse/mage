@@ -146,6 +146,21 @@ pub enum TriggeredEffect {
     InitiativeUpkeep,
     /// An Undercity dungeon room effect resolves.
     UndercityRoom(crate::types::UndercityRoom),
+    /// Thassa's Oracle ETB: if cards in library <= devotion to blue, you win.
+    ThassasOracleETB,
+    /// Coveted Jewel ETB: draw 3 cards.
+    CovetedJewelETB,
+    /// Portable Hole ETB: exile target nonland permanent an opponent controls with MV <= 2.
+    PortableHoleETB { hole_id: ObjectId },
+    /// Argentum Masticore upkeep: sacrifice unless you discard a card.
+    ArgentumMasticoreUpkeep { masticore_id: ObjectId },
+    /// Cindervines: whenever opponent casts a noncreature spell, deal 1 damage to them.
+    CindervinesDamage { target_player: PlayerId },
+    /// Lavinia: whenever an opponent casts a spell with no mana spent, counter that spell.
+    LaviniaCounter { spell_id: ObjectId },
+    /// Oko -5: exchange control of target artifact/creature you control and target creature
+    /// opponent controls with power 3 or less.
+    OkoExchange,
 }
 
 /// Activated ability effects.
@@ -183,6 +198,8 @@ pub enum ActivatedEffect {
     OkoFood,
     /// Oko +1: Elkify
     OkoElkify,
+    /// Oko -5: exchange control
+    OkoExchange,
     /// Wrenn +1: return land from graveyard
     WrennReturn,
     /// Wrenn -1: deal 1 damage
@@ -203,6 +220,8 @@ pub enum ActivatedEffect {
     KayaExile,
     /// Kaya -1: exile permanent
     KayaMinus,
+    /// Kaya -5: deal damage to target player equal to cards they own in exile, gain that much life
+    KayaUltimate,
     /// Equip: attach equipment to a creature (targets[0] = creature ObjectId)
     EquipCreature { equipment_id: ObjectId },
     /// Batterskull bounce: return Batterskull to owner's hand
@@ -233,6 +252,8 @@ pub enum ActivatedEffect {
     IsochronScepterActivated { scepter_id: ObjectId },
     /// Hideaway land {T}: cast the hidden card for free (condition already checked in movegen).
     HideawayActivated { land_id: ObjectId },
+    /// Griselbrand: pay 7 life, draw 7 cards.
+    GriselbrandDraw,
 }
 
 /// The game stack.

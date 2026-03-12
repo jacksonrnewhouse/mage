@@ -152,6 +152,32 @@ impl GameState {
                             });
                         }
                     }
+                    ChoiceReason::FlashPutCreature => {
+                        // Flash: put chosen creature from hand onto battlefield
+                        if card_id != 0 {
+                            let pid = choice.player as usize;
+                            if let Some(pos) = self.players[pid].hand.iter().position(|&id| id == card_id) {
+                                self.players[pid].hand.remove(pos);
+                                let card_name = self.card_name_for_id(card_id);
+                                if let Some(cn) = card_name {
+                                    if let Some(def) = find_card(db, cn) {
+                                        let mut perm = Permanent::new(
+                                            card_id, cn, choice.player, choice.player,
+                                            def.power, def.toughness, def.loyalty, def.keywords, def.card_types,
+                                        );
+                                        if def.is_changeling {
+                                            perm.creature_types = crate::types::CreatureType::ALL.to_vec();
+                                        } else {
+                                            perm.creature_types = def.creature_types.to_vec();
+                                        }
+                                        perm.colors = def.color_identity.to_vec();
+                                        self.battlefield.push(perm);
+                                        self.handle_etb(cn, card_id, choice.player);
+                                    }
+                                }
+                            }
+                        }
+                    }
                     ChoiceReason::ChromeMoxImprint { mox_id } => {
                         // card_id == 0 means the player declined to imprint anything.
                         if card_id != 0 {

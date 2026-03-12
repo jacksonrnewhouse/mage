@@ -30,6 +30,7 @@ pub mod action;
 pub mod combat;
 pub mod movegen;
 pub mod search;
+pub mod draft;
 
 #[cfg(test)]
 mod tests;

@@ -129,12 +129,12 @@ impl GameState {
         card_name: CardName,
         controller: PlayerId,
         targets: &[Target],
-        _x_value: u8,
+        x_value: u8,
         modes: &[u8],
         is_copy: bool,
         db: &[CardDef],
     ) {
-        self.resolve_card_effect(card_name, controller, targets, modes, is_copy, db);
+        self.resolve_card_effect(card_name, controller, targets, x_value, modes, is_copy, db);
     }
 
     fn resolve_card_effect(
@@ -142,6 +142,7 @@ impl GameState {
         card_name: CardName,
         controller: PlayerId,
         targets: &[Target],
+        x_value: u8,
         modes: &[u8],
         is_copy: bool,
         db: &[CardDef],
@@ -157,8 +158,7 @@ impl GameState {
             }
 
             // === Counterspells ===
-            CardName::Counterspell | CardName::ForceOfWill | CardName::ManaDrain
-            | CardName::ForceOfNegation | CardName::MindbreakTrap => {
+            CardName::Counterspell | CardName::ForceOfWill | CardName::ForceOfNegation => {
                 if let Some(Target::Object(spell_id)) = targets.first() {
                     // Check if the targeted spell can't be countered
                     let is_uncounterable = self.stack.items()
@@ -169,6 +169,44 @@ impl GameState {
                     if !is_uncounterable {
                         if let Some(item) = self.stack.remove(*spell_id) {
                             self.route_countered_spell(item);
+                        }
+                    }
+                }
+            }
+            CardName::ManaDrain => {
+                if let Some(Target::Object(spell_id)) = targets.first() {
+                    // Get the mana value of the targeted spell before removing it
+                    let mana_value = self.stack.items()
+                        .iter()
+                        .find(|item| item.id == *spell_id)
+                        .and_then(|item| {
+                            if let crate::stack::StackItemKind::Spell { card_name, .. } = &item.kind {
+                                find_card(db, *card_name).map(|d| d.mana_cost.cmc())
+                            } else {
+                                None
+                            }
+                        })
+                        .unwrap_or(0);
+                    let is_uncounterable = self.stack.items()
+                        .iter()
+                        .find(|item| item.id == *spell_id)
+                        .map(|item| item.cant_be_countered)
+                        .unwrap_or(false);
+                    if !is_uncounterable {
+                        if let Some(item) = self.stack.remove(*spell_id) {
+                            self.route_countered_spell(item);
+                        }
+                        // Add colorless mana equal to countered spell's mana value
+                        self.players[controller as usize].mana_pool.add(None, mana_value as u8);
+                    }
+                }
+            }
+            CardName::MindbreakTrap => {
+                // Exile target spell from the stack (not counter — bypasses "can't be countered")
+                if let Some(Target::Object(spell_id)) = targets.first() {
+                    if let Some(item) = self.stack.remove(*spell_id) {
+                        if let crate::stack::StackItemKind::Spell { card_id, card_name, .. } = item.kind {
+                            self.exile.push((card_id, card_name, item.controller));
                         }
                     }
                 }
@@ -213,8 +251,7 @@ impl GameState {
             }
             CardName::MentalMisstep | CardName::Flusterstorm | CardName::Daze
             | CardName::ManaLeak
-            | CardName::SpellPierce | CardName::MysticalDispute | CardName::ConsignToMemory
-            | CardName::SinkIntoStupor => {
+            | CardName::SpellPierce | CardName::MysticalDispute | CardName::ConsignToMemory => {
                 // Counter unless controller pays - simplified: just counter
                 // Also respects can't-be-countered flag
                 if let Some(Target::Object(spell_id)) = targets.first() {
@@ -294,16 +331,61 @@ impl GameState {
                     }
                 }
             }
-            CardName::PathToExile | CardName::Dismember => {
+            CardName::PathToExile => {
                 if let Some(Target::Object(creature_id)) = targets.first() {
                     self.remove_permanent_to_zone(*creature_id, DestinationZone::Exile);
                 }
             }
+            CardName::Dismember => {
+                // -5/-5 until end of turn
+                if let Some(Target::Object(creature_id)) = targets.first() {
+                    self.add_temporary_effect(TemporaryEffect::ModifyPT {
+                        target: *creature_id,
+                        power: -5,
+                        toughness: -5,
+                    });
+                }
+            }
             // Bounce spells
-            CardName::ChainOfVapor | CardName::IntoTheFloodMaw | CardName::HurkylsRecall
-            | CardName::Commandeer | CardName::Misdirection => {
+            CardName::ChainOfVapor | CardName::IntoTheFloodMaw | CardName::SinkIntoStupor => {
                 if let Some(Target::Object(target_id)) = targets.first() {
                     self.remove_permanent_to_zone(*target_id, DestinationZone::Hand);
+                }
+            }
+            // Step Through: return two target creatures to their owners' hands
+            CardName::StepThrough => {
+                for target in targets.iter().take(2) {
+                    if let Target::Object(target_id) = target {
+                        self.remove_permanent_to_zone(*target_id, DestinationZone::Hand);
+                    }
+                }
+            }
+            // Commandeer: counter target noncreature spell (simplified from gain control)
+            // Misdirection: counter target spell with a single target (simplified from redirect)
+            CardName::Commandeer | CardName::Misdirection => {
+                if let Some(Target::Object(spell_id)) = targets.first() {
+                    let is_uncounterable = self.stack.items()
+                        .iter()
+                        .find(|item| item.id == *spell_id)
+                        .map(|item| item.cant_be_countered)
+                        .unwrap_or(false);
+                    if !is_uncounterable {
+                        if let Some(item) = self.stack.remove(*spell_id) {
+                            self.route_countered_spell(item);
+                        }
+                    }
+                }
+            }
+            CardName::HurkylsRecall => {
+                // Return ALL artifacts target player owns to their hand
+                if let Some(Target::Player(target_player)) = targets.first() {
+                    let artifact_ids: Vec<ObjectId> = self.battlefield.iter()
+                        .filter(|p| p.owner == *target_player && p.is_artifact())
+                        .map(|p| p.id)
+                        .collect();
+                    for id in artifact_ids {
+                        self.remove_permanent_to_zone(id, DestinationZone::Hand);
+                    }
                 }
             }
 
@@ -449,7 +531,9 @@ impl GameState {
 
             // === Discard ===
             CardName::Duress | CardName::InquisitionOfKozilek | CardName::Thoughtseize => {
-                self.players[controller as usize].life -= 2;
+                if card_name == CardName::Thoughtseize {
+                    self.players[controller as usize].life -= 2;
+                }
                 if let Some(Target::Player(target_player)) = targets.first() {
                     let options: Vec<ObjectId> = self.players[*target_player as usize]
                         .hand
@@ -503,8 +587,7 @@ impl GameState {
                 // Target player discards X at random
                 if let Some(Target::Player(target_player)) = targets.first() {
                     let pid = *target_player as usize;
-                    // X is part of the cost - simplified: discard 3
-                    let count = 3.min(self.players[pid].hand.len());
+                    let count = (x_value as usize).min(self.players[pid].hand.len());
                     for _ in 0..count {
                         if let Some(id) = self.players[pid].hand.pop() {
                             self.players[pid].graveyard.push(id);
@@ -519,7 +602,7 @@ impl GameState {
                 for pid in 0..self.num_players as usize {
                     // Discard hand
                     let hand = std::mem::take(&mut self.players[pid].hand);
-                    if card_name == CardName::Timetwister {
+                    if card_name == CardName::Timetwister || card_name == CardName::EchoOfEons {
                         // Shuffle hand + graveyard into library
                         self.players[pid].library.extend(hand);
                         let gy = std::mem::take(&mut self.players[pid].graveyard);
@@ -563,18 +646,27 @@ impl GameState {
                 self.draw_cards(controller, 2);
             }
             CardName::ParadoxicalOutcome => {
-                // Bounce own permanents, draw that many - simplified: draw 2
-                self.draw_cards(controller, 2);
+                // Bounce any number of nonland, nontoken permanents you control, draw that many.
+                // Simplified: bounce all nonland nontoken permanents you control, then draw that many.
+                let to_bounce: Vec<ObjectId> = self.battlefield.iter()
+                    .filter(|p| p.controller == controller && !p.is_land() && !p.is_token)
+                    .map(|p| p.id)
+                    .collect();
+                let count = to_bounce.len();
+                for id in to_bounce {
+                    self.remove_permanent_to_zone(id, DestinationZone::Hand);
+                }
+                self.draw_cards(controller, count);
             }
             CardName::Gush => {
                 // Return 2 Islands or pay mana, draw 2
                 self.draw_cards(controller, 2);
             }
             CardName::ShowAndTell => {
-                // Each player may put an artifact, creature, enchantment, or planeswalker
+                // Each player may put an artifact, creature, enchantment, planeswalker, or land
                 // from their hand onto the battlefield simultaneously.
                 // We resolve one player at a time: active player first, then opponent.
-                // Valid permanent types: Artifact, Creature, Enchantment, Planeswalker (not Instant/Sorcery/Land).
+                // Valid permanent types: Artifact, Creature, Enchantment, Planeswalker, Land (not Instant/Sorcery).
                 let valid_options: Vec<ObjectId> = self.players[controller as usize]
                     .hand
                     .iter()
@@ -585,6 +677,7 @@ impl GameState {
                                 return def.card_types.iter().any(|t| matches!(t,
                                     CardType::Artifact | CardType::Creature
                                     | CardType::Enchantment | CardType::Planeswalker
+                                    | CardType::Land
                                 ));
                             }
                         }
@@ -603,7 +696,29 @@ impl GameState {
                 });
             }
             CardName::Flash => {
-                // Put creature from hand onto battlefield - simplified
+                // Put a creature from hand onto battlefield
+                let creature_options: Vec<ObjectId> = self.players[controller as usize]
+                    .hand
+                    .iter()
+                    .copied()
+                    .filter(|&id| {
+                        if let Some(cn) = self.card_name_for_id(id) {
+                            if let Some(def) = find_card(db, cn) {
+                                return def.card_types.contains(&CardType::Creature);
+                            }
+                        }
+                        false
+                    })
+                    .collect();
+                if !creature_options.is_empty() {
+                    self.pending_choice = Some(PendingChoice {
+                        player: controller,
+                        kind: ChoiceKind::ChooseFromList {
+                            options: creature_options,
+                            reason: ChoiceReason::FlashPutCreature,
+                        },
+                    });
+                }
             }
             CardName::GitaxianProbe => {
                 // Look at opponent's hand, draw a card
@@ -635,8 +750,18 @@ impl GameState {
                 }
             }
             CardName::VeilOfSummer => {
-                // Draw a card if opponent cast blue or black, hexproof from blue/black
-                self.draw_cards(controller, 1);
+                // Your spells can't be countered this turn.
+                // You and permanents you control gain hexproof from blue and from black until end of turn.
+                // Draw a card if an opponent has cast a blue or black spell this turn.
+                // Simplified: check if opponent controls any blue or black permanents as a proxy
+                // for having cast blue/black spells. In a game tree search this is a reasonable heuristic.
+                let opp = self.opponent(controller);
+                let opp_has_blue_or_black = self.battlefield.iter().any(|p| {
+                    p.controller == opp && p.colors.iter().any(|c| matches!(c, Color::Blue | Color::Black))
+                });
+                if opp_has_blue_or_black {
+                    self.draw_cards(controller, 1);
+                }
             }
             CardName::OnceUponATime => {
                 // Look at top 5, take creature or land - simplified: draw 1
@@ -802,15 +927,24 @@ impl GameState {
             | CardName::Vandalblast | CardName::Suplex
             | CardName::MoltenCollapse | CardName::PrismaticEnding | CardName::FatalPush
             | CardName::BitterTriumph | CardName::SnuffOut
-            | CardName::UntimellyMalfunction | CardName::Crash | CardName::CouncilsJudgment
+            | CardName::UntimelyMalfunction | CardName::Crash | CardName::CouncilsJudgment
             | CardName::MarchOfOtherworldlyLight | CardName::SunderingEruption
             | CardName::PestControl => {
+                // Nature's Claim: destroyed permanent's controller gains 4 life
+                let target_controller = if card_name == CardName::NaturesClaim {
+                    if let Some(Target::Object(target_id)) = targets.first() {
+                        self.find_permanent(*target_id).map(|p| p.controller)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
                 if let Some(Target::Object(target_id)) = targets.first() {
                     self.destroy_permanent(*target_id);
                 }
-                // Nature's Claim: controller gains 4 life
-                if card_name == CardName::NaturesClaim {
-                    // target's controller already handled
+                if let Some(tc) = target_controller {
+                    self.players[tc as usize].life += 4;
                 }
             }
 
@@ -852,6 +986,63 @@ impl GameState {
                         self.card_name_for_id(id)
                             .and_then(|cn| find_card(db, cn))
                             .map(|def| def.card_types.contains(&CardType::Land))
+                            .unwrap_or(false)
+                    })
+                    .copied()
+                    .collect();
+                if !searchable.is_empty() {
+                    self.pending_choice = Some(PendingChoice {
+                        player: controller,
+                        kind: ChoiceKind::ChooseFromList {
+                            options: searchable,
+                            reason: ChoiceReason::GenericSearch,
+                        },
+                    });
+                }
+            }
+
+            // Tinker: sacrifice an artifact (targets[0]), search for an artifact and put it onto the battlefield.
+            CardName::Tinker => {
+                if let Some(Target::Object(sac_id)) = targets.first() {
+                    self.destroy_permanent(*sac_id);
+                }
+                let searchable: Vec<ObjectId> = self.players[controller as usize]
+                    .library
+                    .iter()
+                    .filter(|&&id| {
+                        self.card_name_for_id(id)
+                            .and_then(|cn| find_card(db, cn))
+                            .map(|def| def.card_types.contains(&CardType::Artifact))
+                            .unwrap_or(false)
+                    })
+                    .copied()
+                    .collect();
+                if !searchable.is_empty() {
+                    self.pending_choice = Some(PendingChoice {
+                        player: controller,
+                        kind: ChoiceKind::ChooseFromList {
+                            options: searchable,
+                            reason: ChoiceReason::GenericSearch,
+                        },
+                    });
+                }
+            }
+
+            // Transmute Artifact: sacrifice an artifact (targets[0]), search library for
+            // an artifact card, put it onto the battlefield (simplified: any artifact).
+            CardName::TransmuteArtifact => {
+                // Sacrifice the targeted artifact
+                if let Some(Target::Object(sac_id)) = targets.first() {
+                    self.destroy_permanent(*sac_id);
+                }
+                // Search for any artifact in library
+                let searchable: Vec<ObjectId> = self.players[controller as usize]
+                    .library
+                    .iter()
+                    .filter(|&&id| {
+                        self.card_name_for_id(id)
+                            .and_then(|cn| find_card(db, cn))
+                            .map(|def| def.card_types.contains(&CardType::Artifact))
                             .unwrap_or(false)
                     })
                     .copied()
@@ -931,8 +1122,9 @@ impl GameState {
                                     );
                                     self.battlefield.push(perm);
                                     self.handle_etb(cn, card_id, controller);
-                                    // Lose life equal to CMC - simplified
-                                    self.players[controller as usize].life -= 5;
+                                    // Lose life equal to mana value
+                                    let mana_value = find_card(db, cn).map(|d| d.mana_cost.cmc()).unwrap_or(0) as i32;
+                                    self.players[controller as usize].life -= mana_value;
                                 }
                             }
                             break;
@@ -951,7 +1143,7 @@ impl GameState {
             }
 
             // === Storm ===
-            CardName::TendrillsOfAgony => {
+            CardName::TendrilsOfAgony => {
                 // Base effect: target loses 2, you gain 2
                 if let Some(target) = targets.first() {
                     match target {
@@ -992,23 +1184,68 @@ impl GameState {
             // === Storm spells ===
             CardName::BrainFreeze => {
                 // Target player mills 3 cards. Storm.
+                // Each copy (including the original) mills exactly 3.
                 if let Some(Target::Player(p)) = targets.first() {
-                    let mill_count = 3 * (1 + self.storm_count as usize);
-                    for _ in 0..mill_count {
+                    for _ in 0..3 {
                         if let Some(id) = self.players[*p as usize].library.pop() {
                             self.players[*p as usize].graveyard.push(id);
                         }
                     }
                 }
+                // Storm: push storm_count copies onto the stack as individual items
+                if !is_copy {
+                    let storm = self.storm_count;
+                    let template = crate::stack::StackItem {
+                        id: 0,
+                        kind: crate::stack::StackItemKind::Spell {
+                            card_name: CardName::BrainFreeze,
+                            card_id: 0,
+                            cast_via_evoke: false,
+                        },
+                        controller,
+                        targets: targets.to_vec(),
+                        cant_be_countered: false,
+                        x_value: 0,
+                        cast_from_graveyard: false,
+                        cast_as_adventure: false,
+                        modes: vec![],
+                        is_copy: false,
+                    };
+                    for _ in 0..storm {
+                        self.stack.push_copy(&template);
+                    }
+                }
             }
             CardName::MindsDesire => {
-                // Exile top card, play it free. Storm.
-                let copies = 1 + self.storm_count as usize;
-                for _ in 0..copies {
-                    if let Some(id) = self.players[controller as usize].library.pop() {
-                        self.exile.push((id, self.card_name_for_id(id).unwrap_or(CardName::Plains), controller));
-                        // Simplified: put in hand instead
-                        self.players[controller as usize].hand.push(id);
+                // Shuffle library, then exile top card. Until end of turn, you may play
+                // that card without paying its mana cost. Storm.
+                // Simplified: put top card directly into hand (approximates
+                // "cast for free from exile" without needing exile-cast infrastructure).
+                // Shuffle is omitted since library order is treated as random in search.
+                if let Some(id) = self.players[controller as usize].library.pop() {
+                    self.players[controller as usize].hand.push(id);
+                }
+                // Storm: push storm_count copies onto the stack as individual items
+                if !is_copy {
+                    let storm = self.storm_count;
+                    let template = crate::stack::StackItem {
+                        id: 0,
+                        kind: crate::stack::StackItemKind::Spell {
+                            card_name: CardName::MindsDesire,
+                            card_id: 0,
+                            cast_via_evoke: false,
+                        },
+                        controller,
+                        targets: targets.to_vec(),
+                        cant_be_countered: false,
+                        x_value: 0,
+                        cast_from_graveyard: false,
+                        cast_as_adventure: false,
+                        modes: vec![],
+                        is_copy: false,
+                    };
+                    for _ in 0..storm {
+                        self.stack.push_copy(&template);
                     }
                 }
             }
@@ -1033,8 +1270,41 @@ impl GameState {
 
             // === Extra turns ===
             CardName::ExpressiveIteration => {
-                // Look at top 3, put one in hand, exile one (play this turn), bottom one
-                self.draw_cards(controller, 1); // Simplified
+                // Look at top 3, put 1 in hand, put 1 on bottom of library
+                // Simplified: draw 2 (put 1 in hand + exile 1 playable this turn ~ 2 cards of advantage)
+                self.draw_cards(controller, 2);
+            }
+            CardName::FlameOfAnor => {
+                // Choose one (or two if you control a Wizard):
+                //   0: Destroy target artifact
+                //   1: Draw two cards
+                //   2: Deal 5 damage to target creature
+                // Simplified: if no modes given, default to draw 2
+                if modes.is_empty() {
+                    self.draw_cards(controller, 2);
+                } else {
+                    let mut target_idx = 0usize;
+                    for &mode in modes {
+                        match mode {
+                            0 => {
+                                if let Some(Target::Object(id)) = targets.get(target_idx) {
+                                    self.destroy_permanent(*id);
+                                }
+                                target_idx += 1;
+                            }
+                            1 => {
+                                self.draw_cards(controller, 2);
+                            }
+                            2 => {
+                                if let Some(Target::Object(id)) = targets.get(target_idx) {
+                                    self.deal_damage_to_target(Target::Object(*id), 5, controller);
+                                }
+                                target_idx += 1;
+                            }
+                            _ => {}
+                        }
+                    }
+                }
             }
             CardName::ForthEorlingas => {
                 // Create two 2/2 Human Knight tokens with trample and haste
@@ -1056,20 +1326,22 @@ impl GameState {
 
             // === Doomsday ===
             CardName::Doomsday => {
-                // Lose half life, search for 5 cards
+                // Lose half life rounded up, search for 5 cards
                 let life = self.players[controller as usize].life;
-                self.players[controller as usize].life = (life + 1) / 2; // Rounded up loss
+                let loss = (life + 1) / 2;
+                self.players[controller as usize].life -= loss;
                 // Simplified: don't actually search
             }
 
             // === Life from the Loam ===
             CardName::LifeFromTheLoam => {
-                // Return up to 3 lands from graveyard to hand
-                let mut count = 0;
+                // Return up to 3 land cards from graveyard to hand
                 let gy = &self.players[controller as usize].graveyard;
                 let land_indices: Vec<usize> = gy.iter().enumerate()
                     .filter(|(_, &id)| {
-                        self.card_name_for_id(id).map_or(false, |_| true) // Simplified
+                        self.card_name_for_id(id).map_or(false, |cn| {
+                            find_card(db, cn).map_or(false, |d| d.card_types.contains(&CardType::Land))
+                        })
                     })
                     .map(|(i, _)| i)
                     .take(3)
@@ -1077,18 +1349,30 @@ impl GameState {
                 for &idx in land_indices.iter().rev() {
                     let id = self.players[controller as usize].graveyard.remove(idx);
                     self.players[controller as usize].hand.push(id);
-                    count += 1;
-                    if count >= 3 { break; }
                 }
             }
 
             // === Regrowth and similar ===
-            CardName::Regrowth | CardName::MemorysJourney => {
+            CardName::Regrowth => {
                 if let Some(Target::Object(target_id)) = targets.first() {
                     let gy = &mut self.players[controller as usize].graveyard;
                     if let Some(pos) = gy.iter().position(|&id| id == *target_id) {
                         let card = gy.remove(pos);
                         self.players[controller as usize].hand.push(card);
+                    }
+                }
+            }
+            CardName::MemorysJourney => {
+                // Shuffle up to 3 target cards from a single graveyard into their owner's library
+                // Simplified: targets[0] is one card from controller's graveyard, shuffle it into library
+                for target in targets.iter().take(3) {
+                    if let Target::Object(target_id) = target {
+                        let gy = &mut self.players[controller as usize].graveyard;
+                        if let Some(pos) = gy.iter().position(|&id| id == *target_id) {
+                            let card = gy.remove(pos);
+                            // Put into library (shuffled in)
+                            self.players[controller as usize].library.push(card);
+                        }
                     }
                 }
             }
@@ -1149,56 +1433,73 @@ impl GameState {
             }
 
             CardName::KozileksCommand => {
-                // Choose two — modes:
-                //   0: Target player draws two cards and loses 2 life
-                //   1: Create a 0/1 Eldrazi Spawn token with "Sacrifice: Add {C}"
-                //   2: Destroy target artifact or enchantment with mana value 3 or less
-                //   3: Target creature gets -3/-3 until end of turn
+                // Choose two — X spell modes:
+                //   0: Target player creates X 0/1 Eldrazi Spawn tokens
+                //   1: Target player scries X, then draws a card
+                //   2: Exile target creature with mana value X or less
+                //   3: Exile up to X target cards from graveyards
+                let x = x_value;
                 let mut target_idx = 0usize;
                 for &mode in modes {
                     match mode {
                         0 => {
-                            if let Some(Target::Player(p)) = targets.get(target_idx) {
-                                self.draw_cards(*p, 2);
-                                self.players[*p as usize].life -= 2;
-                            }
+                            // Create X 0/1 Eldrazi Spawn tokens for target player
+                            let target_player = if let Some(Target::Player(p)) = targets.get(target_idx) {
+                                *p
+                            } else {
+                                controller
+                            };
                             target_idx += 1;
+                            for _ in 0..x {
+                                let token_id = self.new_object_id();
+                                let mut token = crate::permanent::Permanent::new(
+                                    token_id,
+                                    CardName::EldraziSpawnToken,
+                                    target_player,
+                                    target_player,
+                                    Some(0),
+                                    Some(1),
+                                    None,
+                                    Keywords::empty(),
+                                    &[CardType::Creature],
+                                );
+                                token.is_token = true;
+                                self.battlefield.push(token);
+                            }
                         }
                         1 => {
-                            // Create a 0/1 Eldrazi Spawn token (no target needed)
-                            let token_id = self.new_object_id();
-                            let mut token = crate::permanent::Permanent::new(
-                                token_id,
-                                CardName::EldraziSpawnToken,
-                                controller,
-                                controller,
-                                Some(0),
-                                Some(1),
-                                None,
-                                Keywords::empty(),
-                                &[CardType::Creature],
-                            );
-                            token.is_token = true;
-                            self.battlefield.push(token);
-                            // no target consumed
+                            // Target player scries X, then draws a card
+                            // Simplified: just draw a card (scry is hidden info)
+                            let target_player = if let Some(Target::Player(p)) = targets.get(target_idx) {
+                                *p
+                            } else {
+                                controller
+                            };
+                            target_idx += 1;
+                            self.draw_cards(target_player, 1);
                         }
                         2 => {
-                            // Destroy target artifact or enchantment
+                            // Exile target creature with mana value X or less
                             if let Some(Target::Object(id)) = targets.get(target_idx) {
-                                self.destroy_permanent(*id);
+                                self.remove_permanent_to_zone(*id, DestinationZone::Exile);
                             }
                             target_idx += 1;
                         }
                         3 => {
-                            // Target creature gets -3/-3 until end of turn
-                            if let Some(Target::Object(id)) = targets.get(target_idx) {
-                                self.add_temporary_effect(crate::types::TemporaryEffect::ModifyPT {
-                                    target: *id,
-                                    power: -3,
-                                    toughness: -3,
-                                });
+                            // Exile up to X target cards from graveyards
+                            for _ in 0..x {
+                                if let Some(Target::Object(id)) = targets.get(target_idx) {
+                                    for pid in 0..self.num_players as usize {
+                                        if let Some(pos) = self.players[pid].graveyard.iter().position(|&gid| gid == *id) {
+                                            let card = self.players[pid].graveyard.remove(pos);
+                                            let cn = self.card_name_for_id(card).unwrap_or(CardName::Plains);
+                                            self.exile.push((card, cn, pid as PlayerId));
+                                            break;
+                                        }
+                                    }
+                                }
+                                target_idx += 1;
                             }
-                            target_idx += 1;
                         }
                         _ => {}
                     }
@@ -1372,6 +1673,81 @@ impl GameState {
                     );
                 }
             }
+            // Thassa's Oracle: ETB win condition (put on stack so it resolves with db access)
+            CardName::ThassasOracle => {
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: _card_id,
+                        source_name: card_name,
+                        effect: TriggeredEffect::ThassasOracleETB,
+                    },
+                    controller,
+                    vec![],
+                );
+            }
+            // Fury: deal 4 damage divided among any number of target creatures/planeswalkers
+            // Simplified: deal 4 to the first opponent creature
+            CardName::Fury => {
+                let target: Option<ObjectId> = self.battlefield.iter()
+                    .find(|p| p.is_creature() && p.controller != controller)
+                    .map(|p| p.id);
+                if let Some(tid) = target {
+                    self.deal_damage_to_target(Target::Object(tid), 4, controller);
+                }
+            }
+            // Dark Confidant: register a recurring upkeep trigger
+            CardName::DarkConfidant => {
+                self.add_delayed_trigger(crate::types::DelayedTrigger {
+                    condition: crate::types::DelayedTriggerCondition::AtBeginningOfUpkeep {
+                        player: controller,
+                    },
+                    effect: TriggeredEffect::DarkConfidantUpkeep,
+                    controller,
+                    fires_once: false,
+                });
+            }
+            // Portable Hole: exile target nonland permanent an opponent controls with MV 2 or less
+            CardName::PortableHole => {
+                let opp = self.opponent(controller);
+                let targets: Vec<ObjectId> = self.battlefield.iter()
+                    .filter(|p| p.controller == opp && !p.is_land() && !p.is_token)
+                    .map(|p| p.id)
+                    .collect();
+                if let Some(&target_id) = targets.first() {
+                    self.stack.push(
+                        StackItemKind::TriggeredAbility {
+                            source_id: _card_id,
+                            source_name: card_name,
+                            effect: TriggeredEffect::PortableHoleETB { hole_id: _card_id },
+                        },
+                        controller,
+                        vec![Target::Object(target_id)],
+                    );
+                }
+            }
+            // Argentum Masticore: upkeep trigger — sacrifice unless you discard a card
+            CardName::ArgentumMasticore => {
+                self.add_delayed_trigger(crate::types::DelayedTrigger {
+                    condition: crate::types::DelayedTriggerCondition::AtBeginningOfUpkeep {
+                        player: controller,
+                    },
+                    effect: TriggeredEffect::ArgentumMasticoreUpkeep { masticore_id: _card_id },
+                    controller,
+                    fires_once: false,
+                });
+            }
+            // Coveted Jewel: draw 3 cards on ETB
+            CardName::CovetedJewel => {
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: _card_id,
+                        source_name: card_name,
+                        effect: TriggeredEffect::CovetedJewelETB,
+                    },
+                    controller,
+                    vec![],
+                );
+            }
             // Snapcaster Mage: ETB handled separately in handle_etb_with_cast_targets
             // because it needs the targets from the CastSpell action.
             CardName::SnapcasterMage => {}
@@ -1425,10 +1801,67 @@ impl GameState {
                     self.destroy_permanent(target_id);
                 }
             }
+            // Ajani, Nacatl Pariah: create a 2/1 white Cat Warrior token
+            CardName::AjaniNacatlPariah => {
+                let token_id = self.new_object_id();
+                let mut token = Permanent::new(
+                    token_id, CardName::AjaniNacatlPariah, controller, controller,
+                    Some(2), Some(1), None, Keywords::empty(), &[CardType::Creature],
+                );
+                token.is_token = true;
+                token.creature_types = vec![CreatureType::Cat, CreatureType::Warrior];
+                self.battlefield.push(token);
+            }
+            // Voice of Victory: create a 1/1 white Human creature token
+            CardName::VoiceOfVictory => {
+                let token_id = self.new_object_id();
+                let mut token = Permanent::new(
+                    token_id, CardName::VoiceOfVictory, controller, controller,
+                    Some(1), Some(1), None, Keywords::empty(), &[CardType::Creature],
+                );
+                token.is_token = true;
+                token.creature_types = vec![CreatureType::Human];
+                self.battlefield.push(token);
+            }
+            // White Orchid Phantom: destroy target nonbasic land opponent controls
+            CardName::WhiteOrchidPhantom => {
+                let target_id = self.battlefield.iter()
+                    .find(|p| p.controller != controller && p.is_land() && !matches!(p.card_name,
+                        CardName::Plains | CardName::Island | CardName::Swamp | CardName::Mountain | CardName::Forest))
+                    .map(|p| p.id);
+                if let Some(tid) = target_id {
+                    self.destroy_permanent(tid);
+                }
+            }
+            // Doorkeeper Thrull: exile target artifact/enchantment an opponent controls
+            CardName::DoorkeeperThrull => {
+                let target_id = self.battlefield.iter()
+                    .find(|p| p.controller != controller && (p.is_artifact() || p.is_enchantment()))
+                    .map(|p| p.id);
+                if let Some(tid) = target_id {
+                    self.exile_linked.push((_card_id, tid));
+                    self.remove_permanent_to_zone(tid, DestinationZone::Exile);
+                }
+            }
             // Mana Vault / Grim Monolith / Time Vault: set doesnt_untap flag
             CardName::ManaVault | CardName::GrimMonolith | CardName::TimeVault => {
                 if let Some(perm) = self.find_permanent_mut(_card_id) {
                     perm.doesnt_untap = true;
+                }
+            }
+            // Shatterskull, the Hammer Pass (MDFC back face): enters tapped
+            // (simplified: always enters tapped, skip the "pay 3 life" option)
+            CardName::ShatterskullTheHammerPass => {
+                if let Some(perm) = self.find_permanent_mut(_card_id) {
+                    perm.tapped = true;
+                }
+            }
+            // Starting Town: enters tapped unless it's turn 1-3
+            CardName::StartingTown => {
+                if self.turn_number > 3 {
+                    if let Some(perm) = self.find_permanent_mut(_card_id) {
+                        perm.tapped = true;
+                    }
                 }
             }
             // Shock lands: player chooses to pay 2 life (enter untapped) or enter tapped
@@ -1451,19 +1884,17 @@ impl GameState {
                     },
                 });
             }
-            // Surveil lands: shock-land life/tapped choice, then surveil 1.
+            // Survey lands: always enter tapped, then surveil 1.
             CardName::MeticulousArchive
             | CardName::UndercitySewers
             | CardName::ThunderingFalls
             | CardName::HedgeMaze => {
-                self.pending_choice = Some(PendingChoice {
-                    player: controller,
-                    kind: ChoiceKind::ChooseNumber {
-                        min: 0,
-                        max: 1,
-                        reason: ChoiceReason::SurveilLandShock { card_id: _card_id },
-                    },
-                });
+                // Always enter tapped
+                if let Some(perm) = self.find_permanent_mut(_card_id) {
+                    perm.tapped = true;
+                }
+                // Surveil 1
+                self.surveil(controller, 1, false);
             }
             // Generous Plunderer: each player creates a Treasure token
             CardName::GenerousPlunderer => {
@@ -1824,11 +2255,15 @@ impl GameState {
                 self.players[opp as usize].life -= 2;
             }
             TriggeredEffect::DarkConfidantUpkeep => {
-                // Reveal top card, lose life equal to CMC
+                // Reveal top card, put it in hand, lose life equal to its mana value
                 if let Some(id) = self.players[controller as usize].library.pop() {
                     self.players[controller as usize].hand.push(id);
-                    // Lose life equal to CMC - simplified: lose 2
-                    self.players[controller as usize].life -= 2;
+                    // Lose life equal to CMC of the revealed card
+                    let life_loss = self.card_name_for_id(id)
+                        .and_then(|cn| find_card(db, cn))
+                        .map(|def| def.mana_cost.cmc() as i32)
+                        .unwrap_or(0);
+                    self.players[controller as usize].life -= life_loss;
                 }
             }
             TriggeredEffect::YoungPyromancerCast | TriggeredEffect::MonasteryMentorCast => {
@@ -1979,16 +2414,25 @@ impl GameState {
             }
             TriggeredEffect::ArchonOfCrueltyTrigger => {
                 // Opponent: sacrifice creature, discard, lose 3
-                // You: draw, gain 3, create Treasure
+                // You: draw, gain 3
                 if let Some(Target::Player(opp)) = targets.first() {
                     let opid = *opp as usize;
-                    self.players[opid].life -= 3;
+                    // Opponent sacrifices a creature (simplified: destroy first creature they control)
+                    let creature_to_sac: Option<ObjectId> = self.battlefield.iter()
+                        .find(|p| p.controller == *opp && p.is_creature())
+                        .map(|p| p.id);
+                    if let Some(cid) = creature_to_sac {
+                        self.destroy_permanent(cid);
+                    }
+                    // Opponent discards a card
                     if let Some(id) = self.players[opid].hand.pop() {
                         self.players[opid].graveyard.push(id);
                     }
+                    // Opponent loses 3 life
+                    self.players[opid].life -= 3;
+                    // You draw a card, gain 3 life
                     self.draw_cards(controller, 1);
                     self.players[controller as usize].life += 3;
-                    self.create_treasure_token(controller);
                 }
             }
             TriggeredEffect::WurmcoilDeath => {
@@ -2447,6 +2891,76 @@ impl GameState {
                 }
             }
 
+            TriggeredEffect::ArgentumMasticoreUpkeep { masticore_id } => {
+                // Sacrifice unless you discard a card.
+                // Simplified: if hand is not empty, discard a card; otherwise sacrifice.
+                if self.find_permanent(masticore_id).is_some() {
+                    if !self.players[controller as usize].hand.is_empty() {
+                        // Discard a card (simplified: discard last card in hand)
+                        if let Some(card_id) = self.players[controller as usize].hand.pop() {
+                            self.discard_card(card_id, controller, db);
+                        }
+                    } else {
+                        // No cards to discard, sacrifice the Masticore
+                        self.destroy_permanent(masticore_id);
+                    }
+                }
+            }
+
+            TriggeredEffect::ThassasOracleETB => {
+                // If the number of cards in your library <= your devotion to blue, you win.
+                let devotion = self.devotion_to(controller, Color::Blue, db);
+                let lib_size = self.players[controller as usize].library.len() as u32;
+                if devotion >= lib_size {
+                    self.result = crate::types::GameResult::Win(controller);
+                }
+            }
+
+            TriggeredEffect::CovetedJewelETB => {
+                self.draw_cards(controller, 3);
+            }
+
+            TriggeredEffect::PortableHoleETB { hole_id } => {
+                // Exile target nonland permanent an opponent controls with MV <= 2.
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    self.exile_linked.push((hole_id, *target_id));
+                    self.remove_permanent_to_zone(*target_id, DestinationZone::Exile);
+                }
+            }
+
+            TriggeredEffect::CindervinesDamage { target_player } => {
+                // Deal 1 damage to the player who cast the noncreature spell
+                self.players[target_player as usize].life -= 1;
+            }
+
+            TriggeredEffect::LaviniaCounter { spell_id } => {
+                // Counter the spell (if it's still on the stack)
+                if let Some(item) = self.stack.remove(spell_id) {
+                    self.route_countered_spell(item);
+                }
+            }
+
+            TriggeredEffect::OkoExchange => {
+                // Exchange control of two targets
+                if targets.len() >= 2 {
+                    if let (Target::Object(your_id), Target::Object(their_id)) =
+                        (targets[0], targets[1])
+                    {
+                        // Swap controllers
+                        let your_ctrl = self.find_permanent(your_id).map(|p| p.controller);
+                        let their_ctrl = self.find_permanent(their_id).map(|p| p.controller);
+                        if let (Some(yc), Some(tc)) = (your_ctrl, their_ctrl) {
+                            if let Some(p) = self.find_permanent_mut(your_id) {
+                                p.controller = tc;
+                            }
+                            if let Some(p) = self.find_permanent_mut(their_id) {
+                                p.controller = yc;
+                            }
+                        }
+                    }
+                }
+            }
+
             _ => {}
         }
         let _ = db; // suppress unused warning when db not used in all arms
@@ -2456,6 +2970,9 @@ impl GameState {
         match effect {
             ActivatedEffect::SacrificeForMana { amount: _ } => {
                 // Handled at activation time (mana already added, permanent already sacrificed)
+            }
+            ActivatedEffect::GriselbrandDraw => {
+                self.draw_cards(controller, 7);
             }
             ActivatedEffect::JaceBrainstorm => {
                 self.draw_cards(controller, 3);
@@ -2592,6 +3109,26 @@ impl GameState {
                     }
                 }
             }
+            ActivatedEffect::OkoExchange => {
+                // Oko -5: exchange control of target artifact/creature you control
+                // and target creature opponent controls with power 3 or less
+                if targets.len() >= 2 {
+                    if let (Target::Object(your_id), Target::Object(their_id)) =
+                        (targets[0], targets[1])
+                    {
+                        let your_ctrl = self.find_permanent(your_id).map(|p| p.controller);
+                        let their_ctrl = self.find_permanent(their_id).map(|p| p.controller);
+                        if let (Some(yc), Some(tc)) = (your_ctrl, their_ctrl) {
+                            if let Some(p) = self.find_permanent_mut(your_id) {
+                                p.controller = tc;
+                            }
+                            if let Some(p) = self.find_permanent_mut(their_id) {
+                                p.controller = yc;
+                            }
+                        }
+                    }
+                }
+            }
             ActivatedEffect::WrennReturn => {
                 // Wrenn and Six +1: return target land from graveyard to hand
                 if let Some(Target::Object(target_id)) = targets.first() {
@@ -2633,26 +3170,47 @@ impl GameState {
                 // Gideon +1: prevent all damage from a source (simplified: no-op)
             }
             ActivatedEffect::KayaExile => {
-                // Kaya +1: exile target card from a graveyard
-                if let Some(Target::Object(target_id)) = targets.first() {
-                    // Check both players' graveyards
-                    for pid in 0..self.players.len() {
-                        if let Some(pos) = self.players[pid].graveyard.iter().position(|&id| id == *target_id) {
-                            let id = self.players[pid].graveyard.remove(pos);
+                // Kaya +1: exile up to two cards from each graveyard.
+                // You gain 2 life if at least one creature card was exiled.
+                let mut exiled_creature = false;
+                for pid in 0..self.players.len() {
+                    let to_exile: Vec<ObjectId> = self.players[pid].graveyard.iter()
+                        .rev()
+                        .take(2)
+                        .copied()
+                        .collect();
+                    for id in to_exile {
+                        if let Some(pos) = self.players[pid].graveyard.iter().position(|&gid| gid == id) {
+                            self.players[pid].graveyard.remove(pos);
                             let card_name = self.card_name_for_id(id).unwrap_or(CardName::Plains);
+                            if let Some(def) = crate::card::find_card(db, card_name) {
+                                if def.card_types.contains(&CardType::Creature) {
+                                    exiled_creature = true;
+                                }
+                            }
                             self.exile.push((id, card_name, pid as PlayerId));
-                            break;
                         }
                     }
                 }
+                if exiled_creature {
+                    self.players[controller as usize].life += 2;
+                }
             }
             ActivatedEffect::KayaMinus => {
-                // Kaya -1: exile target nonland permanent, owner gains 2 life
+                // Kaya -1: exile target nonland permanent with mana value 1 or less
                 if let Some(Target::Object(target_id)) = targets.first() {
-                    if let Some(perm) = self.remove_permanent_to_zone(*target_id, DestinationZone::Exile) {
-                        let owner = perm.owner as usize;
-                        self.players[owner].life += 2;
-                    }
+                    self.remove_permanent_to_zone(*target_id, DestinationZone::Exile);
+                }
+            }
+            ActivatedEffect::KayaUltimate => {
+                // Kaya -5: deal damage to target player equal to cards they own in exile,
+                // and you gain that much life.
+                if let Some(Target::Player(target_player)) = targets.first() {
+                    let cards_in_exile = self.exile.iter()
+                        .filter(|&&(_, _, owner)| owner == *target_player)
+                        .count() as i32;
+                    self.players[*target_player as usize].life -= cards_in_exile;
+                    self.players[controller as usize].life += cards_in_exile;
                 }
             }
             ActivatedEffect::PlaneswalkerAbility { .. } => {
@@ -2720,7 +3278,7 @@ impl GameState {
                 }
             }
             ActivatedEffect::OtawaraChannel => {
-                // Return target artifact, creature, or planeswalker to owner's hand.
+                // Return target artifact, creature, enchantment, or planeswalker to owner's hand.
                 if let Some(Target::Object(target_id)) = targets.first() {
                     self.remove_permanent_to_zone(*target_id, DestinationZone::Hand);
                 }
@@ -2855,7 +3413,7 @@ impl GameState {
                     // For targeted instants, we would need a pending choice; for now resolve inline.
                     let targets: Vec<Target> = Vec::new();
                     let modes: Vec<u8> = Vec::new();
-                    self.resolve_card_effect(card_name, controller, &targets, &modes, false, &[]);
+                    self.resolve_card_effect(card_name, controller, &targets, 0, &modes, false, &[]);
                 }
             }
 

@@ -177,7 +177,7 @@ impl GameState {
                             }
                             // Mark evoke-cast spells so resolution can apply the sacrifice trigger.
                             let is_evoke = matches!(alt_cost, Some(AltCost::Evoke { .. }));
-                            self.stack.push_with_flags(
+                            let spell_id = self.stack.push_with_flags(
                                 StackItemKind::Spell {
                                     card_name: cn,
                                     card_id: *card_id,
@@ -190,6 +190,9 @@ impl GameState {
                                 *from_graveyard,
                                 modes.clone(),
                             );
+                            // Check Lavinia / Boromir: counter free spells cast by opponents.
+                            let mana_was_spent = alt_cost.is_none() && !(*from_library_top && self.battlefield.iter().any(|p| p.card_name == CardName::BolassCitadel && p.controller == player_id));
+                            self.check_lavinia_trigger(player_id, spell_id, mana_was_spent);
                             self.players[player_id as usize].spells_cast_this_turn += 1;
                             if !def.card_types.contains(&CardType::Artifact) {
                                 self.players[player_id as usize].nonartifact_spells_cast_this_turn += 1;
@@ -696,6 +699,21 @@ impl GameState {
                 self.reset_priority_passes();
             }
 
+            // Griselbrand: pay 7 life, draw 7 cards
+            CardName::Griselbrand if ability_index == 0 => {
+                self.players[controller as usize].life -= 7;
+                self.stack.push(
+                    StackItemKind::ActivatedAbility {
+                        source_id: permanent_id,
+                        source_name: card_name,
+                        effect: ActivatedEffect::GriselbrandDraw,
+                    },
+                    controller,
+                    vec![],
+                );
+                self.reset_priority_passes();
+            }
+
             // The One Ring: {T}: Put a burden counter, then draw cards equal to burden counters.
             CardName::TheOneRing if ability_index == 0 => {
                 self.stack.push(
@@ -1004,6 +1022,19 @@ impl GameState {
                                 targets.to_vec(),
                             );
                         }
+                        2 => {
+                            // -5: Exchange control
+                            perm.loyalty -= 5;
+                            self.stack.push(
+                                StackItemKind::ActivatedAbility {
+                                    source_id: permanent_id,
+                                    source_name: card_name,
+                                    effect: ActivatedEffect::OkoExchange,
+                                },
+                                controller,
+                                targets.to_vec(),
+                            );
+                        }
                         _ => {}
                     }
                 }
@@ -1070,6 +1101,18 @@ impl GameState {
                                 targets.to_vec(),
                             );
                         }
+                        2 => {
+                            perm.loyalty -= 5;
+                            self.stack.push(
+                                StackItemKind::ActivatedAbility {
+                                    source_id: permanent_id,
+                                    source_name: card_name,
+                                    effect: ActivatedEffect::KayaUltimate,
+                                },
+                                controller,
+                                targets.to_vec(),
+                            );
+                        }
                         _ => {}
                     }
                 }
@@ -1123,6 +1166,7 @@ impl GameState {
     fn is_fetchable(&self, fetch: CardName, target: CardName) -> bool {
         match fetch {
             // FloodedStrand fetches Plains or Island lands
+            // FloodedStrand fetches Plains or Island lands
             CardName::FloodedStrand => matches!(target,
                 // Basic lands
                 CardName::Plains | CardName::Island
@@ -1134,9 +1178,9 @@ impl GameState {
                 // Shock lands with Island subtype
                 | CardName::WateryGrave | CardName::SteamVents | CardName::BreedingPool
                 // Survey lands with Plains subtype
-                | CardName::MeticulousArchive | CardName::HedgeMaze
-                // Survey lands with Island subtype
-                | CardName::UndercitySewers
+                | CardName::MeticulousArchive
+                // Survey lands with Island subtype (ThunderingFalls=Island+Mountain, HedgeMaze=Forest+Island)
+                | CardName::UndercitySewers | CardName::ThunderingFalls | CardName::HedgeMaze
             ),
             // PollutedDelta fetches Island or Swamp lands
             CardName::PollutedDelta => matches!(target,
@@ -1152,7 +1196,7 @@ impl GameState {
                 | CardName::BloodCrypt | CardName::OvergrownTomb | CardName::GodlessShrine
                 // Survey lands with Island subtype
                 | CardName::UndercitySewers | CardName::MeticulousArchive
-                // Survey lands with Swamp subtype (none currently)
+                | CardName::ThunderingFalls | CardName::HedgeMaze
             ),
             // BloodstainedMire fetches Swamp or Mountain lands
             CardName::BloodstainedMire => matches!(target,
@@ -1165,10 +1209,9 @@ impl GameState {
                 | CardName::BloodCrypt | CardName::OvergrownTomb | CardName::WateryGrave | CardName::GodlessShrine
                 // Shock lands with Mountain subtype
                 | CardName::StompingGround | CardName::SteamVents | CardName::SacredFoundry
-                // Survey lands with Swamp subtype (none currently)
-                // Survey lands with Mountain subtype
+                // Survey lands with Mountain subtype (ThunderingFalls=Island+Mountain)
                 | CardName::ThunderingFalls
-                // Survey lands with Island subtype that also have Swamp (UndercitySewers = Island+Swamp)
+                // Survey lands with Swamp subtype (UndercitySewers = Island+Swamp)
                 | CardName::UndercitySewers
             ),
             // WoodedFoothills fetches Mountain or Forest lands
@@ -1182,9 +1225,9 @@ impl GameState {
                 | CardName::StompingGround | CardName::SteamVents | CardName::SacredFoundry | CardName::BloodCrypt
                 // Shock lands with Forest subtype
                 | CardName::TempleGarden | CardName::OvergrownTomb | CardName::BreedingPool
-                // Survey lands with Mountain subtype
+                // Survey lands with Mountain subtype (ThunderingFalls=Island+Mountain)
                 | CardName::ThunderingFalls
-                // Survey lands with Forest subtype
+                // Survey lands with Forest subtype (HedgeMaze=Forest+Island)
                 | CardName::HedgeMaze
             ),
             // WindsweptHeath fetches Forest or Plains lands
@@ -1198,8 +1241,8 @@ impl GameState {
                 | CardName::TempleGarden | CardName::OvergrownTomb | CardName::BreedingPool | CardName::StompingGround
                 // Shock lands with Plains subtype
                 | CardName::HallowedFountain | CardName::GodlessShrine | CardName::SacredFoundry
-                // Survey lands with Forest subtype
-                | CardName::HedgeMaze | CardName::ThunderingFalls
+                // Survey lands with Forest subtype (HedgeMaze=Forest+Island)
+                | CardName::HedgeMaze
                 // Survey lands with Plains subtype
                 | CardName::MeticulousArchive
             ),
@@ -1215,10 +1258,10 @@ impl GameState {
                 | CardName::StompingGround
                 // Shock lands with Island subtype
                 | CardName::HallowedFountain | CardName::WateryGrave | CardName::SteamVents
-                // Survey lands with Forest subtype
-                | CardName::HedgeMaze | CardName::ThunderingFalls
+                // Survey lands with Forest subtype (HedgeMaze=Forest+Island)
+                | CardName::HedgeMaze
                 // Survey lands with Island subtype
-                | CardName::MeticulousArchive | CardName::UndercitySewers
+                | CardName::MeticulousArchive | CardName::UndercitySewers | CardName::ThunderingFalls
             ),
             // ScaldingTarn fetches Island or Mountain lands
             CardName::ScaldingTarn => matches!(target,
@@ -1231,10 +1274,10 @@ impl GameState {
                 | CardName::SteamVents | CardName::HallowedFountain | CardName::WateryGrave | CardName::BreedingPool
                 // Shock lands with Mountain subtype
                 | CardName::StompingGround | CardName::SacredFoundry | CardName::BloodCrypt
-                // Survey lands with Island subtype
-                | CardName::MeticulousArchive | CardName::UndercitySewers
-                // Survey lands with Mountain subtype
+                // Survey lands with Island+Mountain subtype (ThunderingFalls=Island+Mountain)
                 | CardName::ThunderingFalls
+                // Survey lands with Island subtype
+                | CardName::MeticulousArchive | CardName::UndercitySewers | CardName::HedgeMaze
             ),
             // VerdantCatacombs fetches Swamp or Forest lands
             CardName::VerdantCatacombs => matches!(target,
@@ -1249,8 +1292,8 @@ impl GameState {
                 | CardName::TempleGarden | CardName::BreedingPool | CardName::StompingGround
                 // Survey lands with Swamp subtype (UndercitySewers = Island+Swamp)
                 | CardName::UndercitySewers
-                // Survey lands with Forest subtype
-                | CardName::HedgeMaze | CardName::ThunderingFalls
+                // Survey lands with Forest subtype (HedgeMaze=Forest+Island)
+                | CardName::HedgeMaze
             ),
             // AridMesa fetches Mountain or Plains lands
             CardName::AridMesa => matches!(target,
@@ -1263,10 +1306,10 @@ impl GameState {
                 | CardName::SacredFoundry | CardName::StompingGround | CardName::SteamVents | CardName::BloodCrypt
                 // Shock lands with Plains subtype
                 | CardName::HallowedFountain | CardName::GodlessShrine | CardName::TempleGarden
-                // Survey lands with Mountain subtype
+                // Survey lands with Mountain subtype (ThunderingFalls=Island+Mountain)
                 | CardName::ThunderingFalls
                 // Survey lands with Plains subtype
-                | CardName::MeticulousArchive | CardName::HedgeMaze
+                | CardName::MeticulousArchive
             ),
             // MarshFlats fetches Plains or Swamp lands
             CardName::MarshFlats => matches!(target,
@@ -1280,7 +1323,7 @@ impl GameState {
                 // Shock lands with Swamp subtype
                 | CardName::BloodCrypt | CardName::OvergrownTomb | CardName::WateryGrave
                 // Survey lands with Plains subtype
-                | CardName::MeticulousArchive | CardName::HedgeMaze
+                | CardName::MeticulousArchive
                 // Survey lands with Swamp subtype (UndercitySewers = Island+Swamp)
                 | CardName::UndercitySewers
             ),
@@ -1374,6 +1417,15 @@ impl GameState {
                 }
                 self.players[player_id as usize].life -= *life_paid as i32;
                 self.players[player_id as usize].mana_pool.pay(normal_cost);
+                true
+            }
+            AltCost::SnuffOut => {
+                // Pay 4 life (must control a Swamp — checked when generating actions).
+                let player = &self.players[player_id as usize];
+                if player.life <= 4 {
+                    return false;
+                }
+                self.players[player_id as usize].life -= 4;
                 true
             }
         }

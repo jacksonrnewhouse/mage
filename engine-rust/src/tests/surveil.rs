@@ -213,7 +213,7 @@ fn test_consider_send_to_graveyard_then_draw_next() {
 
 // ─── Surveil lands ────────────────────────────────────────────────────────────
 
-/// Playing a surveil land creates a SurveilLandShock pending choice first.
+/// Playing a survey land always enters tapped and triggers surveil.
 #[test]
 fn test_surveil_land_etb_creates_shock_choice() {
     let (mut state, db) = make_main_phase_state();
@@ -222,24 +222,20 @@ fn test_surveil_land_etb_creates_shock_choice() {
     state.card_registry.push((land_id, CardName::UndercitySewers));
     state.players[0].hand.push(land_id);
 
+    // Put a card on top so surveil has something to work with
+    let top_id = push_library_top(&mut state, CardName::Island, 0);
+
     state.apply_action(&Action::PlayLand(land_id), &db);
 
-    // Should have a SurveilLandShock pending choice (tapped vs pay life).
-    assert!(state.pending_choice.is_some(), "Surveil land should create pending choice on ETB");
+    // Survey lands always enter tapped
+    let land_perm = state.battlefield.iter().find(|p| p.id == land_id).expect("land on battlefield");
+    assert!(land_perm.tapped, "Survey land should always enter tapped");
 
-    if let Some(ref ch) = state.pending_choice {
-        if let ChoiceKind::ChooseNumber { reason, .. } = &ch.kind {
-            assert!(
-                matches!(reason, ChoiceReason::SurveilLandShock { .. }),
-                "Choice reason should be SurveilLandShock"
-            );
-        } else {
-            panic!("Expected ChooseNumber choice");
-        }
-    }
+    // Surveil choice follows directly (keep or mill)
+    assert!(state.pending_choice.is_some(), "Survey land should create surveil pending choice on ETB");
 }
 
-/// Surveil land: choose enter tapped (n=0), then surveil choice follows.
+/// Survey land: always enters tapped, then surveil choice follows.
 #[test]
 fn test_surveil_land_enter_tapped_then_surveil() {
     let (mut state, db) = make_main_phase_state();
@@ -250,18 +246,14 @@ fn test_surveil_land_enter_tapped_then_surveil() {
     state.players[0].hand.push(land_id);
     state.apply_action(&Action::PlayLand(land_id), &db);
 
-    // Resolve shock choice: enter tapped (n=0)
-    let shock_choice = state.pending_choice.take().unwrap();
-    state.resolve_number_choice(shock_choice, 0, &db);
-
-    // Land should be tapped.
+    // Land should always be tapped.
     let land_perm = state.battlefield.iter().find(|p| p.id == land_id).expect("land on battlefield");
-    assert!(land_perm.tapped, "Surveil land should enter tapped when choosing 0");
+    assert!(land_perm.tapped, "Survey land should always enter tapped");
 
-    // Now there should be a surveil pending choice.
+    // Surveil pending choice should follow directly.
     assert!(
         state.pending_choice.is_some(),
-        "After shock choice, surveil choice should follow"
+        "Surveil choice should follow ETB"
     );
 
     // Resolve surveil: keep on top (n=0)
@@ -276,7 +268,7 @@ fn test_surveil_land_enter_tapped_then_surveil() {
     );
 }
 
-/// Surveil land: choose pay 2 life (n=1), land enters untapped, then surveil.
+/// Survey land: always enters tapped, no life payment option, then surveil to graveyard.
 #[test]
 fn test_surveil_land_pay_life_untapped_then_surveil() {
     let (mut state, db) = make_main_phase_state();
@@ -288,19 +280,15 @@ fn test_surveil_land_pay_life_untapped_then_surveil() {
     state.players[0].hand.push(land_id);
     state.apply_action(&Action::PlayLand(land_id), &db);
 
-    // Resolve shock choice: pay 2 life (n=1)
-    let shock_choice = state.pending_choice.take().unwrap();
-    state.resolve_number_choice(shock_choice, 1, &db);
+    // Survey lands always enter tapped, no life payment.
+    assert_eq!(state.players[0].life, 20, "No life should be paid for survey lands");
 
-    // Life should be reduced by 2.
-    assert_eq!(state.players[0].life, 18, "Player should have paid 2 life");
-
-    // Land should NOT be tapped.
+    // Land should be tapped.
     let land_perm = state.battlefield.iter().find(|p| p.id == land_id).expect("land on battlefield");
-    assert!(!land_perm.tapped, "Surveil land should enter untapped when paying 2 life");
+    assert!(land_perm.tapped, "Survey land should always enter tapped");
 
-    // Surveil choice follows.
-    assert!(state.pending_choice.is_some(), "Surveil choice should follow after life payment");
+    // Surveil choice follows directly.
+    assert!(state.pending_choice.is_some(), "Surveil choice should follow ETB");
 
     // Resolve surveil: send to graveyard (n=1)
     let surveil_choice = state.pending_choice.take().unwrap();

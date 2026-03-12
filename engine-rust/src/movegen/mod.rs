@@ -144,6 +144,21 @@ impl GameState {
                         continue;
                     }
 
+                    // Lavinia, Azorius Renegade: opponents can't cast noncreature spells with MV > lands they control
+                    let lavinia_active = self.battlefield.iter().any(|p| {
+                        p.card_name == CardName::LaviniaAzoriusRenegade && p.controller != player_id
+                    });
+                    if lavinia_active
+                        && !def.card_types.contains(&CardType::Creature)
+                    {
+                        let land_count = self.battlefield.iter()
+                            .filter(|p| p.controller == player_id && p.is_land())
+                            .count() as u8;
+                        if def.mana_cost.cmc() > land_count {
+                            continue;
+                        }
+                    }
+
                     // Check mana cost (including Thalia tax, etc.)
                     let effective_cost = self.effective_cost(def, player_id);
                     let is_artifact = def.card_types.contains(&CardType::Artifact);
@@ -332,6 +347,21 @@ impl GameState {
                             && player.noncreature_spells_cast_this_turn >= 1
                         {
                             continue;
+                        }
+
+                        // Lavinia, Azorius Renegade: opponents can't cast noncreature spells with MV > lands they control
+                        let lavinia_active = self.battlefield.iter().any(|p| {
+                            p.card_name == CardName::LaviniaAzoriusRenegade && p.controller != player_id
+                        });
+                        if lavinia_active
+                            && !def.card_types.contains(&CardType::Creature)
+                        {
+                            let land_count = self.battlefield.iter()
+                                .filter(|p| p.controller == player_id && p.is_land())
+                                .count() as u8;
+                            if def.mana_cost.cmc() > land_count {
+                                continue;
+                            }
                         }
 
                         // Check mana affordability using the flashback cost (with taxes applied)
@@ -766,9 +796,9 @@ impl GameState {
                     .collect()
             }
             ChannelKind::Otawara => {
-                // Return target artifact, creature, or planeswalker to owner's hand
+                // Return target artifact, creature, enchantment, or planeswalker to owner's hand
                 self.battlefield.iter()
-                    .filter(|p| p.is_artifact() || p.is_creature() || p.is_planeswalker())
+                    .filter(|p| p.is_artifact() || p.is_creature() || p.is_planeswalker() || p.is_enchantment())
                     .map(|p| Target::Object(p.id))
                     .collect()
             }
@@ -803,8 +833,8 @@ impl GameState {
                 // Archon of Emeria: each player can cast only 1 spell per turn
                 // (cast restriction handled elsewhere, but also nonbasic lands enter tapped)
 
-                // Lodestone Golem: nonartifact spells cost {1} more
-                CardName::LodestoneGolem if p.controller != _controller => {
+                // Lodestone Golem: nonartifact spells cost {1} more (for ALL players)
+                CardName::LodestoneGolem => {
                     if !def.card_types.contains(&CardType::Artifact) {
                         generic_increase += 1;
                     }
@@ -1020,8 +1050,10 @@ impl GameState {
             // Survey/Misc dual lands
             CardName::MeticulousArchive => vec![Some(Color::White), Some(Color::Blue)],
             CardName::UndercitySewers => vec![Some(Color::Blue), Some(Color::Black)],
-            CardName::ThunderingFalls => vec![Some(Color::Red), Some(Color::Green)],
-            CardName::HedgeMaze => vec![Some(Color::Green), Some(Color::White)],
+            CardName::ThunderingFalls => vec![Some(Color::Blue), Some(Color::Red)],
+            CardName::HedgeMaze => vec![Some(Color::Green), Some(Color::Blue)],
+            // MDFC land back face: {T}: Add {R}
+            CardName::ShatterskullTheHammerPass => vec![Some(Color::Red)],
 
             // Other utility lands producing colored mana
             CardName::Karakas => vec![Some(Color::White)],
@@ -1042,11 +1074,35 @@ impl GameState {
 
             // Lands producing colorless
             CardName::CityOfTraitors | CardName::GhostQuarter
-            | CardName::SpireOfIndustry | CardName::TheMycoSynthGardens
-            | CardName::UrzasSaga | CardName::TalonGatesOfMadara => vec![None],
+            | CardName::TheMycoSynthGardens
+            | CardName::UrzasSaga => vec![None],
+
+            // Talon Gates of Madara: {T}: {C}, or {1}{T}: any color
+            CardName::TalonGatesOfMadara => vec![None, Some(Color::White), Some(Color::Blue), Some(Color::Black),
+                Some(Color::Red), Some(Color::Green)],
+
+            // Spire of Industry: {T} for {C}, or {T} + pay 1 life for any color (if you control an artifact)
+            CardName::SpireOfIndustry => {
+                let controls_artifact = self.battlefield.iter().any(|p| {
+                    p.controller == perm.controller && p.is_artifact()
+                });
+                if controls_artifact {
+                    vec![None, Some(Color::White), Some(Color::Blue), Some(Color::Black),
+                         Some(Color::Red), Some(Color::Green)]
+                } else {
+                    vec![None]
+                }
+            }
 
             // Lands producing any color
-            CardName::ForbiddenOrchard | CardName::StartingTown => vec![
+            CardName::ForbiddenOrchard => vec![
+                Some(Color::White), Some(Color::Blue), Some(Color::Black),
+                Some(Color::Red), Some(Color::Green),
+            ],
+
+            // Starting Town: {T}: {C} or {T}, pay 1 life: any color
+            CardName::StartingTown => vec![
+                None, // colorless
                 Some(Color::White), Some(Color::Blue), Some(Color::Black),
                 Some(Color::Red), Some(Color::Green),
             ],
@@ -1146,9 +1202,7 @@ impl GameState {
                 let has_land_in_gy = self.players.iter().any(|p| {
                     p.graveyard.iter().any(|&id| {
                         if let Some(name) = self.card_name_for_id(id) {
-                            if let Some(def) = find_card(&[], name) { // would need db
-                                return def.card_types.contains(&CardType::Land);
-                            }
+                            return crate::card::is_land_card(name);
                         }
                         false
                     })
@@ -1161,11 +1215,8 @@ impl GameState {
                 }
             }
 
-            // Undermountain Adventurer: any color
-            CardName::UndermountainAdventurer => vec![
-                Some(Color::White), Some(Color::Blue), Some(Color::Black),
-                Some(Color::Red), Some(Color::Green),
-            ],
+            // Undermountain Adventurer: {T}: Add {G}{G}
+            CardName::UndermountainAdventurer => vec![Some(Color::Green)],
 
             // The Mightstone and Weakstone: {T} for CC
             CardName::TheMightstoneAndWeakstone => vec![None],
@@ -1256,6 +1307,8 @@ impl GameState {
             | CardName::UndercitySewers
             | CardName::ThunderingFalls
             | CardName::HedgeMaze
+            // MDFC land back faces
+            | CardName::ShatterskullTheHammerPass
             // Other colored-producing lands
             | CardName::Karakas
             | CardName::OtawaraSoaringCity
@@ -1268,19 +1321,43 @@ impl GameState {
             | CardName::MosswortBridge
             // Any-color mana producers
             | CardName::ForbiddenOrchard
-            | CardName::StartingTown
             | CardName::Gleemox
             | CardName::ChromeMox
             | CardName::MoxDiamond
             | CardName::ChromaticStar
-            | CardName::DelightedHalfling
-            | CardName::UndermountainAdventurer => {
+            | CardName::DelightedHalfling => {
                 if let Some(perm) = self.find_permanent_mut(permanent_id) {
                     perm.tapped = true;
                 }
                 self.players[controller as usize]
                     .mana_pool
                     .add(color_choice, 1);
+                true
+            }
+
+            // Starting Town: {T}: {C} or {T}, pay 1 life: any color
+            CardName::StartingTown => {
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.tapped = true;
+                }
+                if color_choice.is_some() {
+                    // Pay 1 life for colored mana
+                    self.players[controller as usize].life -= 1;
+                }
+                self.players[controller as usize]
+                    .mana_pool
+                    .add(color_choice, 1);
+                true
+            }
+
+            // Undermountain Adventurer: {T}: Add {G}{G}
+            CardName::UndermountainAdventurer => {
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.tapped = true;
+                }
+                self.players[controller as usize]
+                    .mana_pool
+                    .add(Some(Color::Green), 2);
                 true
             }
 
@@ -1350,13 +1427,42 @@ impl GameState {
 
             // Strip Mine / Wasteland / other colorless-producing lands: {T} for {C}
             CardName::StripMine | CardName::Wasteland | CardName::LibraryOfAlexandria
-            | CardName::GhostQuarter | CardName::SpireOfIndustry
-            | CardName::TheMycoSynthGardens | CardName::UrzasSaga
-            | CardName::TalonGatesOfMadara => {
+            | CardName::GhostQuarter
+            | CardName::TheMycoSynthGardens | CardName::UrzasSaga => {
                 if let Some(perm) = self.find_permanent_mut(permanent_id) {
                     perm.tapped = true;
                 }
                 self.players[controller as usize].mana_pool.colorless += 1;
+                true
+            }
+
+            // Talon Gates of Madara: {T}: {C}, or {1}{T}: any color
+            CardName::TalonGatesOfMadara => {
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.tapped = true;
+                }
+                if let Some(color) = color_choice {
+                    // For colored mana, simplified: just add 1 colored mana
+                    // (ideally costs {1} extra, but mana payment is complex)
+                    self.players[controller as usize].mana_pool.add(Some(color), 1);
+                } else {
+                    self.players[controller as usize].mana_pool.colorless += 1;
+                }
+                true
+            }
+
+            // Spire of Industry: {T} for {C}, or {T} + pay 1 life for any color (if you control an artifact)
+            CardName::SpireOfIndustry => {
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.tapped = true;
+                }
+                if let Some(color) = color_choice {
+                    // Pay 1 life for colored mana
+                    self.players[controller as usize].life -= 1;
+                    self.players[controller as usize].mana_pool.add(Some(color), 1);
+                } else {
+                    self.players[controller as usize].mana_pool.colorless += 1;
+                }
                 true
             }
 
@@ -1427,6 +1533,35 @@ impl GameState {
                 self.players[controller as usize]
                     .mana_pool
                     .add(Some(Color::Blue), artifact_count);
+                true
+            }
+
+            // Deathrite Shaman: {T}, exile a land card from a graveyard: add one mana of any color
+            CardName::DeathriteShaman => {
+                // Find and exile a land card from any graveyard
+                let mut found = false;
+                for pid in 0..self.num_players as usize {
+                    if let Some(pos) = self.players[pid].graveyard.iter().position(|&id| {
+                        self.card_name_for_id(id)
+                            .map(|cn| crate::card::is_land_card(cn))
+                            .unwrap_or(false)
+                    }) {
+                        let card_id = self.players[pid].graveyard.remove(pos);
+                        let card_name = self.card_name_for_id(card_id).unwrap_or(CardName::Plains);
+                        self.exile.push((card_id, card_name, pid as PlayerId));
+                        found = true;
+                        break;
+                    }
+                }
+                if !found {
+                    return false;
+                }
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.tapped = true;
+                }
+                self.players[controller as usize]
+                    .mana_pool
+                    .add(color_choice, 1);
                 true
             }
 
@@ -1535,6 +1670,14 @@ impl GameState {
                 if target.is_artifact() && target.id != perm.id && target.tapped {
                     abilities.push((0, vec![Target::Object(target.id)]));
                 }
+            }
+        }
+
+        // Griselbrand: pay 7 life, draw 7 cards (no tap required)
+        if perm.card_name == CardName::Griselbrand {
+            let player = &self.players[perm.controller as usize];
+            if player.life >= 7 {
+                abilities.push((0, vec![]));
             }
         }
 
@@ -1681,6 +1824,22 @@ impl GameState {
                             abilities.push((1, vec![Target::Object(target.id)]));
                         }
                     }
+                    // -5: Exchange control of artifact/creature you control and creature opp controls with power <= 3
+                    if perm.loyalty >= 5 {
+                        let my_perms: Vec<ObjectId> = self.battlefield.iter()
+                            .filter(|p| p.controller == perm.controller && (p.is_artifact() || p.is_creature()))
+                            .map(|p| p.id)
+                            .collect();
+                        let opp_creatures: Vec<ObjectId> = self.battlefield.iter()
+                            .filter(|p| p.controller != perm.controller && p.is_creature() && p.power() <= 3)
+                            .map(|p| p.id)
+                            .collect();
+                        for &mine in &my_perms {
+                            for &theirs in &opp_creatures {
+                                abilities.push((2, vec![Target::Object(mine), Target::Object(theirs)]));
+                            }
+                        }
+                    }
                 }
                 CardName::KarnTheGreatCreator => {
                     // +1: Target noncreature artifact becomes creature
@@ -1703,6 +1862,12 @@ impl GameState {
                             if !target.is_land() {
                                 abilities.push((1, vec![Target::Object(target.id)]));
                             }
+                        }
+                    }
+                    // -5: Deal damage to target player equal to cards in exile, gain that much life
+                    if perm.loyalty >= 5 {
+                        for pid in 0..self.num_players {
+                            abilities.push((2, vec![Target::Player(pid)]));
                         }
                     }
                 }
@@ -1859,6 +2024,15 @@ impl GameState {
                     .collect()
             }
 
+            // Tinker: sacrifice an artifact as additional cost, tutor an artifact to battlefield.
+            // targets[0] = artifact to sacrifice (controlled by caster).
+            CardName::Tinker => {
+                self.battlefield.iter()
+                    .filter(|p| p.controller == controller && p.is_artifact())
+                    .map(|p| vec![Target::Object(p.id)])
+                    .collect()
+            }
+
             // Natural Order: sacrifice a green creature as additional cost, tutor a green creature.
             // targets[0] = green creature to sacrifice (controlled by caster).
             CardName::NaturalOrder => {
@@ -1892,10 +2066,19 @@ impl GameState {
 
             // Target creature
             CardName::SwordsToPlowshares | CardName::PathToExile | CardName::Dismember
-            | CardName::FatalPush | CardName::SnuffOut => {
+            | CardName::FatalPush => {
                 self.battlefield
                     .iter()
                     .filter(|p| p.is_creature() && self.can_be_targeted(p, controller, &spell_colors))
+                    .map(|p| vec![Target::Object(p.id)])
+                    .collect()
+            }
+
+            // Target nonblack creature
+            CardName::SnuffOut => {
+                self.battlefield
+                    .iter()
+                    .filter(|p| p.is_creature() && !p.colors.contains(&Color::Black) && self.can_be_targeted(p, controller, &spell_colors))
                     .map(|p| vec![Target::Object(p.id)])
                     .collect()
             }
@@ -1911,7 +2094,8 @@ impl GameState {
 
             // Target nonland permanent
             CardName::CouncilsJudgment | CardName::MarchOfOtherworldlyLight
-            | CardName::ChainOfVapor | CardName::IntoTheFloodMaw => {
+            | CardName::ChainOfVapor | CardName::IntoTheFloodMaw
+            | CardName::SinkIntoStupor => {
                 self.battlefield
                     .iter()
                     .filter(|p| !p.is_land() && self.can_be_targeted(p, controller, &spell_colors))
@@ -1924,7 +2108,7 @@ impl GameState {
             | CardName::ForceOfWill | CardName::ForceOfNegation | CardName::Flusterstorm
             | CardName::Daze | CardName::ManaLeak | CardName::MemoryLapse | CardName::Remand
             | CardName::SpellPierce | CardName::MysticalDispute | CardName::MindbreakTrap
-            | CardName::SinkIntoStupor => {
+            | CardName::ConsignToMemory => {
                 self.stack
                     .items()
                     .iter()
@@ -1933,7 +2117,7 @@ impl GameState {
             }
 
             // Target activated or triggered ability on stack
-            CardName::Stifle | CardName::ConsignToMemory => {
+            CardName::Stifle => {
                 self.stack
                     .items()
                     .iter()
@@ -1957,14 +2141,14 @@ impl GameState {
             }
 
             // Target opponent (for damage/drain)
-            CardName::TendrillsOfAgony | CardName::BrainFreeze => {
+            CardName::TendrilsOfAgony | CardName::BrainFreeze => {
                 vec![vec![Target::Player(self.opponent(controller))]]
             }
 
             // Target artifact or enchantment
             CardName::Disenchant | CardName::NaturesClaim | CardName::Fragmentize
             | CardName::AncientGrudge | CardName::ShatteringSpree | CardName::Vandalblast
-            | CardName::Suplex | CardName::UntimellyMalfunction | CardName::Crash
+            | CardName::Suplex | CardName::UntimelyMalfunction | CardName::Crash
             | CardName::SunderingEruption | CardName::AbruptDecay | CardName::PestControl => {
                 self.battlefield
                     .iter()
@@ -2041,6 +2225,13 @@ impl GameState {
                     }
                 }
                 targets
+            }
+
+            // Target player (Hurkyl's Recall: return all artifacts target player owns)
+            CardName::HurkylsRecall => {
+                (0..self.num_players)
+                    .map(|pid| vec![Target::Player(pid)])
+                    .collect()
             }
 
             // No targets needed (tutors, cantrips, board wipes, etc.)
@@ -2417,6 +2608,37 @@ impl GameState {
                     }
                 }
 
+                // --- Snuff Out: pay 4 life if you control a Swamp ---
+                CardName::SnuffOut => {
+                    // Check if player controls a land with Swamp subtype
+                    let controls_swamp = self.battlefield.iter().any(|p| {
+                        p.controller == player_id && matches!(p.card_name,
+                            CardName::Swamp
+                            | CardName::UndergroundSea | CardName::Badlands | CardName::Bayou | CardName::Scrubland
+                            | CardName::BloodCrypt | CardName::OvergrownTomb | CardName::WateryGrave | CardName::GodlessShrine
+                            | CardName::UndercitySewers
+                        )
+                    });
+                    if controls_swamp && player.life > 4 {
+                        let target_sets = self.generate_targets(card_name, player_id, db);
+                        if target_sets.is_empty() {
+                            continue;
+                        }
+                        let alt = AltCost::SnuffOut;
+                        for targets in &target_sets {
+                            actions.push(Action::CastSpell {
+                                card_id,
+                                targets: targets.clone(),
+                                x_value: 0,
+                                from_graveyard: false,
+                                from_library_top: false,
+                                alt_cost: Some(alt.clone()),
+                                modes: vec![],
+                            });
+                        }
+                    }
+                }
+
                 _ => {}
             }
         }
@@ -2708,6 +2930,7 @@ pub fn requires_sacrifice_cost(name: CardName) -> bool {
             | CardName::DeadlyDispute
             | CardName::ShrapnelBlast
             | CardName::NaturalOrder
+            | CardName::Tinker
             | CardName::CropRotation
     )
 }

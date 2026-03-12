@@ -230,7 +230,8 @@ fn test_kolaghan_command_mode_2_destroys_artifact() {
 
 #[test]
 fn test_kozilek_command_mode_1_creates_token() {
-    // Mode 1: create a 0/1 Eldrazi Spawn token (no target needed).
+    // Mode 0: create X 0/1 Eldrazi Spawn tokens for target player.
+    // Mode 1: target player scries X, then draws a card.
     let p0_deck: Vec<CardName> = std::iter::repeat(CardName::Island)
         .take(32)
         .chain(std::iter::repeat(CardName::Island).take(7))
@@ -238,22 +239,23 @@ fn test_kozilek_command_mode_1_creates_token() {
         .collect();
     let p1_deck: Vec<CardName> = vec![CardName::Island; 40];
 
-    // KozileksCommand costs {2}{C}{C} — give colorless mana
+    // KozileksCommand costs {X}{C}{C} — give enough colorless mana for X=2
     let (mut state, db) = setup_game(&p0_deck, &p1_deck);
-    state.players[0].mana_pool.colorless += 4;
+    state.players[0].mana_pool.colorless += 4; // {2}{C}{C} = 4
 
     let cmd_id = state.players[0].hand.iter()
         .find(|&&id| state.card_name_for_id(id) == Some(CardName::KozileksCommand))
         .copied()
         .expect("KozileksCommand should be in hand");
 
-    let battlefield_count_before = state.battlefield.len();
+    let _battlefield_count_before = state.battlefield.len();
+    let p0_hand_before = state.players[0].hand.len();
 
-    // Cast with modes [0, 1]: draw 2 + create token. Mode 0 targets player 1.
+    // Cast with modes [0, 1]: create X tokens for player 0, player 0 draws a card. X=2.
     state.apply_action(&Action::CastSpell {
         card_id: cmd_id,
-        targets: vec![Target::Player(1)],
-        x_value: 0,
+        targets: vec![Target::Player(0), Target::Player(0)],
+        x_value: 2,
         from_graveyard: false,
         from_library_top: false,
         alt_cost: None,
@@ -262,21 +264,24 @@ fn test_kozilek_command_mode_1_creates_token() {
 
     state.resolve_top(&db);
 
-    // A 0/1 Eldrazi Spawn token should have been created
+    // Two 0/1 Eldrazi Spawn tokens should have been created (X=2)
     let tokens: Vec<_> = state.battlefield.iter()
         .filter(|p| p.card_name == CardName::EldraziSpawnToken && p.is_token)
         .collect();
-    assert_eq!(tokens.len(), 1, "Should have one Eldrazi Spawn token");
+    assert_eq!(tokens.len(), 2, "Should have two Eldrazi Spawn tokens (X=2)");
     assert_eq!(tokens[0].base_power, 0);
     assert_eq!(tokens[0].base_toughness, 1);
 
-    // Player 1 drew 2 cards and lost 2 life
-    assert_eq!(state.players[1].life, 18, "Player 1 should have lost 2 life from mode 0");
+    // Player 0 drew 1 card from mode 1 (scry X then draw 1)
+    // Hand: started with p0_hand_before, cast 1 spell (-1), drew 1 (+1)
+    assert_eq!(state.players[0].hand.len(), p0_hand_before - 1 + 1,
+        "Player 0 should have drawn 1 card from mode 1");
 }
 
 #[test]
 fn test_kozilek_command_mode_3_reduces_pt() {
-    // Mode 3: target creature gets -3/-3 until end of turn.
+    // Mode 2: exile target creature with mana value X or less.
+    // Mode 0: create X 0/1 Eldrazi Spawn tokens.
     let p0_deck: Vec<CardName> = std::iter::repeat(CardName::Island)
         .take(39)
         .chain(std::iter::once(CardName::KozileksCommand))
@@ -288,7 +293,7 @@ fn test_kozilek_command_mode_3_reduces_pt() {
 
     let (mut state, db) = setup_game(&p0_deck, &p1_deck);
 
-    // Put a 4/4 creature on battlefield for player 1
+    // Put a creature on battlefield for player 1
     let creature_id = state.new_object_id();
     state.card_registry.push((creature_id, CardName::GoblinGuide));
     let creature = crate::permanent::Permanent::new(
@@ -297,33 +302,36 @@ fn test_kozilek_command_mode_3_reduces_pt() {
     );
     state.battlefield.push(creature);
 
-    // Give player 0 4 colorless mana
-    state.players[0].mana_pool.colorless += 4;
+    // Give player 0 enough colorless mana for X=3 ({3}{C}{C} = 5 colorless)
+    state.players[0].mana_pool.colorless += 5;
 
     let cmd_id = state.players[0].hand.iter()
         .find(|&&id| state.card_name_for_id(id) == Some(CardName::KozileksCommand))
         .copied()
         .expect("KozileksCommand should be in hand");
 
-    // Cast with modes [1, 3]: create token + -3/-3 to creature
+    // Cast with modes [0, 2]: create X tokens + exile target creature. X=3.
     state.apply_action(&Action::CastSpell {
         card_id: cmd_id,
-        targets: vec![Target::Object(creature_id)],
-        x_value: 0,
+        targets: vec![Target::Player(0), Target::Object(creature_id)],
+        x_value: 3,
         from_graveyard: false,
         from_library_top: false,
         alt_cost: None,
-        modes: vec![1, 3],
+        modes: vec![0, 2],
     }, &db);
 
     state.resolve_top(&db);
 
-    // The creature should have -3/-3 applied (now 1/1)
+    // The creature should have been exiled
     let creature_perm = state.battlefield.iter().find(|p| p.id == creature_id);
-    assert!(creature_perm.is_some(), "Creature should still be alive (4/4 - 3/3 = 1/1)");
-    let perm = creature_perm.unwrap();
-    assert_eq!(perm.power(), 1, "Creature power should be 1 (4 - 3)");
-    assert_eq!(perm.toughness(), 1, "Creature toughness should be 1 (4 - 3)");
+    assert!(creature_perm.is_none(), "Creature should have been exiled");
+
+    // Three Eldrazi Spawn tokens should have been created (X=3)
+    let tokens: Vec<_> = state.battlefield.iter()
+        .filter(|p| p.card_name == CardName::EldraziSpawnToken && p.is_token)
+        .collect();
+    assert_eq!(tokens.len(), 3, "Should have three Eldrazi Spawn tokens (X=3)");
 }
 
 #[test]
