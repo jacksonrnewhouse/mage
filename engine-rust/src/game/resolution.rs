@@ -791,11 +791,16 @@ impl GameState {
                 // Target player discards X at random
                 if let Some(Target::Player(target_player)) = targets.first() {
                     let pid = *target_player as usize;
+                    let owner = *target_player;
                     let count = (x_value as usize).min(self.players[pid].hand.len());
+                    let mut discarded = Vec::new();
                     for _ in 0..count {
                         if let Some(id) = self.players[pid].hand.pop() {
-                            self.players[pid].graveyard.push(id);
+                            discarded.push(id);
                         }
+                    }
+                    for id in discarded {
+                        self.discard_card(id, owner, db);
                     }
                     self.check_emrakul_graveyard_shuffle(*target_player);
                 }
