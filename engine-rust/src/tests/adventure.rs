@@ -6,6 +6,7 @@ use crate::action::*;
 use crate::card::*;
 use crate::game::*;
 use crate::permanent::Permanent;
+use crate::stack::{StackItemKind, TriggeredEffect};
 use crate::types::*;
 
 fn setup_base() -> (GameState, Vec<CardDef>) {
@@ -394,4 +395,62 @@ fn test_non_adventure_card_has_no_adventure_action() {
         !has_adventure,
         "Lightning Bolt has no adventure — should not generate CastAdventure action"
     );
+}
+
+// ── Test: Bonecrusher Giant when-targeted damage trigger ─────────────────────
+
+/// When Bonecrusher Giant on the battlefield is targeted by a spell,
+/// it deals 2 damage to that spell's controller.
+#[test]
+fn test_bonecrusher_giant_targeting_trigger() {
+    let (mut state, db) = setup_base();
+
+    // Put Bonecrusher Giant on the battlefield for player 0
+    let giant_id = add_creature(&mut state, 0, CardName::BonecrusherGiant, 4, 3);
+
+    // Simulate the targeting trigger by calling check_bonecrusher_targeting_triggers
+    // Player 1 is the spell controller targeting Bonecrusher Giant
+    state.check_bonecrusher_targeting_triggers(&[giant_id], 1);
+
+    // Should have a BonecrusherGiantTargeted trigger on the stack
+    assert_eq!(state.stack.len(), 1, "Bonecrusher targeting trigger should be on the stack");
+    let top = state.stack.top().unwrap();
+    assert!(
+        matches!(
+            &top.kind,
+            StackItemKind::TriggeredAbility {
+                effect: TriggeredEffect::BonecrusherGiantTargeted { target_player: 1 },
+                ..
+            }
+        ),
+        "Stack item should be BonecrusherGiantTargeted with target_player = 1"
+    );
+
+    // Resolve the trigger
+    state.resolve_top(&db);
+
+    // Player 1 (the spell's controller) should have taken 2 damage
+    assert_eq!(
+        state.players[1].life, 18,
+        "Spell controller should take 2 damage from Bonecrusher Giant trigger"
+    );
+}
+
+/// When a non-Bonecrusher creature is targeted, no trigger fires.
+#[test]
+fn test_bonecrusher_trigger_does_not_fire_for_other_creatures() {
+    let (mut state, db) = setup_base();
+
+    // Put a non-Bonecrusher creature on the battlefield
+    let goblin_id = add_creature(&mut state, 0, CardName::GoblinGuide, 2, 2);
+
+    // Also put Bonecrusher on the battlefield (it only triggers when IT is targeted)
+    let _giant_id = add_creature(&mut state, 0, CardName::BonecrusherGiant, 4, 3);
+
+    // Target the Goblin Guide, not the Bonecrusher
+    state.check_bonecrusher_targeting_triggers(&[goblin_id], 1);
+
+    // No trigger should fire
+    assert_eq!(state.stack.len(), 0, "Targeting a non-Bonecrusher creature should not trigger");
+    assert_eq!(state.players[1].life, 20, "No damage should be dealt");
 }

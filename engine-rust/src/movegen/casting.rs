@@ -360,6 +360,15 @@ impl GameState {
                                     self.check_nadu_targeting_triggers(&creature_target_ids);
                                 }
                             }
+                            // Bonecrusher Giant: check if any targeted permanent is a Bonecrusher Giant
+                            if !permanent_targets.is_empty() {
+                                let perm_target_ids: Vec<ObjectId> = permanent_targets.iter()
+                                    .filter_map(|t| if let Target::Object(id) = t { Some(*id) } else { None })
+                                    .collect();
+                                if !perm_target_ids.is_empty() {
+                                    self.check_bonecrusher_targeting_triggers(&perm_target_ids, player_id);
+                                }
+                            }
                             // Tezzeret, Cruel Captain emblem: "Whenever you cast an artifact spell,
                             // search your library for an artifact card, put it onto the battlefield."
                             if def.card_types.contains(&CardType::Artifact)

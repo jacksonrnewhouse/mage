@@ -4624,6 +4624,11 @@ impl GameState {
                 // (simplified: we skip the counter since we're approximating as draw)
             }
 
+            TriggeredEffect::BonecrusherGiantTargeted { target_player } => {
+                // Bonecrusher Giant deals 2 damage to that spell's controller
+                self.players[target_player as usize].life -= 2;
+            }
+
             _ => {}
         }
         let _ = db; // suppress unused warning when db not used in all arms

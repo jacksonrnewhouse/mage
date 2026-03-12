@@ -245,6 +245,9 @@ pub enum TriggeredEffect {
     CavesOfChaosAttackExile,
     /// Zhao, the Moon Slayer: attack trigger — exile top card, may play it this turn.
     ZhaoAttackExile,
+    /// Bonecrusher Giant: whenever this creature becomes the target of a spell,
+    /// deal 2 damage to that spell's controller.
+    BonecrusherGiantTargeted { target_player: PlayerId },
 }
 
 /// Activated ability effects.

@@ -601,6 +601,41 @@ impl GameState {
         }
     }
 
+    /// Check Bonecrusher Giant targeting triggers.
+    /// "Whenever this creature becomes the target of a spell, Bonecrusher Giant deals
+    /// 2 damage to that spell's controller."
+    ///
+    /// `targeted_permanent_ids` is the set of permanent ObjectIds being targeted.
+    /// `spell_controller` is the player who controls the spell targeting the creature.
+    pub(crate) fn check_bonecrusher_targeting_triggers(
+        &mut self,
+        targeted_permanent_ids: &[ObjectId],
+        spell_controller: PlayerId,
+    ) {
+        for &target_id in targeted_permanent_ids {
+            // Check if the targeted permanent is a Bonecrusher Giant on the battlefield
+            let bonecrusher = self
+                .battlefield
+                .iter()
+                .find(|p| p.id == target_id && p.card_name == CardName::BonecrusherGiant);
+            if let Some(perm) = bonecrusher {
+                let bc_controller = perm.controller;
+                let bc_id = perm.id;
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: bc_id,
+                        source_name: CardName::BonecrusherGiant,
+                        effect: TriggeredEffect::BonecrusherGiantTargeted {
+                            target_player: spell_controller,
+                        },
+                    },
+                    bc_controller,
+                    vec![Target::Player(spell_controller)],
+                );
+            }
+        }
+    }
+
     /// Check Clarion Conqueror triggered ability: whenever an opponent casts a spell
     /// during your turn, create a 1/1 white Soldier creature token.
     /// Called after any spell is pushed to the stack.
