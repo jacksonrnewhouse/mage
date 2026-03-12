@@ -1185,6 +1185,16 @@ impl GameState {
                         if mv_ok {
                             self.destroy_permanent(*target_id);
                         }
+                    } else if card_name == CardName::FatalPush {
+                        // Fatal Push: destroy if MV <= 2 (or MV <= 4 with revolt).
+                        // Revolt not yet tracked; approximate as MV <= 4.
+                        let mv_ok = self.find_permanent(*target_id)
+                            .and_then(|p| find_card(db, p.card_name))
+                            .map(|d| d.mana_cost.cmc() <= 4)
+                            .unwrap_or(false);
+                        if mv_ok {
+                            self.destroy_permanent(*target_id);
+                        }
                     } else {
                         self.destroy_permanent(*target_id);
                     }

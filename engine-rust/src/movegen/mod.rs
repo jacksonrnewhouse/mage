@@ -2554,11 +2554,25 @@ impl GameState {
             }
 
             // Target creature
-            CardName::SwordsToPlowshares | CardName::PathToExile | CardName::Dismember
-            | CardName::FatalPush => {
+            CardName::SwordsToPlowshares | CardName::PathToExile | CardName::Dismember => {
                 self.battlefield
                     .iter()
                     .filter(|p| p.is_creature() && self.can_be_targeted(p, controller, &spell_colors))
+                    .map(|p| vec![Target::Object(p.id)])
+                    .collect()
+            }
+
+            // Fatal Push: target creature with MV <= 4 (revolt approximation)
+            CardName::FatalPush => {
+                self.battlefield
+                    .iter()
+                    .filter(|p| {
+                        p.is_creature()
+                            && self.can_be_targeted(p, controller, &spell_colors)
+                            && find_card(db, p.card_name)
+                                .map(|d| d.mana_cost.cmc() <= 4)
+                                .unwrap_or(true)
+                    })
                     .map(|p| vec![Target::Object(p.id)])
                     .collect()
             }
