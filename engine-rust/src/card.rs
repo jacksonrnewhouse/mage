@@ -1821,7 +1821,7 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Search your library for a card, then shuffle and put that card on top. You lose 2 life.");
     card!(InquisitionOfKozilek, "Inquisition of Kozilek", ManaCost::b(1), &[Sorcery], &[], None, None, None, kw(), &[Black],
         "Target player reveals their hand. You choose a nonland card from it with mana value 3 or less. That player discards that card.");
-    card!(MindTwist, "Mind Twist", ManaCost { black: 1, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Black],
+    card!(X(1) MindTwist, "Mind Twist", ManaCost { black: 1, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Black],
         "Target player discards X cards at random.");
     card!(Exhume, "Exhume", ManaCost { black: 1, generic: 1, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Black],
         "Each player puts a creature card from their graveyard onto the battlefield.");
