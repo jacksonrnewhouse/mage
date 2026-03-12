@@ -1668,7 +1668,7 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Return two target creatures to their owners' hands. Wizardcycling {2}.");
     card!(Thoughtcast, "Thoughtcast", ManaCost { blue: 1, generic: 4, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Blue],
         "Affinity for artifacts. Draw two cards.");
-    card!(EchoOfEons, "Echo of Eons", ManaCost { blue: 2, generic: 4, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Blue],
+    card!(FB(ManaCost { blue: 1, generic: 2, ..c }) EchoOfEons, "Echo of Eons", ManaCost { blue: 2, generic: 4, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Blue],
         "Each player shuffles their hand and graveyard into their library, then draws seven cards. Flashback {2}{U}.");
     card!(MindsDesire, "Mind's Desire", ManaCost { blue: 2, generic: 4, ..c }, &[Sorcery], &[], None, None, None, storm(), &[Blue],
         "Shuffle your library. Then exile the top card of your library. Until end of turn, you may play that card without paying its mana cost. Storm.");
