@@ -1954,7 +1954,7 @@ impl GameState {
                             abilities.push((1, vec![Target::Player(pid)]));
                         }
                         for target in &self.battlefield {
-                            if target.is_creature() {
+                            if target.is_creature() || target.is_planeswalker() {
                                 abilities.push((1, vec![Target::Object(target.id)]));
                             }
                         }
