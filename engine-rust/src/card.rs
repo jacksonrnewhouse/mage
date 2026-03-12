@@ -2150,7 +2150,7 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(CT(&[CreatureType::Wurm]) WurmcoilEngine, "Wurmcoil Engine", ManaCost::generic(6), &[Artifact, Creature], &[],
         Some(6), Some(6), None, deathtouch_lifelink(), &[],
         "Deathtouch, lifelink. When Wurmcoil Engine dies, create a 3/3 colorless Wurm artifact creature token with deathtouch and a 3/3 colorless Wurm artifact creature token with lifelink.");
-    card!(EmrakulTheAeonsTorn, "Emrakul, the Aeons Torn", ManaCost::generic(15), &[Creature], &[Legendary],
+    card!(CT(&[CreatureType::Eldrazi]) EmrakulTheAeonsTorn, "Emrakul, the Aeons Torn", ManaCost::generic(15), &[Creature], &[Legendary],
         Some(15), Some(15), None, {
             let mut k = Keywords::empty();
             k.add(Keyword::Flying);

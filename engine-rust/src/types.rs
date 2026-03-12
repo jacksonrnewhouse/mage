@@ -223,6 +223,7 @@ pub enum CreatureType {
     Lhurgoyf,
     Pest,
     Ogre,
+    Eldrazi,
 }
 
 impl CreatureType {
@@ -294,6 +295,7 @@ impl CreatureType {
         CreatureType::Lhurgoyf,
         CreatureType::Pest,
         CreatureType::Ogre,
+        CreatureType::Eldrazi,
     ];
 }
 
