@@ -2288,11 +2288,31 @@ impl GameState {
             CardName::Counterspell | CardName::ManaDrain | CardName::MentalMisstep
             | CardName::ForceOfWill | CardName::ForceOfNegation | CardName::Flusterstorm
             | CardName::Daze | CardName::ManaLeak | CardName::MemoryLapse | CardName::Remand
-            | CardName::SpellPierce | CardName::MysticalDispute | CardName::MindbreakTrap
-            | CardName::ConsignToMemory => {
+            | CardName::SpellPierce | CardName::MysticalDispute | CardName::MindbreakTrap => {
                 self.stack
                     .items()
                     .iter()
+                    .map(|item| vec![Target::Object(item.id)])
+                    .collect()
+            }
+
+            // Target artifact or enchantment spell on stack
+            CardName::ConsignToMemory => {
+                self.stack
+                    .items()
+                    .iter()
+                    .filter(|item| {
+                        if let StackItemKind::Spell { card_name: cn, .. } = &item.kind {
+                            find_card(db, *cn)
+                                .map(|def| {
+                                    def.card_types.contains(&CardType::Artifact)
+                                        || def.card_types.contains(&CardType::Enchantment)
+                                })
+                                .unwrap_or(false)
+                        } else {
+                            false
+                        }
+                    })
                     .map(|item| vec![Target::Object(item.id)])
                     .collect()
             }

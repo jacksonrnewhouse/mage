@@ -1611,7 +1611,7 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(ChainOfVapor, "Chain of Vapor", ManaCost::u(1), &[Instant], &[], None, None, None, kw(), &[Blue],
         "Return target nonland permanent to its owner's hand. Then that permanent's controller may sacrifice a land. If they do, they may copy this spell and choose a new target.");
     card!(ConsignToMemory, "Consign to Memory", ManaCost::u(1), &[Instant], &[], None, None, None, storm(), &[Blue],
-        "Counter target spell. Storm.");
+        "Counter target artifact or enchantment spell. Storm.");
     card!(Flusterstorm, "Flusterstorm", ManaCost::u(1), &[Instant], &[], None, None, None, storm(), &[Blue],
         "Counter target instant or sorcery spell unless its controller pays {1}. Storm.");
     card!(IntoTheFloodMaw, "Into the Flood Maw", ManaCost::u(1), &[Instant], &[], None, None, None, kw(), &[Blue],
