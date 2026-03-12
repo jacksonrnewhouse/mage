@@ -754,7 +754,7 @@ impl GameState {
                 // --- Cycling ---
                 if let Some((cycling_cost, cycling_kind)) = crate::card::cycling_ability(card_name) {
                     match cycling_kind {
-                        CyclingKind::Basic => {
+                        CyclingKind::Basic | CyclingKind::Swampcycling | CyclingKind::Islandcycling => {
                             // Street Wraith cycling costs 2 life (zero mana), check life total
                             let life_cost = if card_name == CardName::StreetWraith { 2i32 } else { 0 };
                             let can_pay_mana = player.mana_pool.can_pay(&cycling_cost);

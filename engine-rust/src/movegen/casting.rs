@@ -703,6 +703,8 @@ impl GameState {
                     let effect = match cycling_kind {
                         CyclingKind::Basic => ActivatedEffect::CyclingDraw,
                         CyclingKind::SharkTyphoon => ActivatedEffect::SharkTyphoonCycling { x_value },
+                        CyclingKind::Swampcycling => ActivatedEffect::CyclingSearchSwamp,
+                        CyclingKind::Islandcycling => ActivatedEffect::CyclingSearchIsland,
                     };
                     self.stack.push(
                         StackItemKind::ActivatedAbility {
@@ -2121,6 +2123,26 @@ impl GameState {
             ),
             _ => false,
         }
+    }
+
+    /// Returns true if the given card name has the Swamp land subtype.
+    pub(crate) fn has_swamp_subtype(target: CardName) -> bool {
+        matches!(target,
+            CardName::Swamp
+            | CardName::UndergroundSea | CardName::Badlands | CardName::Bayou | CardName::Scrubland
+            | CardName::BloodCrypt | CardName::OvergrownTomb | CardName::WateryGrave | CardName::GodlessShrine
+            | CardName::UndercitySewers
+        )
+    }
+
+    /// Returns true if the given card name has the Island land subtype.
+    pub(crate) fn has_island_subtype(target: CardName) -> bool {
+        matches!(target,
+            CardName::Island
+            | CardName::UndergroundSea | CardName::TropicalIsland | CardName::VolcanicIsland | CardName::Tundra
+            | CardName::HallowedFountain | CardName::WateryGrave | CardName::SteamVents | CardName::BreedingPool
+            | CardName::MeticulousArchive | CardName::UndercitySewers | CardName::ThunderingFalls | CardName::HedgeMaze
+        )
     }
 
     /// Pay an alternate cost for a spell being cast.

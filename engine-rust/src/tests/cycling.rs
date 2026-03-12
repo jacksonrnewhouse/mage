@@ -70,11 +70,11 @@ fn test_lorien_revealed_cycling_no_mana_no_action() {
 fn test_cycling_discards_card_and_draws() {
     let (mut state, db) = setup_main_phase();
 
-    // Put Lorien Revealed in hand
+    // Put Hollow One in hand (basic cycling: discard + draw)
     let card_id = state.new_object_id();
-    state.card_registry.push((card_id, CardName::LorienRevealed));
+    state.card_registry.push((card_id, CardName::HollowOne));
     state.players[0].hand.push(card_id);
-    state.players[0].mana_pool.colorless = 1;
+    state.players[0].mana_pool.colorless = 2;
 
     // Put a card in library to draw
     let draw_id = state.new_object_id();
@@ -93,14 +93,14 @@ fn test_cycling_discards_card_and_draws() {
     };
     state.apply_action(&cycle_action, &db);
 
-    // After activation: Lorien Revealed is discarded, cycling effect is on the stack
+    // After activation: Hollow One is discarded, cycling effect is on the stack
     assert!(
         !state.players[0].hand.contains(&card_id),
-        "Lorien Revealed should be removed from hand"
+        "Hollow One should be removed from hand"
     );
     assert!(
         state.players[0].graveyard.contains(&card_id),
-        "Lorien Revealed should be in graveyard"
+        "Hollow One should be in graveyard"
     );
     assert!(!state.stack.is_empty(), "Cycling effect should be on the stack");
 
@@ -114,6 +114,113 @@ fn test_cycling_discards_card_and_draws() {
     );
     // Library is now empty
     assert!(state.players[0].library.is_empty());
+}
+
+#[test]
+fn test_lorien_revealed_islandcycling_searches_for_island() {
+    let (mut state, db) = setup_main_phase();
+
+    // Put Lorien Revealed in hand (islandcycling: search for Island card)
+    let card_id = state.new_object_id();
+    state.card_registry.push((card_id, CardName::LorienRevealed));
+    state.players[0].hand.push(card_id);
+    state.players[0].mana_pool.colorless = 1;
+
+    // Put an Island and a non-Island in library
+    let island_id = state.new_object_id();
+    state.card_registry.push((island_id, CardName::Island));
+    state.players[0].library.push(island_id);
+
+    let forest_id = state.new_object_id();
+    state.card_registry.push((forest_id, CardName::Forest));
+    state.players[0].library.push(forest_id);
+
+    // Apply cycling action
+    let cycle_action = Action::ActivateFromHand {
+        card_id,
+        ability_index: 0,
+        targets: vec![],
+        x_value: 0,
+    };
+    state.apply_action(&cycle_action, &db);
+
+    // Lorien Revealed should be discarded
+    assert!(state.players[0].graveyard.contains(&card_id));
+    assert!(!state.stack.is_empty(), "Cycling effect should be on the stack");
+
+    // Resolve the islandcycling effect (search for Island)
+    state.resolve_top(&db);
+
+    // Should have a pending choice to pick from searchable Islands
+    assert!(state.pending_choice.is_some(), "Should have pending choice to pick Island");
+
+    // Resolve the choice by picking the Island
+    let choice = state.pending_choice.take().unwrap();
+    state.resolve_choice(choice, island_id, &db);
+
+    // Island should be in hand
+    assert!(
+        state.players[0].hand.contains(&island_id),
+        "Island should be in hand after islandcycling"
+    );
+    // Forest should still be in library
+    assert!(
+        state.players[0].library.contains(&forest_id),
+        "Forest should remain in library"
+    );
+}
+
+#[test]
+fn test_troll_of_khazad_dum_swampcycling_searches_for_swamp() {
+    let (mut state, db) = setup_main_phase();
+
+    // Put Troll of Khazad-dum in hand (swampcycling {1})
+    let card_id = state.new_object_id();
+    state.card_registry.push((card_id, CardName::TrollOfKhazadDum));
+    state.players[0].hand.push(card_id);
+    state.players[0].mana_pool.colorless = 1;
+
+    // Put a Swamp and a Mountain in library
+    let swamp_id = state.new_object_id();
+    state.card_registry.push((swamp_id, CardName::Swamp));
+    state.players[0].library.push(swamp_id);
+
+    let mountain_id = state.new_object_id();
+    state.card_registry.push((mountain_id, CardName::Mountain));
+    state.players[0].library.push(mountain_id);
+
+    // Apply cycling action
+    let cycle_action = Action::ActivateFromHand {
+        card_id,
+        ability_index: 0,
+        targets: vec![],
+        x_value: 0,
+    };
+    state.apply_action(&cycle_action, &db);
+
+    // Troll should be discarded
+    assert!(state.players[0].graveyard.contains(&card_id));
+
+    // Resolve the swampcycling effect
+    state.resolve_top(&db);
+
+    // Should have a pending choice to pick from searchable Swamps
+    assert!(state.pending_choice.is_some(), "Should have pending choice to pick Swamp");
+
+    // Resolve the choice by picking the Swamp
+    let choice = state.pending_choice.take().unwrap();
+    state.resolve_choice(choice, swamp_id, &db);
+
+    // Swamp should be in hand
+    assert!(
+        state.players[0].hand.contains(&swamp_id),
+        "Swamp should be in hand after swampcycling"
+    );
+    // Mountain should still be in library
+    assert!(
+        state.players[0].library.contains(&mountain_id),
+        "Mountain should remain in library"
+    );
 }
 
 #[test]

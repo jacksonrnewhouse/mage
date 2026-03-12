@@ -300,6 +300,10 @@ pub enum ActivatedEffect {
     BatterskullBounce,
     /// Basic cycling: discard a card, draw a card (already discarded at activation).
     CyclingDraw,
+    /// Swampcycling: discard, search library for a Swamp card, put it into hand (already discarded).
+    CyclingSearchSwamp,
+    /// Islandcycling: discard, search library for an Island card, put it into hand (already discarded).
+    CyclingSearchIsland,
     /// Shark Typhoon cycling: discard, create an X/X Shark token with flying (X chosen at activation).
     SharkTyphoonCycling { x_value: u8 },
     /// Boseiju channel: destroy target artifact, enchantment, or nonbasic land.

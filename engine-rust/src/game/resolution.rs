@@ -4852,6 +4852,54 @@ impl GameState {
                 // Discard already happened at activation; just draw a card.
                 self.draw_cards(controller, 1);
             }
+            ActivatedEffect::CyclingSearchSwamp => {
+                // Swampcycling: search library for a card with Swamp subtype, put it into hand.
+                if !self.library_search_restricted(controller) {
+                    let searchable: Vec<ObjectId> = self.players[controller as usize]
+                        .library
+                        .iter()
+                        .filter(|&&id| {
+                            self.card_name_for_id(id)
+                                .map(|cn| GameState::has_swamp_subtype(cn))
+                                .unwrap_or(false)
+                        })
+                        .copied()
+                        .collect();
+                    if !searchable.is_empty() {
+                        self.pending_choice = Some(PendingChoice {
+                            player: controller,
+                            kind: ChoiceKind::ChooseFromList {
+                                options: searchable,
+                                reason: ChoiceReason::DemonicTutorSearch,
+                            },
+                        });
+                    }
+                }
+            }
+            ActivatedEffect::CyclingSearchIsland => {
+                // Islandcycling: search library for a card with Island subtype, put it into hand.
+                if !self.library_search_restricted(controller) {
+                    let searchable: Vec<ObjectId> = self.players[controller as usize]
+                        .library
+                        .iter()
+                        .filter(|&&id| {
+                            self.card_name_for_id(id)
+                                .map(|cn| GameState::has_island_subtype(cn))
+                                .unwrap_or(false)
+                        })
+                        .copied()
+                        .collect();
+                    if !searchable.is_empty() {
+                        self.pending_choice = Some(PendingChoice {
+                            player: controller,
+                            kind: ChoiceKind::ChooseFromList {
+                                options: searchable,
+                                reason: ChoiceReason::DemonicTutorSearch,
+                            },
+                        });
+                    }
+                }
+            }
             ActivatedEffect::SharkTyphoonCycling { x_value } => {
                 // Discard already happened at activation; create an X/X Shark with flying, then draw.
                 let token_id = self.new_object_id();

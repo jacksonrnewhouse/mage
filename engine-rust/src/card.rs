@@ -693,6 +693,10 @@ pub enum CyclingKind {
     Basic,
     /// Shark Typhoon: pay {X}{U}, discard, create an X/X Shark with flying.
     SharkTyphoon,
+    /// Swampcycling: discard, search library for a Swamp card, put it into hand.
+    Swampcycling,
+    /// Islandcycling: discard, search library for an Island card, put it into hand.
+    Islandcycling,
 }
 
 /// Returns the cycling cost and kind for a card in hand, or None if it can't cycle.
@@ -703,9 +707,9 @@ pub fn cycling_ability(card_name: CardName) -> Option<(ManaCost, CyclingKind)> {
         // Street Wraith: cycling costs 2 life (life payment handled separately; cost is zero mana)
         CardName::StreetWraith => Some((ManaCost::ZERO, CyclingKind::Basic)),
         // Troll of Khazad-dum: Swamp cycling {1}
-        CardName::TrollOfKhazadDum => Some((ManaCost::generic(1), CyclingKind::Basic)),
+        CardName::TrollOfKhazadDum => Some((ManaCost::generic(1), CyclingKind::Swampcycling)),
         // Lorien Revealed: Island cycling {1}
-        CardName::LorienRevealed => Some((ManaCost::generic(1), CyclingKind::Basic)),
+        CardName::LorienRevealed => Some((ManaCost::generic(1), CyclingKind::Islandcycling)),
         // Step Through: Wizardcycling {2}
         CardName::StepThrough => Some((ManaCost::generic(2), CyclingKind::Basic)),
         // Shark Typhoon: cycling {X}{U}
