@@ -1381,6 +1381,31 @@ impl GameState {
                     continue;
                 }
             }
+            // Chains of Mephistopheles replacement: extra draws (beyond the first
+            // draw-step draw) require discarding first. If the player can't discard
+            // (empty hand), they mill a card instead of drawing.
+            if self.players[pid].draws_this_turn >= 1 {
+                let has_chains = self.battlefield.iter().any(|p| p.card_name == CardName::ChainsOfMephistopheles);
+                if has_chains {
+                    if self.players[pid].hand.is_empty() {
+                        // Can't discard -> mill one card instead of drawing
+                        if let Some(milled) = self.players[pid].library.pop() {
+                            let card_name = self.card_name_for_id(milled).unwrap_or(CardName::Plains);
+                            self.send_to_graveyard(milled, card_name, player);
+                        }
+                        self.players[pid].draws_this_turn += 1;
+                        continue;
+                    } else {
+                        // Discard a card (pick last card in hand for deterministic game-tree search)
+                        let discard_id = *self.players[pid].hand.last().unwrap();
+                        self.players[pid].hand.retain(|&id| id != discard_id);
+                        let card_name = self.card_name_for_id(discard_id).unwrap_or(CardName::Plains);
+                        self.players[pid].cards_discarded_this_turn += 1;
+                        self.send_to_graveyard(discard_id, card_name, player);
+                        // After discarding, the player draws a card (fall through to normal draw below)
+                    }
+                }
+            }
             if let Some(id) = self.players[pid].library.pop() {
                 self.players[pid].hand.push(id);
                 self.players[pid].draws_this_turn += 1;
