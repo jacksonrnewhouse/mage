@@ -2350,10 +2350,25 @@ impl GameState {
             CardName::Disenchant | CardName::NaturesClaim | CardName::Fragmentize
             | CardName::AncientGrudge | CardName::ShatteringSpree | CardName::Vandalblast
             | CardName::Suplex | CardName::UntimelyMalfunction | CardName::Crash
-            | CardName::SunderingEruption | CardName::AbruptDecay | CardName::PestControl => {
+            | CardName::SunderingEruption | CardName::PestControl => {
                 self.battlefield
                     .iter()
                     .filter(|p| p.is_artifact() || p.is_enchantment())
+                    .map(|p| vec![Target::Object(p.id)])
+                    .collect()
+            }
+
+            // Target nonland permanent with mana value 3 or less
+            CardName::AbruptDecay => {
+                self.battlefield
+                    .iter()
+                    .filter(|p| {
+                        !p.is_land()
+                            && self.can_be_targeted(p, controller, &spell_colors)
+                            && find_card(db, p.card_name)
+                                .map(|d| d.mana_cost.cmc() <= 3)
+                                .unwrap_or(false)
+                    })
                     .map(|p| vec![Target::Object(p.id)])
                     .collect()
             }
