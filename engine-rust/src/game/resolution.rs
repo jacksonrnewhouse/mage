@@ -546,7 +546,27 @@ impl GameState {
                 if let Some(Target::Player(target_player)) = targets.first() {
                     let options: Vec<ObjectId> = self.players[*target_player as usize]
                         .hand
-                        .clone();
+                        .iter()
+                        .copied()
+                        .filter(|&card_id| {
+                            if let Some(cn) = self.card_name_for_id(card_id) {
+                                if let Some(def) = crate::card::find_card(db, cn) {
+                                    let is_land = def.card_types.contains(&CardType::Land);
+                                    let is_creature = def.card_types.contains(&CardType::Creature);
+                                    match card_name {
+                                        CardName::Duress => !is_land && !is_creature,
+                                        CardName::Thoughtseize => !is_land,
+                                        CardName::InquisitionOfKozilek => !is_land && def.mana_cost.cmc() <= 3,
+                                        _ => true,
+                                    }
+                                } else {
+                                    true
+                                }
+                            } else {
+                                true
+                            }
+                        })
+                        .collect();
                     if !options.is_empty() {
                         self.pending_choice = Some(PendingChoice {
                             player: controller,
@@ -577,10 +597,24 @@ impl GameState {
             }
 
             CardName::Unmask => {
-                // May exile black card instead of paying mana
+                // Unmask: target player reveals hand, choose a nonland card to discard
                 if let Some(Target::Player(target_player)) = targets.first() {
                     let options: Vec<ObjectId> = self.players[*target_player as usize]
-                        .hand.clone();
+                        .hand
+                        .iter()
+                        .copied()
+                        .filter(|&card_id| {
+                            if let Some(cn) = self.card_name_for_id(card_id) {
+                                if let Some(def) = crate::card::find_card(db, cn) {
+                                    !def.card_types.contains(&CardType::Land)
+                                } else {
+                                    true
+                                }
+                            } else {
+                                true
+                            }
+                        })
+                        .collect();
                     if !options.is_empty() {
                         self.pending_choice = Some(PendingChoice {
                             player: controller,
@@ -939,10 +973,10 @@ impl GameState {
             CardName::Disenchant | CardName::NaturesClaim | CardName::Fragmentize
             | CardName::AbruptDecay | CardName::AncientGrudge | CardName::ShatteringSpree
             | CardName::Vandalblast | CardName::Suplex
-            | CardName::MoltenCollapse | CardName::PrismaticEnding | CardName::FatalPush
+            | CardName::MoltenCollapse | CardName::FatalPush
             | CardName::BitterTriumph | CardName::SnuffOut
             | CardName::UntimelyMalfunction | CardName::Crash | CardName::CouncilsJudgment
-            | CardName::MarchOfOtherworldlyLight | CardName::SunderingEruption
+            | CardName::SunderingEruption
             | CardName::PestControl => {
                 // Nature's Claim: destroyed permanent's controller gains 4 life
                 let target_controller = if card_name == CardName::NaturesClaim {
@@ -959,6 +993,13 @@ impl GameState {
                 }
                 if let Some(tc) = target_controller {
                     self.players[tc as usize].life += 4;
+                }
+            }
+
+            // === Exile-based removal ===
+            CardName::PrismaticEnding | CardName::MarchOfOtherworldlyLight => {
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    self.remove_permanent_to_zone(*target_id, DestinationZone::Exile);
                 }
             }
 
@@ -1173,17 +1214,27 @@ impl GameState {
                         _ => {}
                     }
                 }
-                // Storm copies
-                let storm = self.storm_count;
-                for _ in 0..storm {
-                    if let Some(target) = targets.first() {
-                        match target {
-                            Target::Player(p) => {
-                                self.players[*p as usize].life -= 2;
-                                self.players[controller as usize].life += 2;
-                            }
-                            _ => {}
-                        }
+                // Storm: push storm_count copies onto the stack as individual items
+                if !is_copy {
+                    let storm = self.storm_count;
+                    let template = crate::stack::StackItem {
+                        id: 0,
+                        kind: crate::stack::StackItemKind::Spell {
+                            card_name: CardName::TendrilsOfAgony,
+                            card_id: 0,
+                            cast_via_evoke: false,
+                        },
+                        controller,
+                        targets: targets.to_vec(),
+                        cant_be_countered: false,
+                        x_value: 0,
+                        cast_from_graveyard: false,
+                        cast_as_adventure: false,
+                        modes: vec![],
+                        is_copy: false,
+                    };
+                    for _ in 0..storm {
+                        self.stack.push_copy(&template);
                     }
                 }
             }
