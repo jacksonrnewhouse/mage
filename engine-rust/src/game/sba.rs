@@ -141,6 +141,7 @@ impl GameState {
             | CardName::DovinHandOfControl
             // Enchantments
             | CardName::FableOfTheMirrorBreaker | CardName::HidetsuguConsumesAll
+            | CardName::VesselOfTheAllConsuming
         )
     }
 }

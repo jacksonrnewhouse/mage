@@ -490,6 +490,8 @@ pub enum CardName {
     // === Rakdos (BR) ===
     MoltenCollapse,
     HidetsuguConsumesAll,
+    /// Back face of Hidetsugu Consumes All
+    VesselOfTheAllConsuming,
 
     // === Gruul (RG) ===
     AncientGrudge,
@@ -2273,8 +2275,53 @@ pub fn build_card_db() -> Vec<CardDef> {
     // === Rakdos (BR) ===
     card!(MoltenCollapse, "Molten Collapse", ManaCost { black: 1, red: 1, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Black, Red],
         "Choose one. If you descended this turn, you may choose both instead. Destroy target creature or planeswalker. Destroy target noncreature, nonland permanent with mana value 1 or less.");
-    card!(HidetsuguConsumesAll, "Hidetsugu Consumes All", ManaCost { black: 1, red: 1, generic: 1, ..c }, &[Enchantment], &[Legendary], None, None, None, kw(), &[Black, Red],
-        "I: Destroy each nonland permanent with mana value 1 or less. II: Exile all graveyards. III: Exile this Saga, then return it as Vessel of the All-Consuming, a legendary 3/3 creature that gains abilities from exiled cards.");
+    db.push(CardDef {
+        name: CardName::HidetsuguConsumesAll,
+        display_name: "Hidetsugu Consumes All",
+        mana_cost: ManaCost { black: 1, red: 1, generic: 1, ..c },
+        has_x_cost: false,
+        x_multiplier: 0,
+        card_types: &[Enchantment],
+        supertypes: &[Legendary],
+        power: None,
+        toughness: None,
+        loyalty: None,
+        keywords: kw(),
+        color_identity: &[Black, Red],
+        oracle_text: "(As this Saga enters and after your draw step, add a lore counter.) I — Destroy each nonland permanent with mana value 1 or less. II — Exile all graveyards. III — Exile this Saga, then return it to the battlefield transformed under your control.",
+        flashback_cost: None,
+        madness_cost: None,
+        creature_types: &[],
+        is_changeling: false,
+        adventure: None,
+        back_face: Some(CardName::VesselOfTheAllConsuming),
+    });
+    // Back face of Hidetsugu Consumes All — 3/3 Ogre Shaman with Trample
+    db.push(CardDef {
+        name: CardName::VesselOfTheAllConsuming,
+        display_name: "Vessel of the All-Consuming",
+        mana_cost: ManaCost::ZERO,
+        has_x_cost: false,
+        x_multiplier: 0,
+        card_types: &[Enchantment, Creature],
+        supertypes: &[Legendary],
+        power: Some(3),
+        toughness: Some(3),
+        loyalty: None,
+        keywords: {
+            let mut k = Keywords::empty();
+            k.add(Keyword::Trample);
+            k
+        },
+        color_identity: &[Black, Red],
+        oracle_text: "Trample\nWhenever this creature deals damage, put a +1/+1 counter on it.\nWhenever this creature deals damage to a player, if it has dealt 10 or more damage to that player this turn, they lose the game.",
+        flashback_cost: None,
+        madness_cost: None,
+        creature_types: &[CreatureType::Ogre, CreatureType::Shaman],
+        is_changeling: false,
+        adventure: None,
+        back_face: None,
+    });
 
     // === Gruul (RG) ===
     card!(FB(ManaCost { green: 1, ..c }) AncientGrudge, "Ancient Grudge", ManaCost { red: 1, generic: 1, ..c }, &[Instant], &[], None, None, None, kw(), &[Red, Green],

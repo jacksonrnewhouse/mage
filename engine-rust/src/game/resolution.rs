@@ -2522,6 +2522,37 @@ impl GameState {
                 });
             }
 
+            // Hidetsugu Consumes All: a Saga enchantment with 3 chapters.
+            // Same pattern as Urza's Saga: add a lore counter on ETB, register recurring advance trigger.
+            // Chapter I:   Destroy each nonland permanent with mana value 1 or less.
+            // Chapter II:  Exile all graveyards.
+            // Chapter III: Exile this Saga, then return it to the battlefield transformed.
+            CardName::HidetsuguConsumesAll => {
+                // Add the first lore counter immediately as it enters.
+                if let Some(perm) = self.find_permanent_mut(_card_id) {
+                    perm.counters.add(CounterType::Lore, 1);
+                }
+                // Push Chapter I trigger onto the stack.
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: _card_id,
+                        source_name: CardName::HidetsuguConsumesAll,
+                        effect: TriggeredEffect::SagaChapter { saga_id: _card_id, chapter: 1 },
+                    },
+                    controller,
+                    vec![],
+                );
+                // Register a recurring precombat-main trigger to advance lore counters.
+                self.add_delayed_trigger(crate::types::DelayedTrigger {
+                    condition: crate::types::DelayedTriggerCondition::AtBeginningOfPreCombatMain {
+                        player: controller,
+                    },
+                    effect: TriggeredEffect::SagaChapter { saga_id: _card_id, chapter: 0 },
+                    controller,
+                    fires_once: false,
+                });
+            }
+
             // Delver of Secrets: register a recurring upkeep trigger to check the top card.
             // At the beginning of your upkeep, reveal the top card of your library.
             // If it's an instant or sorcery, transform Delver of Secrets.
@@ -2803,6 +2834,12 @@ impl GameState {
                 // Simplified: draw a card to represent the card advantage from the ability.
                 // Full implementation requires choosing from any graveyard; model as draw for now.
                 self.draw_cards(controller, 1);
+            }
+            TriggeredEffect::VesselDealsDamage { vessel_id } => {
+                // Vessel of the All-Consuming deals damage: put a +1/+1 counter on it.
+                if let Some(perm) = self.find_permanent_mut(vessel_id) {
+                    perm.counters.add(CounterType::PlusOnePlusOne, 1);
+                }
             }
             TriggeredEffect::OrcishBowmastersETB | TriggeredEffect::OrcishBowmastersOpponentDraw => {
                 // Deal 1 damage to any target and amass Orcs 1 (create 1/1 token)
@@ -3196,12 +3233,13 @@ impl GameState {
                     0 => {
                         // Only proceed if the saga is still on the battlefield and still controlled
                         // by the same controller (it might have left since the trigger was registered).
-                        let still_there = self.find_permanent(saga_id)
-                            .map(|p| p.controller == controller)
-                            .unwrap_or(false);
-                        if !still_there {
-                            return;
-                        }
+                        let saga_card_name = self.find_permanent(saga_id)
+                            .filter(|p| p.controller == controller)
+                            .map(|p| p.card_name);
+                        let saga_card_name = match saga_card_name {
+                            Some(n) => n,
+                            None => return,
+                        };
                         // Add a lore counter.
                         let new_lore = {
                             let perm = self.find_permanent_mut(saga_id).unwrap();
@@ -3213,7 +3251,7 @@ impl GameState {
                         self.stack.push(
                             StackItemKind::TriggeredAbility {
                                 source_id: saga_id,
-                                source_name: CardName::UrzasSaga,
+                                source_name: saga_card_name,
                                 effect: TriggeredEffect::SagaChapter { saga_id, chapter: chapter_to_fire },
                             },
                             controller,
@@ -3221,82 +3259,145 @@ impl GameState {
                         );
                     }
 
-                    // Chapter I: Urza's Saga gains "{T}: Add {C}."
-                    // The mana ability is handled via mana generation in movegen; nothing to resolve here.
-                    1 => {
-                        // Chapter I is a static-ability gain — no immediate effect to resolve.
-                        // (The movegen already handles Urza's Saga producing colorless mana once it's on BF.)
-                    }
+                    // Chapters 1–3: dispatch based on which saga this is.
+                    _ => {
+                        // Determine which saga this is from the permanent or card registry.
+                        let saga_name = self.find_permanent(saga_id)
+                            .map(|p| p.card_name)
+                            .or_else(|| self.card_name_for_id(saga_id))
+                            .unwrap_or(CardName::UrzasSaga);
 
-                    // Chapter II: Create a 0/0 colorless Construct artifact creature token.
-                    // The token gets +1/+1 for each artifact you control.
-                    2 => {
-                        let artifact_count = self.battlefield.iter()
-                            .filter(|p| p.controller == controller && p.is_artifact())
-                            .count() as i16;
-                        let token_id = self.new_object_id();
-                        let mut token = Permanent::new(
-                            token_id,
-                            card_name_for_token(),
-                            controller,
-                            controller,
-                            Some(0),
-                            Some(0),
-                            None,
-                            Keywords::empty(),
-                            &[CardType::Artifact, CardType::Creature],
-                        );
-                        token.creature_types.push(CreatureType::Construct);
-                        // The +1/+1 per artifact is a static ability; we bake it in as a fixed bonus
-                        // at token creation time (sufficient for current search depth).
-                        token.power_mod += artifact_count;
-                        token.toughness_mod += artifact_count;
-                        token.is_token = true;
-                        self.battlefield.push(token);
-                    }
-
-                    // Chapter III: Search your library for an artifact card with MV 0 or 1,
-                    // put it onto the battlefield, then shuffle. After it resolves, sacrifice the saga.
-                    3 => {
-                        let options: Vec<ObjectId> = self.players[controller as usize]
-                            .library
-                            .iter()
-                            .copied()
-                            .filter(|&id| {
-                                self.card_name_for_id(id)
-                                    .and_then(|cn| find_card(db, cn))
-                                    .map(|def| {
-                                        def.card_types.contains(&CardType::Artifact)
-                                            && def.mana_cost.cmc() <= 1
+                        match (saga_name, chapter) {
+                            // ---- Urza's Saga ----
+                            // Chapter I: Urza's Saga gains "{T}: Add {C}."
+                            (CardName::UrzasSaga, 1) => {
+                                // Static-ability gain — no immediate effect to resolve.
+                            }
+                            // Chapter II: Create a 0/0 colorless Construct artifact creature token.
+                            (CardName::UrzasSaga, 2) => {
+                                let artifact_count = self.battlefield.iter()
+                                    .filter(|p| p.controller == controller && p.is_artifact())
+                                    .count() as i16;
+                                let token_id = self.new_object_id();
+                                let mut token = Permanent::new(
+                                    token_id,
+                                    card_name_for_token(),
+                                    controller,
+                                    controller,
+                                    Some(0),
+                                    Some(0),
+                                    None,
+                                    Keywords::empty(),
+                                    &[CardType::Artifact, CardType::Creature],
+                                );
+                                token.creature_types.push(CreatureType::Construct);
+                                token.power_mod += artifact_count;
+                                token.toughness_mod += artifact_count;
+                                token.is_token = true;
+                                self.battlefield.push(token);
+                            }
+                            // Chapter III: Search for artifact with MV 0 or 1, put onto BF, sacrifice saga.
+                            (CardName::UrzasSaga, 3) => {
+                                let options: Vec<ObjectId> = self.players[controller as usize]
+                                    .library
+                                    .iter()
+                                    .copied()
+                                    .filter(|&id| {
+                                        self.card_name_for_id(id)
+                                            .and_then(|cn| find_card(db, cn))
+                                            .map(|def| {
+                                                def.card_types.contains(&CardType::Artifact)
+                                                    && def.mana_cost.cmc() <= 1
+                                            })
+                                            .unwrap_or(false)
                                     })
-                                    .unwrap_or(false)
-                            })
-                            .collect();
-                        if !options.is_empty() {
-                            self.pending_choice = Some(PendingChoice {
-                                player: controller,
-                                kind: ChoiceKind::ChooseFromList {
-                                    options,
-                                    reason: ChoiceReason::UrzasSagaChapterIII,
-                                },
-                            });
-                        }
-                        // After chapter III resolves, sacrifice the saga.
-                        // We push the sacrifice trigger on the stack so it resolves after the
-                        // search choice resolves (LIFO — sacrifice fires after choice resolves).
-                        self.stack.push(
-                            StackItemKind::TriggeredAbility {
-                                source_id: saga_id,
-                                source_name: CardName::UrzasSaga,
-                                effect: TriggeredEffect::SagaSacrifice { saga_id },
-                            },
-                            controller,
-                            vec![],
-                        );
-                    }
+                                    .collect();
+                                if !options.is_empty() {
+                                    self.pending_choice = Some(PendingChoice {
+                                        player: controller,
+                                        kind: ChoiceKind::ChooseFromList {
+                                            options,
+                                            reason: ChoiceReason::UrzasSagaChapterIII,
+                                        },
+                                    });
+                                }
+                                self.stack.push(
+                                    StackItemKind::TriggeredAbility {
+                                        source_id: saga_id,
+                                        source_name: CardName::UrzasSaga,
+                                        effect: TriggeredEffect::SagaSacrifice { saga_id },
+                                    },
+                                    controller,
+                                    vec![],
+                                );
+                            }
 
-                    // Future chapters or unexpected values: no effect.
-                    _ => {}
+                            // ---- Hidetsugu Consumes All ----
+                            // Chapter I: Destroy each nonland permanent with mana value 1 or less.
+                            (CardName::HidetsuguConsumesAll, 1) => {
+                                let to_destroy: Vec<ObjectId> = self.battlefield.iter()
+                                    .filter(|p| {
+                                        // Nonland permanent with mana value <= 1
+                                        !p.is_land() && {
+                                            let mv = find_card(db, p.card_name)
+                                                .map(|def| def.mana_cost.cmc())
+                                                .unwrap_or(0);
+                                            mv <= 1
+                                        }
+                                    })
+                                    .map(|p| p.id)
+                                    .collect();
+                                for id in to_destroy {
+                                    self.destroy_permanent(id);
+                                }
+                            }
+                            // Chapter II: Exile all graveyards.
+                            (CardName::HidetsuguConsumesAll, 2) => {
+                                for pid in 0..self.players.len() {
+                                    let graveyard = std::mem::take(&mut self.players[pid].graveyard);
+                                    for card_id in graveyard {
+                                        let card_name = self.card_name_for_id(card_id).unwrap_or(CardName::Plains);
+                                        self.exile.push((card_id, card_name, pid as PlayerId));
+                                    }
+                                }
+                            }
+                            // Chapter III: Exile this Saga, then return it to the battlefield
+                            // transformed under your control.
+                            (CardName::HidetsuguConsumesAll, 3) => {
+                                // Exile the saga
+                                if self.find_permanent(saga_id).is_some() {
+                                    self.remove_permanent_to_zone(saga_id, DestinationZone::Exile);
+                                }
+                                // Remove the recurring lore-counter delayed trigger
+                                self.delayed_triggers.retain(|dt| {
+                                    !matches!(dt.effect, TriggeredEffect::SagaChapter { saga_id: sid, chapter: 0 } if sid == saga_id)
+                                });
+                                // Return it to the battlefield transformed as Vessel of the All-Consuming
+                                if let Some(target_def) = find_card(db, CardName::VesselOfTheAllConsuming) {
+                                    let mut perm = Permanent::new(
+                                        saga_id,
+                                        CardName::VesselOfTheAllConsuming,
+                                        controller,
+                                        controller,
+                                        target_def.power,
+                                        target_def.toughness,
+                                        target_def.loyalty,
+                                        target_def.keywords,
+                                        target_def.card_types,
+                                    );
+                                    perm.creature_types = target_def.creature_types.to_vec();
+                                    perm.colors = target_def.color_identity.to_vec();
+                                    perm.transformed = true;
+                                    self.battlefield.push(perm);
+                                    // Remove from exile (it was just exiled above)
+                                    self.exile.retain(|(id, _, _)| *id != saga_id);
+                                }
+                            }
+
+                            // Unhandled saga/chapter combinations: no effect.
+                            _ => {}
+                        }
+                    }
                 }
             }
 
