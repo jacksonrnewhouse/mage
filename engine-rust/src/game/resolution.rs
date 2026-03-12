@@ -453,10 +453,26 @@ impl GameState {
                     });
                 }
             }
-            // Bounce spells
-            CardName::ChainOfVapor | CardName::IntoTheFloodMaw | CardName::SinkIntoStupor => {
+            // Bounce spells (permanents only)
+            CardName::ChainOfVapor | CardName::IntoTheFloodMaw => {
                 if let Some(Target::Object(target_id)) = targets.first() {
                     self.remove_permanent_to_zone(*target_id, DestinationZone::Hand);
+                }
+            }
+            // Sink into Stupor: return target spell or nonland permanent an opponent controls to hand
+            CardName::SinkIntoStupor => {
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    // Check if target is a spell on the stack
+                    if self.stack.items().iter().any(|item| item.id == *target_id) {
+                        if let Some(item) = self.stack.remove(*target_id) {
+                            if let crate::stack::StackItemKind::Spell { card_id, .. } = item.kind {
+                                self.players[item.controller as usize].hand.push(card_id);
+                            }
+                        }
+                    } else {
+                        // Target is a permanent on the battlefield
+                        self.remove_permanent_to_zone(*target_id, DestinationZone::Hand);
+                    }
                 }
             }
             // Step Through: return two target creatures to their owners' hands

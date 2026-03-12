@@ -2279,13 +2279,29 @@ impl GameState {
 
             // Target nonland permanent
             CardName::CouncilsJudgment | CardName::MarchOfOtherworldlyLight
-            | CardName::ChainOfVapor | CardName::IntoTheFloodMaw
-            | CardName::SinkIntoStupor => {
+            | CardName::ChainOfVapor | CardName::IntoTheFloodMaw => {
                 self.battlefield
                     .iter()
                     .filter(|p| !p.is_land() && self.can_be_targeted(p, controller, &spell_colors))
                     .map(|p| vec![Target::Object(p.id)])
                     .collect()
+            }
+
+            // Target spell or nonland permanent an opponent controls
+            CardName::SinkIntoStupor => {
+                let mut targets: Vec<Vec<Target>> = self.battlefield
+                    .iter()
+                    .filter(|p| !p.is_land() && p.controller != controller && self.can_be_targeted(p, controller, &spell_colors))
+                    .map(|p| vec![Target::Object(p.id)])
+                    .collect();
+                targets.extend(
+                    self.stack
+                        .items()
+                        .iter()
+                        .filter(|item| item.controller != controller)
+                        .map(|item| vec![Target::Object(item.id)])
+                );
+                targets
             }
 
             // Target spell on stack
