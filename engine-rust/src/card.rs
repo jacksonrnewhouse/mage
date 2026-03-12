@@ -894,6 +894,31 @@ pub fn build_card_db() -> Vec<CardDef> {
                 back_face: None,
             });
         };
+        // Variant with adventure half and creature types
+        (ADVENTURE($adv:expr) CT($ct:expr) $name:expr, $display:expr, $cost:expr, $types:expr, $supers:expr,
+         $pow:expr, $tou:expr, $loy:expr, $kw:expr, $colors:expr, $text:expr) => {
+            db.push(CardDef {
+                name: $name,
+                display_name: $display,
+                mana_cost: $cost,
+                has_x_cost: false,
+                x_multiplier: 0,
+                card_types: $types,
+                supertypes: $supers,
+                power: $pow,
+                toughness: $tou,
+                loyalty: $loy,
+                keywords: $kw,
+                color_identity: $colors,
+                oracle_text: $text,
+                flashback_cost: None,
+                madness_cost: None,
+                creature_types: $ct,
+                is_changeling: false,
+                adventure: Some($adv),
+                back_face: None,
+            });
+        };
     }
 
     let kw = Keywords::empty;
@@ -1583,7 +1608,7 @@ pub fn build_card_db() -> Vec<CardDef> {
         display_name: "Petty Theft",
         cost: ManaCost { blue: 1, generic: 1, ..c },
         card_types: &[CardType::Instant],
-    }) BrazenBorrower, "Brazen Borrower", ManaCost { blue: 1, generic: 2, ..c }, &[Creature], &[],
+    }) CT(&[CreatureType::Faerie, CreatureType::Rogue]) BrazenBorrower, "Brazen Borrower", ManaCost { blue: 1, generic: 2, ..c }, &[Creature], &[],
         Some(3), Some(1), None, flash_flying(), &[Blue],
         "Flash. Flying. Brazen Borrower can block only creatures with flying. Adventure - Petty Theft {1}{U}: Return target nonland permanent an opponent controls to its owner's hand.");
     card!(EmryLurkerOfTheLoch, "Emry, Lurker of the Loch", ManaCost { blue: 1, generic: 2, ..c }, &[Creature], &[Legendary],
