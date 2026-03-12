@@ -141,7 +141,8 @@ impl GameState {
             | CardName::OkoThiefOfCrowns | CardName::CometStellarPup
             | CardName::DovinHandOfControl
             // Enchantments
-            | CardName::FableOfTheMirrorBreaker | CardName::HidetsuguConsumesAll
+            | CardName::FableOfTheMirrorBreaker | CardName::ReflectionOfKikiJiki
+            | CardName::HidetsuguConsumesAll
             | CardName::VesselOfTheAllConsuming
         )
     }

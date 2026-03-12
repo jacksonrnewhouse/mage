@@ -349,6 +349,10 @@ pub enum CardName {
     UnderworldBreach,
     BloodMoon,
     FableOfTheMirrorBreaker,
+    /// Back face of Fable of the Mirror-Breaker
+    ReflectionOfKikiJiki,
+    /// Token created by Fable of the Mirror-Breaker Chapter I
+    FableGoblinToken,
     ShatterskullSmashing,
     /// Back face of Shatterskull Smashing — MDFC land
     ShatterskullTheHammerPass,
@@ -1946,8 +1950,49 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Each nonland card in your graveyard has escape. The escape cost is equal to the card's mana cost plus exile three other cards from your graveyard. At the beginning of the end step, sacrifice Underworld Breach.");
     card!(BloodMoon, "Blood Moon", ManaCost { red: 1, generic: 2, ..c }, &[Enchantment], &[], None, None, None, kw(), &[Red],
         "Nonbasic lands are Mountains.");
-    card!(FableOfTheMirrorBreaker, "Fable of the Mirror-Breaker", ManaCost { red: 1, generic: 2, ..c }, &[Enchantment], &[Legendary], None, None, None, kw(), &[Red],
-        "I: Create a 2/2 red Goblin Shaman creature token with \"Whenever this creature attacks, create a Treasure token.\" II: You may discard up to two cards. If you do, draw that many cards. III: Exile this enchantment, then return it as Reflection of Kiki-Jiki.");
+    db.push(CardDef {
+        name: CardName::FableOfTheMirrorBreaker,
+        display_name: "Fable of the Mirror-Breaker",
+        mana_cost: ManaCost { red: 1, generic: 2, ..c },
+        has_x_cost: false,
+        x_multiplier: 0,
+        card_types: &[Enchantment],
+        supertypes: &[Legendary],
+        power: None,
+        toughness: None,
+        loyalty: None,
+        keywords: kw(),
+        color_identity: &[Red],
+        oracle_text: "(As this Saga enters and after your draw step, add a lore counter.) I — Create a 2/2 red Goblin Shaman creature token with \"Whenever this token attacks, create a Treasure token.\" II — You may discard up to two cards. If you do, draw that many cards. III — Exile this Saga, then return it to the battlefield transformed under your control.",
+        flashback_cost: None,
+        madness_cost: None,
+        creature_types: &[],
+        is_changeling: false,
+        adventure: None,
+        back_face: Some(CardName::ReflectionOfKikiJiki),
+    });
+    // Back face of Fable of the Mirror-Breaker — 2/2 Goblin Shaman enchantment creature
+    db.push(CardDef {
+        name: CardName::ReflectionOfKikiJiki,
+        display_name: "Reflection of Kiki-Jiki",
+        mana_cost: ManaCost::ZERO,
+        has_x_cost: false,
+        x_multiplier: 0,
+        card_types: &[Enchantment, Creature],
+        supertypes: &[Legendary],
+        power: Some(2),
+        toughness: Some(2),
+        loyalty: None,
+        keywords: kw(),
+        color_identity: &[Red],
+        oracle_text: "{1}, {T}: Create a token that's a copy of another target nonlegendary creature you control, except it has haste. Sacrifice it at the beginning of the next end step.",
+        flashback_cost: None,
+        madness_cost: None,
+        creature_types: &[CreatureType::Goblin, CreatureType::Shaman],
+        is_changeling: false,
+        adventure: None,
+        back_face: None,
+    });
     db.push(CardDef {
         name: CardName::ShatterskullSmashing,
         display_name: "Shatterskull Smashing",

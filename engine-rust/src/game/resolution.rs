@@ -2951,6 +2951,39 @@ impl GameState {
                 });
             }
 
+            // Fable of the Mirror-Breaker: a Saga enchantment with 3 chapters.
+            // Same pattern as Urza's Saga / Hidetsugu Consumes All.
+            // Chapter I:   Create a 2/2 red Goblin Shaman creature token with
+            //              "Whenever this token attacks, create a Treasure token."
+            // Chapter II:  You may discard up to two cards. If you do, draw that many cards.
+            // Chapter III: Exile this Saga, then return it to the battlefield transformed.
+            CardName::FableOfTheMirrorBreaker => {
+                // Add the first lore counter immediately as it enters.
+                if let Some(perm) = self.find_permanent_mut(_card_id) {
+                    perm.counters.add(CounterType::Lore, 1);
+                }
+                // Push Chapter I trigger onto the stack.
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: _card_id,
+                        source_name: CardName::FableOfTheMirrorBreaker,
+                        effect: TriggeredEffect::SagaChapter { saga_id: _card_id, chapter: 1 },
+                    },
+                    controller,
+                    vec![],
+                );
+                // Register a recurring precombat-main trigger to advance lore counters.
+                self.add_delayed_trigger(crate::types::DelayedTrigger {
+                    condition: crate::types::DelayedTriggerCondition::AtBeginningOfPreCombatMain {
+                        player: controller,
+                    },
+                    effect: TriggeredEffect::SagaChapter { saga_id: _card_id, chapter: 0 },
+                    controller,
+                    fires_once: false,
+                    source_id: None,
+                });
+            }
+
             // Delver of Secrets: register a recurring upkeep trigger to check the top card.
             // At the beginning of your upkeep, reveal the top card of your library.
             // If it's an instant or sorcery, transform Delver of Secrets.
@@ -3850,6 +3883,76 @@ impl GameState {
                                     let mut perm = Permanent::new(
                                         saga_id,
                                         CardName::VesselOfTheAllConsuming,
+                                        controller,
+                                        controller,
+                                        target_def.power,
+                                        target_def.toughness,
+                                        target_def.loyalty,
+                                        target_def.keywords,
+                                        target_def.card_types,
+                                    );
+                                    perm.creature_types = target_def.creature_types.to_vec();
+                                    perm.colors = target_def.color_identity.to_vec();
+                                    perm.transformed = true;
+                                    self.battlefield.push(perm);
+                                    // Remove from exile (it was just exiled above)
+                                    self.exile.retain(|(id, _, _)| *id != saga_id);
+                                }
+                            }
+
+                            // ---- Fable of the Mirror-Breaker ----
+                            // Chapter I: Create a 2/2 red Goblin Shaman creature token
+                            // with "Whenever this token attacks, create a Treasure token."
+                            (CardName::FableOfTheMirrorBreaker, 1) => {
+                                let token_id = self.new_object_id();
+                                let mut token = Permanent::new(
+                                    token_id,
+                                    CardName::FableGoblinToken,
+                                    controller,
+                                    controller,
+                                    Some(2),
+                                    Some(2),
+                                    None,
+                                    Keywords::empty(),
+                                    &[CardType::Creature],
+                                );
+                                token.creature_types = vec![CreatureType::Goblin, CreatureType::Shaman];
+                                token.colors = vec![Color::Red];
+                                token.is_token = true;
+                                self.battlefield.push(token);
+                            }
+                            // Chapter II: You may discard up to two cards. If you do,
+                            // draw that many cards.
+                            (CardName::FableOfTheMirrorBreaker, 2) => {
+                                // Simplified: discard up to 2 (all available, up to 2), then draw that many.
+                                let pid = controller as usize;
+                                let discard_count = std::cmp::min(2, self.players[pid].hand.len());
+                                for _ in 0..discard_count {
+                                    if let Some(card_id) = self.players[pid].hand.pop() {
+                                        self.players[pid].graveyard.push(card_id);
+                                        self.check_emrakul_graveyard_shuffle(controller);
+                                    }
+                                }
+                                if discard_count > 0 {
+                                    self.draw_cards(controller, discard_count);
+                                }
+                            }
+                            // Chapter III: Exile this Saga, then return it to the battlefield
+                            // transformed under your control as Reflection of Kiki-Jiki.
+                            (CardName::FableOfTheMirrorBreaker, 3) => {
+                                // Exile the saga
+                                if self.find_permanent(saga_id).is_some() {
+                                    self.remove_permanent_to_zone(saga_id, DestinationZone::Exile);
+                                }
+                                // Remove the recurring lore-counter delayed trigger
+                                self.delayed_triggers.retain(|dt| {
+                                    !matches!(dt.effect, TriggeredEffect::SagaChapter { saga_id: sid, chapter: 0 } if sid == saga_id)
+                                });
+                                // Return it to the battlefield transformed as Reflection of Kiki-Jiki
+                                if let Some(target_def) = find_card(db, CardName::ReflectionOfKikiJiki) {
+                                    let mut perm = Permanent::new(
+                                        saga_id,
+                                        CardName::ReflectionOfKikiJiki,
                                         controller,
                                         controller,
                                         target_def.power,

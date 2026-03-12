@@ -582,6 +582,18 @@ impl GameState {
                             vec![],
                         );
                     }
+                    // Fable Goblin Token: when it attacks, create a Treasure token.
+                    if cn == CardName::FableGoblinToken {
+                        self.stack.push(
+                            crate::stack::StackItemKind::TriggeredAbility {
+                                source_id: *creature_id,
+                                source_name: CardName::FableGoblinToken,
+                                effect: crate::stack::TriggeredEffect::CreateTreasures { count: 1 },
+                            },
+                            self.active_player,
+                            vec![],
+                        );
+                    }
                     // Seasoned Dungeoneer: when it attacks, target attacking creature explores
                     // and gains protection from creatures until end of turn.
                     if cn == CardName::SeasonedDungeoneer {
