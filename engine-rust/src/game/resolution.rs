@@ -4765,6 +4765,12 @@ impl GameState {
                 self.players[target_player as usize].life -= 2;
             }
 
+            TriggeredEffect::LeovoldTargetDraw => {
+                // Leovold, Emissary of Trest: you may draw a card.
+                // Always draw (optimal in game tree search).
+                self.draw_cards(controller, 1);
+            }
+
             _ => {}
         }
         let _ = db; // suppress unused warning when db not used in all arms

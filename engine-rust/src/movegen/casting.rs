@@ -410,6 +410,10 @@ impl GameState {
                                     self.check_bonecrusher_targeting_triggers(&perm_target_ids, player_id);
                                 }
                             }
+                            // Leovold, Emissary of Trest: check if any target belongs to Leovold's controller
+                            if !targets.is_empty() {
+                                self.check_leovold_targeting_triggers(&targets, player_id);
+                            }
                             // Tezzeret, Cruel Captain emblem: "Whenever you cast an artifact spell,
                             // search your library for an artifact card, put it onto the battlefield."
                             if def.card_types.contains(&CardType::Artifact)
@@ -913,6 +917,11 @@ impl GameState {
             if !creature_target_ids.is_empty() {
                 self.check_nadu_targeting_triggers(&creature_target_ids);
             }
+        }
+
+        // Leovold, Emissary of Trest: check if any target belongs to Leovold's controller
+        if !targets.is_empty() {
+            self.check_leovold_targeting_triggers(&targets, controller);
         }
 
         // Harsh Mentor: triggers when an opponent activates a non-mana ability of an

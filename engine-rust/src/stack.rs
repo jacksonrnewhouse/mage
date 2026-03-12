@@ -253,6 +253,9 @@ pub enum TriggeredEffect {
     /// Bonecrusher Giant: whenever this creature becomes the target of a spell,
     /// deal 2 damage to that spell's controller.
     BonecrusherGiantTargeted { target_player: PlayerId },
+    /// Leovold, Emissary of Trest: whenever you or a permanent you control becomes
+    /// the target of a spell or ability an opponent controls, you may draw a card.
+    LeovoldTargetDraw,
 }
 
 /// Activated ability effects.

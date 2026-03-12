@@ -636,6 +636,70 @@ impl GameState {
         }
     }
 
+    /// Check Leovold, Emissary of Trest targeting triggers.
+    /// "Whenever you or a permanent you control becomes the target of a spell or ability
+    /// an opponent controls, you may draw a card."
+    ///
+    /// `targets` is the list of targets for the spell/ability.
+    /// `source_controller` is the player who controls the spell/ability doing the targeting.
+    pub(crate) fn check_leovold_targeting_triggers(
+        &mut self,
+        targets: &[Target],
+        source_controller: PlayerId,
+    ) {
+        // Find all Leovold permanents on the battlefield
+        let leovolds: Vec<(ObjectId, PlayerId)> = self
+            .battlefield
+            .iter()
+            .filter(|p| p.card_name == CardName::LeovoldEmissaryOfTrest)
+            .map(|p| (p.id, p.controller))
+            .collect();
+
+        if leovolds.is_empty() {
+            return;
+        }
+
+        for &(leovold_id, leovold_controller) in &leovolds {
+            // Only triggers when the source is controlled by an opponent
+            if source_controller == leovold_controller {
+                continue;
+            }
+
+            // Check if any target is Leovold's controller (player) or a permanent they control
+            let mut triggered = false;
+            for target in targets {
+                match target {
+                    Target::Player(pid) if *pid == leovold_controller => {
+                        triggered = true;
+                        break;
+                    }
+                    Target::Object(obj_id) => {
+                        if self.find_permanent(*obj_id)
+                            .map(|p| p.controller == leovold_controller)
+                            .unwrap_or(false)
+                        {
+                            triggered = true;
+                            break;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            if triggered {
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: leovold_id,
+                        source_name: CardName::LeovoldEmissaryOfTrest,
+                        effect: TriggeredEffect::LeovoldTargetDraw,
+                    },
+                    leovold_controller,
+                    vec![],
+                );
+            }
+        }
+    }
+
     /// Check Clarion Conqueror triggered ability: whenever an opponent casts a spell
     /// during your turn, create a 1/1 white Soldier creature token.
     /// Called after any spell is pushed to the stack.
