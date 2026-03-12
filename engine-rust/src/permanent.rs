@@ -172,9 +172,18 @@ impl Permanent {
                         return true;
                     }
                 }
+                Protection::FromCreatures => {
+                    // Protection from creatures is handled in combat blocking/damage logic,
+                    // not here (this method doesn't know if the source is a creature).
+                }
             }
         }
         false
+    }
+
+    /// Returns true if this permanent has protection from creatures.
+    pub fn has_protection_from_creatures(&self) -> bool {
+        self.protections.contains(&Protection::FromCreatures)
     }
 
     /// Current power after all modifications.

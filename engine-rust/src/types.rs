@@ -93,6 +93,9 @@ pub enum Protection {
     /// Protection from multicolored (e.g., Stonecoil Serpent, Argentum Masticore).
     /// Prevents damage/targeting/blocking from sources with 2+ colors.
     FromMulticolored,
+    /// Protection from creatures (e.g., Seasoned Dungeoneer attack trigger).
+    /// Prevents damage/targeting/blocking from creatures.
+    FromCreatures,
 }
 
 /// Keyword abilities that affect game rules directly.

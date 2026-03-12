@@ -4220,6 +4220,140 @@ impl GameState {
                 }
             }
 
+            TriggeredEffect::PheliaAttackExile { phelia_id } => {
+                // Phelia attacks: exile up to one other target nonland permanent.
+                // At the beginning of the next end step, return it under its owner's control.
+                // If it entered under Phelia's controller, put a +1/+1 counter on Phelia.
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    let target_id = *target_id;
+                    let target_perm = self.find_permanent(target_id);
+                    let is_token = target_perm.map(|p| p.is_token).unwrap_or(false);
+                    let card_owner = target_perm.map(|p| p.owner).unwrap_or(controller);
+
+                    if is_token {
+                        // Tokens cease to exist when exiled; they won't return.
+                        self.remove_permanent(target_id);
+                    } else {
+                        // Exile the target (not linked to Phelia leaving — uses delayed trigger instead)
+                        let cn = self.find_permanent(target_id).map(|p| p.card_name).unwrap_or(CardName::Plains);
+                        self.remove_permanent(target_id);
+                        self.exile.push((target_id, cn, card_owner));
+
+                        // Set up delayed trigger: at the beginning of the next end step, return it.
+                        self.add_delayed_trigger(crate::types::DelayedTrigger {
+                            condition: crate::types::DelayedTriggerCondition::AtBeginningOfNextEndStep,
+                            effect: TriggeredEffect::PheliaEndStepReturn {
+                                exiled_card_id: target_id,
+                                card_owner,
+                                phelia_controller: controller,
+                                phelia_id,
+                            },
+                            controller,
+                            fires_once: true,
+                            source_id: Some(phelia_id),
+                        });
+                    }
+                }
+            }
+
+            TriggeredEffect::PheliaEndStepReturn { exiled_card_id, card_owner: _, phelia_controller, phelia_id } => {
+                // Return the exiled card to the battlefield under its owner's control.
+                // If it entered under Phelia's controller, put a +1/+1 counter on Phelia.
+                if let Some(pos) = self.exile.iter().position(|&(id, _, _)| id == exiled_card_id) {
+                    let (card_id, cn, owner) = self.exile.remove(pos);
+                    // Check Grafdigger's Cage / Containment Priest
+                    let cage_active = self.battlefield.iter().any(|p| p.card_name == CardName::GrafdiggersCage);
+                    let priest_active = self.battlefield.iter().any(|p| p.card_name == CardName::ContainmentPriest && p.controller != owner);
+                    if cage_active || priest_active {
+                        // Can't enter from exile — stays exiled
+                        self.exile.push((card_id, cn, owner));
+                    } else if let Some(def) = find_card(db, cn) {
+                        let perm_id = card_id;
+                        let mut perm = crate::permanent::Permanent::new(
+                            perm_id,
+                            cn,
+                            owner,
+                            owner,
+                            def.power,
+                            def.toughness,
+                            def.loyalty,
+                            def.keywords,
+                            def.card_types,
+                        );
+                        perm.colors = def.color_identity.to_vec();
+                        self.battlefield.push(perm);
+                        self.handle_etb(cn, card_id, owner);
+
+                        // If it entered under Phelia's controller, put a +1/+1 counter on Phelia.
+                        if owner == phelia_controller {
+                            if let Some(phelia_perm) = self.find_permanent_mut(phelia_id) {
+                                phelia_perm.counters.add(CounterType::PlusOnePlusOne, 1);
+                            }
+                        }
+                    }
+                }
+            }
+
+            TriggeredEffect::SeasonedDungeoneerAttack => {
+                // Target creature explores: reveal the top card of the library.
+                // If it's a land card, put it into your hand.
+                // Otherwise, put a +1/+1 counter on the creature, then put the card
+                // back on top or into the graveyard.
+                // Also: the creature gains protection from creatures until end of turn.
+                if let Some(Target::Object(creature_id)) = targets.first() {
+                    let creature_id = *creature_id;
+                    // Explore
+                    let pid = controller as usize;
+                    if let Some(&top_card_id) = self.players[pid].library.last() {
+                        let top_card_name = self.card_name_for_id(top_card_id);
+                        let is_land = top_card_name
+                            .and_then(|cn| find_card(db, cn))
+                            .map(|def| def.card_types.contains(&CardType::Land))
+                            .unwrap_or(false);
+
+                        if is_land {
+                            // Put the land into hand
+                            self.players[pid].library.pop();
+                            self.players[pid].hand.push(top_card_id);
+                        } else {
+                            // Put a +1/+1 counter on the creature
+                            if let Some(perm) = self.find_permanent_mut(creature_id) {
+                                perm.counters.add(CounterType::PlusOnePlusOne, 1);
+                            }
+                            // Put the card into the graveyard (simplified: always bin it for search)
+                            self.players[pid].library.pop();
+                            self.players[pid].graveyard.push(top_card_id);
+                            self.check_kishla_skimmer_trigger(controller);
+                        }
+                    }
+
+                    // Grant protection from creatures until end of turn
+                    if let Some(perm) = self.find_permanent_mut(creature_id) {
+                        perm.protections.push(Protection::FromCreatures);
+                    }
+                }
+            }
+
+            TriggeredEffect::ClarionConquerorOpponentCast => {
+                // Create a 1/1 white Soldier creature token.
+                let token_id = self.new_object_id();
+                let mut token = Permanent::new(
+                    token_id,
+                    card_name_for_token(),
+                    controller,
+                    controller,
+                    Some(1),
+                    Some(1),
+                    None,
+                    Keywords::empty(),
+                    &[CardType::Creature],
+                );
+                token.is_token = true;
+                token.creature_types = vec![CreatureType::Soldier];
+                token.colors = vec![Color::White];
+                self.battlefield.push(token);
+            }
+
             _ => {}
         }
         let _ = db; // suppress unused warning when db not used in all arms

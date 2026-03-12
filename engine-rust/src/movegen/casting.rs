@@ -284,6 +284,8 @@ impl GameState {
                             self.check_chalice_trigger(spell_id, def.mana_cost.cmc());
                             // Eidolon of the Great Revel: deal 2 to caster if MV <= 3.
                             self.check_eidolon_trigger(player_id, def.mana_cost.cmc());
+                            // Clarion Conqueror: whenever an opponent casts a spell during your turn.
+                            self.check_clarion_conqueror_trigger(player_id);
                             self.players[player_id as usize].spells_cast_this_turn += 1;
                             self.players[player_id as usize].spells_cast_this_game += 1;
                             if !def.card_types.contains(&CardType::Artifact) {
@@ -462,6 +464,44 @@ impl GameState {
                             vec![crate::types::Target::Player(defending_player)],
                         );
                     }
+                    // Phelia, Exuberant Shepherd: when she attacks, exile up to one other
+                    // target nonland permanent. Return it at the next end step.
+                    if cn == CardName::PheliaExuberantShepherd {
+                        // Find a nonland permanent to exile (not Phelia herself)
+                        let exile_target: Option<ObjectId> = self
+                            .battlefield
+                            .iter()
+                            .find(|p| p.id != *creature_id && !p.is_land())
+                            .map(|p| p.id);
+                        if let Some(target_id) = exile_target {
+                            self.stack.push(
+                                crate::stack::StackItemKind::TriggeredAbility {
+                                    source_id: *creature_id,
+                                    source_name: CardName::PheliaExuberantShepherd,
+                                    effect: crate::stack::TriggeredEffect::PheliaAttackExile {
+                                        phelia_id: *creature_id,
+                                    },
+                                },
+                                self.active_player,
+                                vec![crate::types::Target::Object(target_id)],
+                            );
+                        }
+                    }
+                    // Seasoned Dungeoneer: when it attacks, target attacking creature explores
+                    // and gains protection from creatures until end of turn.
+                    if cn == CardName::SeasonedDungeoneer {
+                        // Target an attacking creature (prefer the Dungeoneer itself)
+                        let explore_target = *creature_id;
+                        self.stack.push(
+                            crate::stack::StackItemKind::TriggeredAbility {
+                                source_id: *creature_id,
+                                source_name: CardName::SeasonedDungeoneer,
+                                effect: crate::stack::TriggeredEffect::SeasonedDungeoneerAttack,
+                            },
+                            self.active_player,
+                            vec![crate::types::Target::Object(explore_target)],
+                        );
+                    }
                 }
             }
 
@@ -559,6 +599,7 @@ impl GameState {
                                 self.check_chalice_trigger(adventure_spell_id, adv.cost.cmc());
                             }
                             self.check_eidolon_trigger(player_id, adv.cost.cmc());
+                            self.check_clarion_conqueror_trigger(player_id);
                             self.players[player_id as usize].spells_cast_this_turn += 1;
                             self.players[player_id as usize].spells_cast_this_game += 1;
                             self.players[player_id as usize].nonartifact_spells_cast_this_turn += 1;
@@ -605,6 +646,7 @@ impl GameState {
                         // Chalice of the Void: counter spells with MV equal to charge counters.
                         self.check_chalice_trigger(spell_id, def.mana_cost.cmc());
                         self.check_eidolon_trigger(player_id, def.mana_cost.cmc());
+                        self.check_clarion_conqueror_trigger(player_id);
                         self.players[player_id as usize].spells_cast_this_turn += 1;
                         self.players[player_id as usize].spells_cast_this_game += 1;
                         if !def.card_types.contains(&CardType::Artifact) {

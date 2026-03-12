@@ -887,7 +887,8 @@ impl GameState {
                     };
                     // Protection: the attacker can't be blocked by creatures with a protected quality.
                     // Check if the attacker has protection from the blocker's colors or from the blocking player.
-                    let blocked_by_protection = attacker.is_protected_from(&perm.colors, perm.controller);
+                    let blocked_by_protection = attacker.is_protected_from(&perm.colors, perm.controller)
+                        || attacker.has_protection_from_creatures();
                     // Menace: must be blocked by 2+ creatures (simplified: allow single block)
                     if can_block_flight && !blocked_by_protection {
                         actions.push(Action::DeclareBlocker {

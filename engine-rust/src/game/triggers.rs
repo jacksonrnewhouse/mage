@@ -572,6 +572,36 @@ impl GameState {
         }
     }
 
+    /// Check Clarion Conqueror triggered ability: whenever an opponent casts a spell
+    /// during your turn, create a 1/1 white Soldier creature token.
+    /// Called after any spell is pushed to the stack.
+    pub(crate) fn check_clarion_conqueror_trigger(&mut self, caster: PlayerId) {
+        // Only triggers when the caster is NOT the active player (i.e., opponent casting during your turn)
+        if caster == self.active_player {
+            return;
+        }
+        let conqueror_triggers: Vec<(ObjectId, PlayerId)> = self
+            .battlefield
+            .iter()
+            .filter(|p| {
+                p.card_name == CardName::ClarionConqueror
+                    && p.controller == self.active_player
+            })
+            .map(|p| (p.id, p.controller))
+            .collect();
+        for (source_id, controller) in conqueror_triggers {
+            self.stack.push(
+                StackItemKind::TriggeredAbility {
+                    source_id,
+                    source_name: CardName::ClarionConqueror,
+                    effect: TriggeredEffect::ClarionConquerorOpponentCast,
+                },
+                controller,
+                vec![],
+            );
+        }
+    }
+
     /// Check Eidolon of the Great Revel triggered ability: whenever a player casts a spell
     /// with mana value 3 or less, Eidolon deals 2 damage to that player.
     /// Called after any spell is pushed to the stack.

@@ -112,7 +112,8 @@ impl GameState {
                     if let Some(blocker) = self.find_permanent(blocker_id) {
                         // Check if blocker has protection from the attacker
                         // (attacker's damage is prevented if blocker has protection from attacker's quality)
-                        let blocker_protected = blocker.is_protected_from(&attacker_colors, attacker_controller);
+                        let blocker_protected = blocker.is_protected_from(&attacker_colors, attacker_controller)
+                            || blocker.has_protection_from_creatures();
 
                         if !blocker_protected {
                             let lethal = if attacker_has_deathtouch {
@@ -132,7 +133,8 @@ impl GameState {
                         let attacker_protected = {
                             // We need attacker's protections; re-fetch attacker
                             self.find_permanent(attacker_id)
-                                .map(|a| a.is_protected_from(&blocker_colors, blocker_controller))
+                                .map(|a| a.is_protected_from(&blocker_colors, blocker_controller)
+                                    || a.has_protection_from_creatures())
                                 .unwrap_or(false)
                         };
                         if blocker_power > 0 && !attacker_protected {

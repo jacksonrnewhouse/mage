@@ -218,6 +218,18 @@ pub enum TriggeredEffect {
     MasterOfDeathUpkeep { owner: PlayerId },
     /// Kishla Skimmer: whenever a card leaves your graveyard during your turn, draw a card (once per turn).
     KishlaSkimmerLeavesGraveyard,
+    /// Phelia, Exuberant Shepherd: attack trigger — exile target nonland permanent.
+    /// At the beginning of the next end step, return it under its owner's control.
+    /// If it entered under Phelia's controller, put a +1/+1 counter on Phelia.
+    PheliaAttackExile { phelia_id: ObjectId },
+    /// Phelia delayed end-step return: return the exiled card to the battlefield.
+    PheliaEndStepReturn { exiled_card_id: ObjectId, card_owner: PlayerId, phelia_controller: PlayerId, phelia_id: ObjectId },
+    /// Seasoned Dungeoneer: attack trigger — target creature explores and gains
+    /// protection from creatures until end of turn.
+    SeasonedDungeoneerAttack,
+    /// Clarion Conqueror: whenever an opponent casts a spell during your turn,
+    /// create a 1/1 white Soldier creature token.
+    ClarionConquerorOpponentCast,
 }
 
 /// Activated ability effects.
