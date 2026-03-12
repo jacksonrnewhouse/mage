@@ -358,6 +358,9 @@ pub enum DelayedTriggerCondition {
     /// Fires at the beginning of combat on the specified player's turn.
     /// Used by Emperor of Bones to exile a card from a graveyard.
     AtBeginningOfCombat { player: PlayerId },
+    /// Fires at the beginning of the upkeep of any player who is NOT `controller`.
+    /// Used by White Plume Adventurer's "at the beginning of each opponent's upkeep" trigger.
+    AtBeginningOfOpponentUpkeep { controller: PlayerId },
 }
 
 /// A delayed triggered ability that will fire at a later point in the game.

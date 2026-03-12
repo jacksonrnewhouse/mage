@@ -2388,6 +2388,11 @@ impl GameState {
             }
         }
 
+        // --- Boromir, Warden of the Tower: Sacrifice: Creatures you control gain indestructible until end of turn. ---
+        if perm.card_name == CardName::BoromirWardenOfTheTower {
+            abilities.push((0, vec![]));
+        }
+
         // --- Sylvan Safekeeper: Sacrifice a land: Target creature you control gains shroud until end of turn ---
         if perm.card_name == CardName::SylvanSafekeeper {
             // Check if there's a land to sacrifice (any land you control other than Safekeeper itself)

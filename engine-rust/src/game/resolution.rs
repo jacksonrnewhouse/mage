@@ -2879,9 +2879,20 @@ impl GameState {
                 });
             }
 
-            // White Plume Adventurer: take the initiative on ETB
+            // White Plume Adventurer: take the initiative on ETB + opponent upkeep untap trigger
             CardName::WhitePlumeAdventurer => {
                 self.take_initiative(controller);
+                // Register delayed trigger: at the beginning of each opponent's upkeep,
+                // untap a creature you control (or all if dungeon completed).
+                self.add_delayed_trigger(crate::types::DelayedTrigger {
+                    condition: crate::types::DelayedTriggerCondition::AtBeginningOfOpponentUpkeep {
+                        controller,
+                    },
+                    effect: TriggeredEffect::WhitePlumeAdventurerUntap,
+                    controller,
+                    fires_once: false,
+                    source_id: Some(_card_id),
+                });
             }
 
             // Seasoned Dungeoneer: take the initiative on ETB
@@ -4402,6 +4413,27 @@ impl GameState {
                 self.battlefield.push(token);
             }
 
+            TriggeredEffect::WhitePlumeAdventurerUntap => {
+                // At the beginning of each opponent's upkeep, untap a creature you control.
+                // If you've completed a dungeon (undercity_room >= 4), untap all creatures instead.
+                let dungeon_completed = self.undercity_room[controller as usize] >= 4;
+                if dungeon_completed {
+                    // Untap all creatures you control
+                    for perm in &mut self.battlefield {
+                        if perm.is_creature() && perm.controller == controller {
+                            perm.tapped = false;
+                        }
+                    }
+                } else {
+                    // Untap a single creature you control (pick the first tapped creature)
+                    if let Some(perm) = self.battlefield.iter_mut()
+                        .find(|p| p.is_creature() && p.controller == controller && p.tapped)
+                    {
+                        perm.tapped = false;
+                    }
+                }
+            }
+
             _ => {}
         }
         let _ = db; // suppress unused warning when db not used in all arms
@@ -5244,6 +5276,21 @@ impl GameState {
                     self.players[pid].graveyard.push(id);
                 }
                 let _ = found_basic;
+            }
+
+            // === Boromir, Warden of the Tower ===
+            ActivatedEffect::BoromirSacrifice => {
+                // Creatures you control gain indestructible until end of turn.
+                let creature_ids: Vec<ObjectId> = self.battlefield.iter()
+                    .filter(|p| p.is_creature() && p.controller == controller)
+                    .map(|p| p.id)
+                    .collect();
+                for cid in creature_ids {
+                    self.add_temporary_effect(TemporaryEffect::GrantKeyword {
+                        target: cid,
+                        keyword: Keyword::Indestructible,
+                    });
+                }
             }
 
             // === Sylvan Safekeeper ===

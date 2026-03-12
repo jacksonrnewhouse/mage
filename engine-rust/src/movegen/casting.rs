@@ -1935,6 +1935,22 @@ impl GameState {
                 self.reset_priority_passes();
             }
 
+            // Boromir, Warden of the Tower: Sacrifice: Creatures you control gain indestructible until end of turn. (ability_index 0)
+            CardName::BoromirWardenOfTheTower if ability_index == 0 => {
+                // Sacrifice Boromir
+                self.destroy_permanent(permanent_id);
+                self.stack.push(
+                    StackItemKind::ActivatedAbility {
+                        source_id: permanent_id,
+                        source_name: card_name,
+                        effect: ActivatedEffect::BoromirSacrifice,
+                    },
+                    controller,
+                    vec![],
+                );
+                self.reset_priority_passes();
+            }
+
             _ => {}
         }
     }

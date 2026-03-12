@@ -1166,6 +1166,9 @@ impl GameState {
                     DelayedTriggerCondition::AtBeginningOfCombat { player } => {
                         phase == Phase::Combat && step == Some(Step::BeginCombat) && active == player
                     }
+                    DelayedTriggerCondition::AtBeginningOfOpponentUpkeep { controller } => {
+                        phase == Phase::Beginning && step == Some(Step::Upkeep) && active != controller
+                    }
                 }
             })
             .map(|(i, _)| i)

@@ -1521,7 +1521,7 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Flying. Each player can't cast more than one spell each turn. Nonbasic lands enter tapped.");
     card!(CT(&[CreatureType::Human, CreatureType::Soldier]) BoromirWardenOfTheTower, "Boromir, Warden of the Tower", ManaCost { white: 1, generic: 2, ..c }, &[Creature], &[Legendary],
         Some(3), Some(3), None, vigilance(), &[White],
-        "Vigilance. Whenever an opponent casts a spell, if no mana was spent to cast it, counter that spell. Sacrifice Boromir: Creatures you control gain indestructible until end of turn. Activate as a sorcery.");
+        "Vigilance. Whenever an opponent casts a spell, if no mana was spent to cast it, counter that spell. Sacrifice Boromir: Creatures you control gain indestructible until end of turn. The Ring tempts you.");
     card!(CT(&[CreatureType::Human, CreatureType::Knight]) ClarionConqueror, "Clarion Conqueror", ManaCost { white: 2, generic: 2, ..c }, &[Creature], &[],
         Some(3), Some(3), None, kw(), &[White],
         "Whenever an opponent casts a spell during your turn, create a 1/1 white Soldier creature token.");
@@ -1530,7 +1530,7 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Vigilance. When Loran enters, destroy target artifact or enchantment an opponent controls. {T}: You and target opponent each draw a card.");
     card!(CT(&[CreatureType::Human, CreatureType::Knight]) WhitePlumeAdventurer, "White Plume Adventurer", ManaCost { white: 1, generic: 2, ..c }, &[Creature], &[],
         Some(3), Some(3), None, kw(), &[White],
-        "When White Plume Adventurer enters, you take the initiative. At the beginning of each opponent's upkeep, untap all creatures you control if you've completed a dungeon.");
+        "When White Plume Adventurer enters, you take the initiative. At the beginning of each opponent's upkeep, untap a creature you control. If you've completed a dungeon, untap all creatures you control instead.");
     card!(CT(&[CreatureType::Human, CreatureType::Warrior]) SeasonedDungeoneer, "Seasoned Dungeoneer", ManaCost { white: 1, generic: 3, ..c }, &[Creature], &[],
         Some(3), Some(4), None, kw(), &[White],
         "Ward—Discard a card. When Seasoned Dungeoneer enters, you take the initiative. Whenever Seasoned Dungeoneer attacks, target creature you control explores. It gains protection from creatures until end of turn.");

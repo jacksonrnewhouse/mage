@@ -230,6 +230,9 @@ pub enum TriggeredEffect {
     /// Clarion Conqueror: whenever an opponent casts a spell during your turn,
     /// create a 1/1 white Soldier creature token.
     ClarionConquerorOpponentCast,
+    /// White Plume Adventurer: at the beginning of each opponent's upkeep, untap a creature
+    /// you control. If you've completed a dungeon, untap all creatures you control instead.
+    WhitePlumeAdventurerUntap,
 }
 
 /// Activated ability effects.
@@ -377,6 +380,8 @@ pub enum ActivatedEffect {
     EmperorOfBonesAdapt { emperor_id: ObjectId },
     /// Mystic Forge: {T}, Pay 1 life: Exile the top card of your library.
     MysticForgeExile,
+    /// Boromir, Warden of the Tower: Sacrifice — creatures you control gain indestructible until end of turn.
+    BoromirSacrifice,
 }
 
 /// The game stack.
