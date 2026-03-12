@@ -441,6 +441,7 @@ impl GameState {
                                     vec![],
                                 );
                                 self.players[owner as usize].spells_cast_this_turn += 1;
+                                self.players[owner as usize].spells_cast_this_game += 1;
                                 if let Some(def) = self.card_name_for_id(card_id)
                                     .and_then(|cn| crate::card::find_card(db, cn))
                                 {

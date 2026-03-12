@@ -281,6 +281,7 @@ impl GameState {
                             // Eidolon of the Great Revel: deal 2 to caster if MV <= 3.
                             self.check_eidolon_trigger(player_id, def.mana_cost.cmc());
                             self.players[player_id as usize].spells_cast_this_turn += 1;
+                            self.players[player_id as usize].spells_cast_this_game += 1;
                             if !def.card_types.contains(&CardType::Artifact) {
                                 self.players[player_id as usize].nonartifact_spells_cast_this_turn += 1;
                             }
@@ -555,6 +556,7 @@ impl GameState {
                             }
                             self.check_eidolon_trigger(player_id, adv.cost.cmc());
                             self.players[player_id as usize].spells_cast_this_turn += 1;
+                            self.players[player_id as usize].spells_cast_this_game += 1;
                             self.players[player_id as usize].nonartifact_spells_cast_this_turn += 1;
                             self.players[player_id as usize].noncreature_spells_cast_this_turn += 1;
                             self.storm_count += 1;
@@ -600,6 +602,7 @@ impl GameState {
                         self.check_chalice_trigger(spell_id, def.mana_cost.cmc());
                         self.check_eidolon_trigger(player_id, def.mana_cost.cmc());
                         self.players[player_id as usize].spells_cast_this_turn += 1;
+                        self.players[player_id as usize].spells_cast_this_game += 1;
                         if !def.card_types.contains(&CardType::Artifact) {
                             self.players[player_id as usize].nonartifact_spells_cast_this_turn += 1;
                         }
@@ -2137,6 +2140,10 @@ impl GameState {
                 self.players[player_id as usize].remove_from_hand(*exile_id);
                 let exile_name = self.card_name_for_id(*exile_id).unwrap_or(CardName::Plains);
                 self.exile.push((*exile_id, exile_name, player_id));
+                true
+            }
+            AltCost::OnceUponATime => {
+                // Free cast — no cost to pay.
                 true
             }
         }

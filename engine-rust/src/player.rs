@@ -46,6 +46,8 @@ pub struct Player {
     /// Veil of Summer: your spells can't be countered this turn;
     /// you and permanents you control gain hexproof from blue and from black until end of turn.
     pub veil_of_summer_active: bool,
+    /// Total number of spells cast this game (for Once Upon a Time free cast check).
+    pub spells_cast_this_game: u16,
 }
 
 impl Player {
@@ -74,6 +76,7 @@ impl Player {
             companion: None,
             necropotence_active: false,
             veil_of_summer_active: false,
+            spells_cast_this_game: 0,
         }
     }
 

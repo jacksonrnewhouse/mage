@@ -4633,6 +4633,7 @@ impl GameState {
                                 vec![],
                             );
                             self.players[controller as usize].spells_cast_this_turn += 1;
+                            self.players[controller as usize].spells_cast_this_game += 1;
                             self.reset_priority_passes();
                         }
                     }

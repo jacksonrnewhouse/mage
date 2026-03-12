@@ -36,6 +36,8 @@ pub enum AltCost {
     /// Force of Vigor: exile a green card from hand (not your turn only).
     /// `exile_id` is the ObjectId of the green card being exiled from hand.
     ForceOfVigor { exile_id: ObjectId },
+    /// Once Upon a Time: free cast if it's the first spell you've cast this game.
+    OnceUponATime,
 }
 
 /// A game action that can be taken by the active/priority player.

@@ -3258,6 +3258,22 @@ impl GameState {
                     }
                 }
 
+                // --- Once Upon a Time: free if first spell of the game ---
+                CardName::OnceUponATime => {
+                    if player.spells_cast_this_game == 0 {
+                        // No targets needed for Once Upon a Time
+                        actions.push(Action::CastSpell {
+                            card_id,
+                            targets: vec![],
+                            x_value: 0,
+                            from_graveyard: false,
+                            from_library_top: false,
+                            alt_cost: Some(AltCost::OnceUponATime),
+                            modes: vec![],
+                        });
+                    }
+                }
+
                 _ => {}
             }
         }
