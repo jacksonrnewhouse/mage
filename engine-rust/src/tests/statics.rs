@@ -304,3 +304,74 @@ fn test_stony_silence_prevents_artifact_abilities() {
     let can_tap_ring = actions.iter().any(|a| matches!(a, Action::ActivateManaAbility { permanent_id, .. } if *permanent_id == ring_id));
     assert!(!can_tap_ring, "Stony Silence should prevent Sol Ring activation");
 }
+
+#[test]
+fn test_manglehorn_opponents_artifacts_enter_tapped() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // P0 controls Manglehorn
+    let manglehorn_id = state.new_object_id();
+    state.card_registry.push((manglehorn_id, CardName::Manglehorn));
+    let def = find_card(&db, CardName::Manglehorn).unwrap();
+    let mut perm = crate::permanent::Permanent::new(
+        manglehorn_id, CardName::Manglehorn, 0, 0,
+        def.power, def.toughness, None, def.keywords, def.card_types,
+    );
+    perm.entered_this_turn = false;
+    state.battlefield.push(perm);
+
+    // P1 (opponent) puts an artifact onto the battlefield
+    let ring_id = state.new_object_id();
+    state.card_registry.push((ring_id, CardName::SolRing));
+    let def2 = find_card(&db, CardName::SolRing).unwrap();
+    let perm2 = crate::permanent::Permanent::new(
+        ring_id, CardName::SolRing, 1, 1,
+        def2.power, def2.toughness, None, def2.keywords, def2.card_types,
+    );
+    state.battlefield.push(perm2);
+    state.apply_enters_tapped_statics(ring_id, 1);
+
+    // The opponent's artifact should enter tapped due to Manglehorn
+    let sol_ring = state.battlefield.iter().find(|p| p.id == ring_id).unwrap();
+    assert!(sol_ring.tapped, "Opponent's artifact should enter tapped with Manglehorn on the battlefield");
+
+    // P0's own artifacts should NOT enter tapped
+    let own_ring_id = state.new_object_id();
+    state.card_registry.push((own_ring_id, CardName::SolRing));
+    let perm3 = crate::permanent::Permanent::new(
+        own_ring_id, CardName::SolRing, 0, 0,
+        def2.power, def2.toughness, None, def2.keywords, def2.card_types,
+    );
+    state.battlefield.push(perm3);
+    state.apply_enters_tapped_statics(own_ring_id, 0);
+    let own_ring = state.battlefield.iter().find(|p| p.id == own_ring_id).unwrap();
+    assert!(!own_ring.tapped, "Controller's own artifacts should NOT enter tapped with Manglehorn");
+}
+
+#[test]
+fn test_manglehorn_treasure_tokens_enter_tapped() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // P0 controls Manglehorn
+    let manglehorn_id = state.new_object_id();
+    state.card_registry.push((manglehorn_id, CardName::Manglehorn));
+    let def = find_card(&db, CardName::Manglehorn).unwrap();
+    let mut perm = crate::permanent::Permanent::new(
+        manglehorn_id, CardName::Manglehorn, 0, 0,
+        def.power, def.toughness, None, def.keywords, def.card_types,
+    );
+    perm.entered_this_turn = false;
+    state.battlefield.push(perm);
+
+    // P1 (opponent) creates a Treasure token — it should enter tapped
+    let treasure_id = state.create_treasure_token(1);
+    let treasure = state.battlefield.iter().find(|p| p.id == treasure_id).unwrap();
+    assert!(treasure.tapped, "Opponent's Treasure token should enter tapped with Manglehorn");
+
+    // P0's own Treasure token should NOT enter tapped
+    let own_treasure_id = state.create_treasure_token(0);
+    let own_treasure = state.battlefield.iter().find(|p| p.id == own_treasure_id).unwrap();
+    assert!(!own_treasure.tapped, "Controller's own Treasure should NOT enter tapped with Manglehorn");
+}

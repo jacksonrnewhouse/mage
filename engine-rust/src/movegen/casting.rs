@@ -41,6 +41,7 @@ impl GameState {
                             );
                             perm.colors = def.color_identity.to_vec();
                             self.battlefield.push(perm);
+                            self.apply_enters_tapped_statics(*card_id, player_id);
                             self.handle_etb(cn, *card_id, player_id);
                         }
                     }
@@ -74,6 +75,7 @@ impl GameState {
                             );
                             perm.colors = def.color_identity.to_vec();
                             self.battlefield.push(perm);
+                            self.apply_enters_tapped_statics(*card_id, player_id);
                             self.handle_etb(cn, *card_id, player_id);
                         }
                     }

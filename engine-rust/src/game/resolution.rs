@@ -82,6 +82,8 @@ impl GameState {
                 // Store color identity for protection checks
                 perm.colors = def.color_identity.to_vec();
                 self.battlefield.push(perm);
+                // Apply static abilities that cause permanents to enter tapped
+                self.apply_enters_tapped_statics(card_id, controller);
                 // ETB triggers
                 self.handle_etb_with_x(card_name, card_id, controller, x_value);
                 // Handle ETB effects that need the cast targets (e.g. Snapcaster Mage)

@@ -1457,7 +1457,28 @@ impl GameState {
         );
         token.is_token = true;
         self.battlefield.push(token);
+        self.apply_enters_tapped_statics(token_id, controller);
         token_id
+    }
+
+    /// Check static abilities that cause permanents to enter the battlefield tapped
+    /// and apply them to the permanent that just entered.
+    pub fn apply_enters_tapped_statics(&mut self, permanent_id: ObjectId, controller: PlayerId) {
+        // Manglehorn: "Artifacts your opponents control enter tapped."
+        let is_artifact = self.battlefield.iter()
+            .find(|p| p.id == permanent_id)
+            .map(|p| p.is_artifact())
+            .unwrap_or(false);
+
+        if is_artifact {
+            let opponent_has_manglehorn = self.battlefield.iter()
+                .any(|p| p.card_name == CardName::Manglehorn && p.controller != controller);
+            if opponent_has_manglehorn {
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.tapped = true;
+                }
+            }
+        }
     }
 }
 
