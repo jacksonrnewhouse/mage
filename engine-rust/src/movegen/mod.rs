@@ -3024,6 +3024,29 @@ impl GameState {
                     }
                 }
 
+                // PhyrexianMetamorph {3}{U/P}: can pay 2 life instead of {U}
+                // Normal cost when paying life: {3}
+                CardName::PhyrexianMetamorph => {
+                    if !sorcery_speed {
+                        continue;
+                    }
+                    if player.life > 2 {
+                        let normal_cost = ManaCost { generic: 3, ..ManaCost::ZERO };
+                        if player.mana_pool.can_pay(&normal_cost) {
+                            let alt = AltCost::PhyrexianMana { life_paid: 2, normal_cost };
+                            actions.push(Action::CastSpell {
+                                card_id,
+                                targets: vec![],
+                                x_value: 0,
+                                from_graveyard: false,
+                from_library_top: false,
+                                alt_cost: Some(alt),
+                                modes: vec![],
+                            });
+                        }
+                    }
+                }
+
                 // Dismember {1}{B/P}{B/P}: each B/P can be paid with 2 life each
                 // Normal cost (stored as all-mana): {1}{B}{B}
                 // Phyrexian options:
