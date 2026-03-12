@@ -1670,7 +1670,7 @@ impl GameState {
         &self,
         perm: &crate::permanent::Permanent,
         sorcery_speed: bool,
-        _db: &[CardDef],
+        db: &[CardDef],
     ) -> Vec<(u8, Vec<Target>)> {
         let mut abilities = Vec::new();
 
@@ -2008,7 +2008,11 @@ impl GameState {
                     // -1: Exile nonland permanent MV 1 or less
                     if perm.loyalty >= 1 {
                         for target in &self.battlefield {
-                            if !target.is_land() {
+                            if !target.is_land()
+                                && find_card(db, target.card_name)
+                                    .map(|d| d.mana_cost.cmc() <= 1)
+                                    .unwrap_or(false)
+                            {
                                 abilities.push((1, vec![Target::Object(target.id)]));
                             }
                         }
