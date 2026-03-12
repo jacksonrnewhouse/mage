@@ -1212,9 +1212,10 @@ impl GameState {
 
             // Lands producing colorless
             CardName::CityOfTraitors | CardName::GhostQuarter
-            | CardName::TheMycoSynthGardens
             | CardName::UrzasSaga => vec![None],
 
+            // The Mycosynth Gardens: {T}: {C}, or {1}{T}: any color
+            CardName::TheMycoSynthGardens |
             // Talon Gates of Madara: {T}: {C}, or {1}{T}: any color
             CardName::TalonGatesOfMadara => {
                 // Colored mana requires {1} generic to activate
@@ -1639,7 +1640,7 @@ impl GameState {
             // Strip Mine / Wasteland / other colorless-producing lands: {T} for {C}
             CardName::StripMine | CardName::Wasteland | CardName::LibraryOfAlexandria
             | CardName::GhostQuarter
-            | CardName::TheMycoSynthGardens | CardName::UrzasSaga => {
+            | CardName::UrzasSaga => {
                 if let Some(perm) = self.find_permanent_mut(permanent_id) {
                     perm.tapped = true;
                 }
@@ -1647,6 +1648,8 @@ impl GameState {
                 true
             }
 
+            // The Mycosynth Gardens: {T}: {C}, or {1}{T}: any color
+            CardName::TheMycoSynthGardens |
             // Talon Gates of Madara: {T}: {C}, or {1}{T}: any color
             CardName::TalonGatesOfMadara => {
                 if let Some(perm) = self.find_permanent_mut(permanent_id) {
