@@ -1,4 +1,4 @@
-/// Tests for replacement effects: Rest in Peace, Grafdigger's Cage, Containment Priest.
+/// Tests for replacement effects: Rest in Peace, Grafdigger's Cage, Containment Priest, Dryad Militant.
 
 use crate::card::*;
 use crate::game::*;
@@ -297,4 +297,101 @@ fn test_rest_in_peace_graveyard_destination() {
         DestinationZone::Exile,
         "Rest in Peace applies to all players"
     );
+}
+
+// ===== Dryad Militant =====
+
+#[test]
+fn test_dryad_militant_active() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    assert!(!state.dryad_militant_active(), "No Dryad Militant on battlefield");
+
+    place_on_battlefield(&mut state, CardName::DryadMilitant, 0, &db);
+    assert!(state.dryad_militant_active(), "Dryad Militant on battlefield");
+}
+
+#[test]
+fn test_dryad_militant_exiles_instant() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // Place Dryad Militant on battlefield
+    place_on_battlefield(&mut state, CardName::DryadMilitant, 0, &db);
+
+    // Send an instant (Lightning Bolt) to graveyard — should be exiled instead
+    let bolt_id = state.new_object_id();
+    state.card_registry.push((bolt_id, CardName::LightningBolt));
+    let dest = state.send_to_graveyard(bolt_id, CardName::LightningBolt, 0);
+
+    assert_eq!(dest, DestinationZone::Exile, "Instant should be exiled with Dryad Militant");
+    assert!(state.players[0].graveyard.is_empty(), "Graveyard should be empty");
+    assert!(state.exile.iter().any(|(id, _, _)| *id == bolt_id), "Bolt should be in exile");
+}
+
+#[test]
+fn test_dryad_militant_exiles_sorcery() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // Place Dryad Militant on battlefield
+    place_on_battlefield(&mut state, CardName::DryadMilitant, 0, &db);
+
+    // Send a sorcery (Demonic Tutor) to graveyard — should be exiled instead
+    let tutor_id = state.new_object_id();
+    state.card_registry.push((tutor_id, CardName::DemonicTutor));
+    let dest = state.send_to_graveyard(tutor_id, CardName::DemonicTutor, 0);
+
+    assert_eq!(dest, DestinationZone::Exile, "Sorcery should be exiled with Dryad Militant");
+    assert!(state.players[0].graveyard.is_empty(), "Graveyard should be empty");
+    assert!(state.exile.iter().any(|(id, _, _)| *id == tutor_id), "Tutor should be in exile");
+}
+
+#[test]
+fn test_dryad_militant_allows_non_instant_sorcery() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // Place Dryad Militant on battlefield
+    place_on_battlefield(&mut state, CardName::DryadMilitant, 0, &db);
+
+    // Send a creature card to graveyard — should NOT be exiled
+    let creature_id = state.new_object_id();
+    state.card_registry.push((creature_id, CardName::Tarmogoyf));
+    let dest = state.send_to_graveyard(creature_id, CardName::Tarmogoyf, 0);
+
+    assert_eq!(dest, DestinationZone::Graveyard, "Creature should go to graveyard normally");
+    assert_eq!(state.players[0].graveyard.len(), 1, "Graveyard should have the creature");
+    assert!(state.exile.is_empty(), "Exile should be empty");
+}
+
+#[test]
+fn test_dryad_militant_applies_to_opponent() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // Player 0 controls Dryad Militant — it should exile opponent's instants/sorceries too
+    place_on_battlefield(&mut state, CardName::DryadMilitant, 0, &db);
+
+    let bolt_id = state.new_object_id();
+    state.card_registry.push((bolt_id, CardName::LightningBolt));
+    let dest = state.send_to_graveyard(bolt_id, CardName::LightningBolt, 1);
+
+    assert_eq!(dest, DestinationZone::Exile, "Opponent's instant should be exiled too");
+    assert!(state.players[1].graveyard.is_empty(), "Opponent's graveyard should be empty");
+}
+
+#[test]
+fn test_dryad_militant_without_militant_allows_instants() {
+    let _db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // No Dryad Militant — instant should go to graveyard normally
+    let bolt_id = state.new_object_id();
+    state.card_registry.push((bolt_id, CardName::LightningBolt));
+    let dest = state.send_to_graveyard(bolt_id, CardName::LightningBolt, 0);
+
+    assert_eq!(dest, DestinationZone::Graveyard, "Without Militant, instant goes to graveyard");
+    assert_eq!(state.players[0].graveyard.len(), 1, "Graveyard should have the bolt");
 }

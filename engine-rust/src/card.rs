@@ -2437,6 +2437,27 @@ pub fn is_land_card(name: CardName) -> bool {
     )
 }
 
+/// Returns true if the given CardName is an instant or sorcery card.
+/// Uses a lazily-initialized lookup table built from the card database for O(1) checks.
+pub fn is_instant_or_sorcery(name: CardName) -> bool {
+    use std::sync::OnceLock;
+    static LOOKUP: OnceLock<Vec<bool>> = OnceLock::new();
+    let table = LOOKUP.get_or_init(|| {
+        let db = build_card_db();
+        let mut flags = vec![false; CardName::_Count as usize];
+        for card in &db {
+            if card.card_types.contains(&CardType::Instant)
+                || card.card_types.contains(&CardType::Sorcery)
+            {
+                flags[card.name as usize] = true;
+            }
+        }
+        flags
+    });
+    let idx = name as usize;
+    idx < table.len() && table[idx]
+}
+
 /// Returns true if the given CardName is a basic land (Plains, Island, Swamp, Mountain, Forest).
 pub fn is_basic_land_card(name: CardName) -> bool {
     matches!(name,

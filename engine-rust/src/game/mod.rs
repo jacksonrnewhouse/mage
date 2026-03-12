@@ -878,6 +878,15 @@ impl GameState {
         DestinationZone::Graveyard
     }
 
+    /// Check whether Dryad Militant is on the battlefield.
+    /// When true, instant and sorcery cards that would be put into a graveyard
+    /// are exiled instead.
+    pub fn dryad_militant_active(&self) -> bool {
+        self.battlefield
+            .iter()
+            .any(|p| p.card_name == CardName::DryadMilitant)
+    }
+
     /// Check whether Grafdigger's Cage is on the battlefield.
     /// When true, creature cards from graveyards and libraries can't enter the battlefield,
     /// and players can't cast spells from graveyards or libraries.
@@ -897,8 +906,15 @@ impl GameState {
 
     /// Send a card (by id and name) from any zone directly to the graveyard,
     /// applying graveyard-replacement effects (Rest in Peace → exile instead).
+    /// Also applies Dryad Militant: if on the battlefield, instant/sorcery cards
+    /// are exiled instead of going to any graveyard.
     /// Returns the actual destination zone used.
     pub fn send_to_graveyard(&mut self, card_id: ObjectId, card_name: CardName, owner: PlayerId) -> DestinationZone {
+        // Dryad Militant: instant/sorcery cards are exiled instead of going to graveyard.
+        if self.dryad_militant_active() && crate::card::is_instant_or_sorcery(card_name) {
+            self.exile.push((card_id, card_name, owner));
+            return DestinationZone::Exile;
+        }
         let dest = self.graveyard_destination(owner);
         match dest {
             DestinationZone::Graveyard => {
