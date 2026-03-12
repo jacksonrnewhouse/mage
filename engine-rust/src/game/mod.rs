@@ -506,6 +506,7 @@ impl GameState {
                     self.exile.push((id, card_name, active as PlayerId));
                 } else {
                     self.players[active].graveyard.push(id);
+                    self.check_emrakul_graveyard_shuffle(active as PlayerId);
                 }
             }
         }
@@ -763,6 +764,7 @@ impl GameState {
             match actual_destination {
                 DestinationZone::Graveyard => {
                     self.players[owner as usize].graveyard.push(perm_id);
+                    self.check_emrakul_graveyard_shuffle(owner);
                 }
                 DestinationZone::Exile => {
                     self.exile.push((perm_id, perm_name, owner));
@@ -872,7 +874,26 @@ impl GameState {
                 self.players[owner as usize].graveyard.push(card_id);
             }
         }
+        // Check if Emrakul was just put into the graveyard
+        if dest == DestinationZone::Graveyard {
+            self.check_emrakul_graveyard_shuffle(owner);
+        }
         dest
+    }
+
+    /// When Emrakul, the Aeons Torn is put into a graveyard from anywhere,
+    /// its owner shuffles their graveyard into their library.
+    pub fn check_emrakul_graveyard_shuffle(&mut self, owner: PlayerId) {
+        let has_emrakul = self.players[owner as usize]
+            .graveyard
+            .iter()
+            .any(|&id| self.card_name_for_id(id) == Some(CardName::EmrakulTheAeonsTorn));
+        if has_emrakul {
+            let graveyard = std::mem::take(&mut self.players[owner as usize].graveyard);
+            for card_id in graveyard {
+                self.players[owner as usize].library.insert(0, card_id);
+            }
+        }
     }
 
     /// Discard a card from a player's hand to the graveyard (or exile if madness applies).

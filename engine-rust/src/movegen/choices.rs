@@ -33,6 +33,7 @@ impl GameState {
                         if let Some(pos) = self.players[pid].library.iter().position(|&id| id == card_id) {
                             self.players[pid].library.remove(pos);
                             self.players[pid].graveyard.push(card_id);
+                            self.check_emrakul_graveyard_shuffle(choice.player);
                         }
                     }
                     ChoiceReason::ThoughtseizeDiscard => {
@@ -387,6 +388,7 @@ impl GameState {
                         if n == 1 {
                             // Declined: put in graveyard.
                             self.players[owner as usize].graveyard.push(card_id);
+                            self.check_emrakul_graveyard_shuffle(owner);
                         } else {
                             // n == 0: cast for the madness cost.
                             // Attempt to pay the madness cost.
@@ -428,6 +430,7 @@ impl GameState {
                             } else {
                                 // Can't afford madness cost — put in graveyard instead.
                                 self.players[owner as usize].graveyard.push(card_id);
+                                self.check_emrakul_graveyard_shuffle(owner);
                             }
                         }
                     }

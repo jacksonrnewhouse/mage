@@ -551,6 +551,7 @@ impl GameState {
                     }
                     self.players[player_id as usize].graveyard.push(card_id);
                     self.players[player_id as usize].cards_discarded_this_turn += 1;
+                    self.check_emrakul_graveyard_shuffle(player_id);
 
                     // Push cycling effect to stack
                     let effect = match cycling_kind {
@@ -580,6 +581,7 @@ impl GameState {
                         return;
                     }
                     self.players[player_id as usize].graveyard.push(card_id);
+                    self.check_emrakul_graveyard_shuffle(player_id);
 
                     // Push channel effect to stack
                     let effect = match channel_kind {

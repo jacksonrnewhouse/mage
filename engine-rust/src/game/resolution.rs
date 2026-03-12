@@ -734,6 +734,7 @@ impl GameState {
                             self.players[pid].graveyard.push(id);
                         }
                     }
+                    self.check_emrakul_graveyard_shuffle(*target_player);
                 }
             }
 
@@ -1004,6 +1005,7 @@ impl GameState {
                             self.players[pid].graveyard.push(id);
                         }
                     }
+                    self.check_emrakul_graveyard_shuffle(pid as PlayerId);
                 }
             }
 
@@ -1404,6 +1406,7 @@ impl GameState {
                             self.players[*p as usize].graveyard.push(id);
                         }
                     }
+                    self.check_emrakul_graveyard_shuffle(*p);
                 }
                 // Storm: push storm_count copies onto the stack as individual items
                 if !is_copy {
@@ -2787,6 +2790,7 @@ impl GameState {
                     // Opponent discards a card
                     if let Some(id) = self.players[opid].hand.pop() {
                         self.players[opid].graveyard.push(id);
+                        self.check_emrakul_graveyard_shuffle(opid as PlayerId);
                     }
                     // Opponent loses 3 life
                     self.players[opid].life -= 3;
@@ -4140,6 +4144,7 @@ impl GameState {
             } else {
                 // Normal: put in owner's graveyard
                 self.players[item.controller as usize].graveyard.push(card_id);
+                self.check_emrakul_graveyard_shuffle(item.controller);
             }
         }
         // Triggered/activated abilities on the stack have no card to route
