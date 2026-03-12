@@ -431,6 +431,15 @@ impl GameState {
                     self.deal_damage_to_target(*target, damage, controller);
                 }
             }
+            // Shatterskull Smashing: deals X damage divided among up to two targets.
+            // If X is 6 or more, deals twice X damage instead.
+            // Simplified: deal all damage to a single target.
+            CardName::ShatterskullSmashing => {
+                if let Some(target) = targets.first() {
+                    let damage = if x_value >= 6 { (x_value as u16) * 2 } else { x_value as u16 };
+                    self.deal_damage_to_target(*target, damage, controller);
+                }
+            }
 
             // === Removal ===
             CardName::SwordsToPlowshares => {
