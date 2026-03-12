@@ -1483,7 +1483,7 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(CT(&[CreatureType::Cat, CreatureType::Artificer]) DauntlessDismantler, "Dauntless Dismantler", ManaCost { white: 1, generic: 1, ..c }, &[Creature], &[],
         Some(1), Some(1), None, kw(), &[White],
         "{X}, {T}, Sacrifice Dauntless Dismantler: Destroy each artifact with mana value X or less.");
-    card!(CT(&[CreatureType::Zombie]) DoorkeeperThrull, "Doorkeeper Thrull", ManaCost { white: 1, generic: 1, ..c }, &[Creature], &[],
+    card!(CT(&[CreatureType::Thrull]) DoorkeeperThrull, "Doorkeeper Thrull", ManaCost { white: 1, generic: 1, ..c }, &[Creature], &[],
         Some(1), Some(3), None, flash(), &[White],
         "Flash. When Doorkeeper Thrull enters, exile target artifact or enchantment an opponent controls until Doorkeeper Thrull leaves the battlefield.");
     card!(CT(&[CreatureType::Human, CreatureType::Wizard]) DrannithMagistrate, "Drannith Magistrate", ManaCost { white: 1, generic: 1, ..c }, &[Creature], &[],
