@@ -1758,7 +1758,7 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Play with the top card of your library revealed. You may play the top card of your library.");
 
     // === Black Creatures ===
-    card!(Nethergoyf, "Nethergoyf", ManaCost::b(1), &[Creature], &[],
+    card!(Nethergoyf, "Nethergoyf", ManaCost { black: 1, generic: 1, ..c }, &[Creature], &[],
         Some(0), None, None, kw(), &[Black],
         "Nethergoyf's power is equal to the number of card types among cards in your graveyard and its toughness is equal to that number plus 1. Escape - {2}{B}, exile any number of other cards from your graveyard with four or more card types among them.");
     card!(DauthiVoidwalker, "Dauthi Voidwalker", ManaCost { black: 2, ..c }, &[Creature], &[],
