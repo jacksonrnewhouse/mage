@@ -2255,6 +2255,53 @@ impl GameState {
             abilities.push((21, vec![]));
         }
 
+        // --- Haywire Mite: {G}, Sacrifice: Exile target noncreature artifact or noncreature enchantment ---
+        if perm.card_name == CardName::HaywireMite {
+            let player = &self.players[perm.controller as usize];
+            if player.mana_pool.green >= 1 {
+                for target in &self.battlefield {
+                    if (target.is_artifact() || target.is_enchantment()) && !target.is_creature() {
+                        abilities.push((0, vec![Target::Object(target.id)]));
+                    }
+                }
+            }
+        }
+
+        // --- Outland Liberator: {1}, Sacrifice: Destroy target artifact or enchantment ---
+        if perm.card_name == CardName::OutlandLiberator {
+            let player = &self.players[perm.controller as usize];
+            if player.mana_pool.total() >= 1 {
+                for target in &self.battlefield {
+                    if target.is_artifact() || target.is_enchantment() {
+                        abilities.push((0, vec![Target::Object(target.id)]));
+                    }
+                }
+            }
+        }
+
+        // --- Hermit Druid: {G}, {T}: Reveal until basic land ---
+        if perm.card_name == CardName::HermitDruid && !perm.tapped && !perm.entered_this_turn {
+            let player = &self.players[perm.controller as usize];
+            if player.mana_pool.green >= 1 && !player.library.is_empty() {
+                abilities.push((0, vec![]));
+            }
+        }
+
+        // --- Sylvan Safekeeper: Sacrifice a land: Target creature you control gains shroud until end of turn ---
+        if perm.card_name == CardName::SylvanSafekeeper {
+            // Check if there's a land to sacrifice (any land you control other than Safekeeper itself)
+            let has_land = self.battlefield.iter().any(|p| {
+                p.is_land() && p.controller == perm.controller
+            });
+            if has_land {
+                for target in &self.battlefield {
+                    if target.is_creature() && target.controller == perm.controller {
+                        abilities.push((0, vec![Target::Object(target.id)]));
+                    }
+                }
+            }
+        }
+
         abilities
     }
 

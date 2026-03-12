@@ -1721,6 +1721,86 @@ impl GameState {
                 self.reset_priority_passes();
             }
 
+            // Haywire Mite: {G}, Sacrifice: Exile target noncreature artifact or noncreature enchantment. (ability_index 0)
+            CardName::HaywireMite if ability_index == 0 => {
+                let cost = crate::mana::ManaCost::g(1);
+                if !self.players[controller as usize].mana_pool.pay(&cost) {
+                    return;
+                }
+                self.destroy_permanent(permanent_id);
+                self.stack.push(
+                    StackItemKind::ActivatedAbility {
+                        source_id: permanent_id,
+                        source_name: card_name,
+                        effect: ActivatedEffect::HaywireMiteExile,
+                    },
+                    controller,
+                    targets.to_vec(),
+                );
+                self.reset_priority_passes();
+            }
+
+            // Outland Liberator: {1}, Sacrifice: Destroy target artifact or enchantment. (ability_index 0)
+            CardName::OutlandLiberator if ability_index == 0 => {
+                let cost = crate::mana::ManaCost::generic(1);
+                if !self.players[controller as usize].mana_pool.pay(&cost) {
+                    return;
+                }
+                self.destroy_permanent(permanent_id);
+                self.stack.push(
+                    StackItemKind::ActivatedAbility {
+                        source_id: permanent_id,
+                        source_name: card_name,
+                        effect: ActivatedEffect::OutlandLiberatorDestroy,
+                    },
+                    controller,
+                    targets.to_vec(),
+                );
+                self.reset_priority_passes();
+            }
+
+            // Hermit Druid: {G}, {T}: Reveal cards from top until basic land. (ability_index 0)
+            CardName::HermitDruid if ability_index == 0 => {
+                let cost = crate::mana::ManaCost::g(1);
+                if !self.players[controller as usize].mana_pool.pay(&cost) {
+                    return;
+                }
+                if let Some(perm_mut) = self.find_permanent_mut(permanent_id) {
+                    perm_mut.tapped = true;
+                }
+                self.stack.push(
+                    StackItemKind::ActivatedAbility {
+                        source_id: permanent_id,
+                        source_name: card_name,
+                        effect: ActivatedEffect::HermitDruidReveal,
+                    },
+                    controller,
+                    vec![],
+                );
+                self.reset_priority_passes();
+            }
+
+            // Sylvan Safekeeper: Sacrifice a land: Target creature you control gains shroud until end of turn. (ability_index 0)
+            CardName::SylvanSafekeeper if ability_index == 0 => {
+                // Find a land to sacrifice (any land the controller controls)
+                let land_to_sac = self.battlefield.iter()
+                    .find(|p| p.is_land() && p.controller == controller)
+                    .map(|p| p.id);
+                if let Some(land_id) = land_to_sac {
+                    self.destroy_permanent(land_id);
+                    self.stack.push(
+                        StackItemKind::ActivatedAbility {
+                            source_id: permanent_id,
+                            source_name: card_name,
+                            effect: ActivatedEffect::SylvanSafekeeperShroud,
+                        },
+                        controller,
+                        targets.to_vec(),
+                    );
+                    self.reset_priority_passes();
+                }
+            }
+
             // Engineered Explosives: {2}, Sacrifice: Destroy each nonland permanent with MV equal to charge counters (ability_index 0)
             CardName::EngineeredExplosives if ability_index == 0 => {
                 let cost = crate::mana::ManaCost::generic(2);

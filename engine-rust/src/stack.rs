@@ -202,6 +202,10 @@ pub enum TriggeredEffect {
     GolosETB,
     /// Soul-Guide Lantern ETB: exile target card from a graveyard.
     SoulGuideLanternETB,
+    /// Satyr Wayfinder ETB: reveal top 4, may put a land into hand, rest to graveyard.
+    SatyrWayfinderETB,
+    /// Haywire Mite dies: gain 2 life.
+    HaywireMiteDeath,
 }
 
 /// Activated ability effects.
@@ -337,6 +341,14 @@ pub enum ActivatedEffect {
     SoulGuideLanternDraw,
     /// Manifold Key: {3}, {T}: Target creature can't be blocked this turn.
     ManifoldKeyUnblockable,
+    /// Haywire Mite: {G}, Sacrifice: Exile target noncreature artifact or noncreature enchantment.
+    HaywireMiteExile,
+    /// Outland Liberator: {1}, Sacrifice: Destroy target artifact or enchantment.
+    OutlandLiberatorDestroy,
+    /// Hermit Druid: {G}, {T}: Reveal cards until basic land, put it in hand, rest to graveyard.
+    HermitDruidReveal,
+    /// Sylvan Safekeeper: Sacrifice a land: Target creature you control gains shroud until end of turn.
+    SylvanSafekeeperShroud,
 }
 
 /// The game stack.

@@ -2434,6 +2434,13 @@ pub fn is_land_card(name: CardName) -> bool {
     )
 }
 
+/// Returns true if the given CardName is a basic land (Plains, Island, Swamp, Mountain, Forest).
+pub fn is_basic_land_card(name: CardName) -> bool {
+    matches!(name,
+        CardName::Plains | CardName::Island | CardName::Swamp | CardName::Mountain | CardName::Forest
+    )
+}
+
 /// Lookup a card definition by name. O(n) scan but only used during setup.
 pub fn find_card(db: &[CardDef], name: CardName) -> Option<&CardDef> {
     db.iter().find(|c| c.name == name)

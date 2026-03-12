@@ -74,6 +74,18 @@ impl GameState {
                     vec![],
                 );
             }
+            CardName::HaywireMite => {
+                // When Haywire Mite dies, you gain 2 life.
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: died_id,
+                        source_name: died_name,
+                        effect: TriggeredEffect::HaywireMiteDeath,
+                    },
+                    controller,
+                    vec![],
+                );
+            }
             _ => {}
         }
 

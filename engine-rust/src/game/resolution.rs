@@ -2117,6 +2117,18 @@ impl GameState {
                     );
                 }
             }
+            // Satyr Wayfinder: ETB reveal top 4, may put a land into hand, rest to graveyard.
+            CardName::SatyrWayfinder => {
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: _card_id,
+                        source_name: card_name,
+                        effect: TriggeredEffect::SatyrWayfinderETB,
+                    },
+                    controller,
+                    vec![],
+                );
+            }
             // Coveted Jewel: draw 3 cards on ETB
             CardName::CovetedJewel => {
                 self.stack.push(
@@ -3829,6 +3841,43 @@ impl GameState {
                 }
             }
 
+            TriggeredEffect::SatyrWayfinderETB => {
+                // Satyr Wayfinder: reveal top 4 cards. May put a land into hand. Rest to graveyard.
+                let pid = controller as usize;
+                let lib_len = self.players[pid].library.len();
+                let reveal_count = lib_len.min(4);
+                let mut revealed: Vec<ObjectId> = Vec::with_capacity(reveal_count);
+                for _ in 0..reveal_count {
+                    if let Some(id) = self.players[pid].library.pop() {
+                        revealed.push(id);
+                    }
+                }
+                // Find first land among revealed cards and put it into hand
+                let mut land_found = false;
+                let mut remaining = Vec::with_capacity(reveal_count);
+                for &id in &revealed {
+                    if !land_found {
+                        if let Some(cn) = self.card_name_for_id(id) {
+                            if crate::card::is_land_card(cn) {
+                                self.players[pid].hand.push(id);
+                                land_found = true;
+                                continue;
+                            }
+                        }
+                    }
+                    remaining.push(id);
+                }
+                // Put the rest into graveyard
+                for id in remaining {
+                    self.players[pid].graveyard.push(id);
+                }
+            }
+
+            TriggeredEffect::HaywireMiteDeath => {
+                // Haywire Mite dies: gain 2 life.
+                self.players[controller as usize].life += 2;
+            }
+
             _ => {}
         }
         let _ = db; // suppress unused warning when db not used in all arms
@@ -4597,6 +4646,54 @@ impl GameState {
                     if let Some(perm) = self.find_permanent_mut(*target_id) {
                         perm.keywords.add(Keyword::CantBeBlocked);
                     }
+                }
+            }
+
+            // === Haywire Mite ===
+            ActivatedEffect::HaywireMiteExile => {
+                // Exile target noncreature artifact or noncreature enchantment.
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    self.remove_permanent_to_zone(*target_id, DestinationZone::Exile);
+                }
+            }
+
+            // === Outland Liberator ===
+            ActivatedEffect::OutlandLiberatorDestroy => {
+                // Destroy target artifact or enchantment.
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    self.destroy_permanent(*target_id);
+                }
+            }
+
+            // === Hermit Druid ===
+            ActivatedEffect::HermitDruidReveal => {
+                // Reveal cards from top of library until a basic land is revealed.
+                // Put that land into hand, all other revealed cards into graveyard.
+                let pid = controller as usize;
+                let mut found_basic = false;
+                while let Some(id) = self.players[pid].library.pop() {
+                    if let Some(cn) = self.card_name_for_id(id) {
+                        if crate::card::is_basic_land_card(cn) {
+                            // Put basic land into hand
+                            self.players[pid].hand.push(id);
+                            found_basic = true;
+                            break;
+                        }
+                    }
+                    // Not a basic land — put into graveyard
+                    self.players[pid].graveyard.push(id);
+                }
+                let _ = found_basic;
+            }
+
+            // === Sylvan Safekeeper ===
+            ActivatedEffect::SylvanSafekeeperShroud => {
+                // Target creature you control gains shroud until end of turn.
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    self.add_temporary_effect(TemporaryEffect::GrantKeyword {
+                        target: *target_id,
+                        keyword: Keyword::Shroud,
+                    });
                 }
             }
         }
