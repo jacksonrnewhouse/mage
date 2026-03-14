@@ -3897,6 +3897,34 @@ impl GameState {
                 result
             }
 
+            CardName::BrotherhoodsEnd => {
+                // Choose one:
+                //   Mode 0: Deal 3 damage to each creature and each planeswalker
+                //   Mode 1: Destroy all artifacts with mana value 3 or less
+                let mut result = Vec::new();
+                // Mode 0: damage mode (no target needed - hits all creatures/planeswalkers)
+                result.push(Action::CastSpell {
+                    card_id,
+                    targets: vec![],
+                    x_value: 0,
+                    from_graveyard: false,
+                    from_library_top: false,
+                    alt_cost: None,
+                    modes: vec![0],
+                });
+                // Mode 1: artifact destruction mode (no target needed - hits all small artifacts)
+                result.push(Action::CastSpell {
+                    card_id,
+                    targets: vec![],
+                    x_value: 0,
+                    from_graveyard: false,
+                    from_library_top: false,
+                    alt_cost: None,
+                    modes: vec![1],
+                });
+                result
+            }
+
             _ => vec![],
         }
     }
@@ -3963,5 +3991,5 @@ pub fn requires_sacrifice_cost(name: CardName) -> bool {
 
 /// Returns true if this card is a modal spell (choose N of M modes).
 pub fn is_modal_spell(name: CardName) -> bool {
-    matches!(name, CardName::KolaghanCommand | CardName::KozileksCommand | CardName::PestControl | CardName::Suplex)
+    matches!(name, CardName::KolaghanCommand | CardName::KozileksCommand | CardName::PestControl | CardName::Suplex | CardName::BrotherhoodsEnd)
 }

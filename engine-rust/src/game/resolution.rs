@@ -1110,13 +1110,32 @@ impl GameState {
                 }
             }
             CardName::BrotherhoodsEnd => {
-                // Deal 3 to each creature and planeswalker OR destroy artifacts CMC<=3
-                let to_remove: Vec<ObjectId> = self.battlefield.iter()
-                    .filter(|p| p.is_creature() || p.is_planeswalker())
-                    .map(|p| p.id)
-                    .collect();
-                for id in to_remove {
-                    self.deal_damage_to_target(Target::Object(id), 3, controller);
+                match modes.first().copied().unwrap_or(0) {
+                    0 => {
+                        // Mode 0: Deal 3 damage to each creature and each planeswalker
+                        let to_damage: Vec<ObjectId> = self.battlefield.iter()
+                            .filter(|p| p.is_creature() || p.is_planeswalker())
+                            .map(|p| p.id)
+                            .collect();
+                        for id in to_damage {
+                            self.deal_damage_to_target(Target::Object(id), 3, controller);
+                        }
+                    }
+                    _ => {
+                        // Mode 1: Destroy all artifacts with mana value 3 or less
+                        let to_destroy: Vec<ObjectId> = self.battlefield.iter()
+                            .filter(|p| {
+                                p.is_artifact() && {
+                                    let cmc = find_card(db, p.card_name).map(|d| d.mana_cost.cmc()).unwrap_or(0);
+                                    cmc <= 3
+                                }
+                            })
+                            .map(|p| p.id)
+                            .collect();
+                        for id in to_destroy {
+                            self.destroy_permanent(id);
+                        }
+                    }
                 }
             }
             CardName::WrathOfTheSkies => {
@@ -1195,8 +1214,7 @@ impl GameState {
             | CardName::AbruptDecay | CardName::AncientGrudge | CardName::ShatteringSpree
             | CardName::MoltenCollapse | CardName::FatalPush
             | CardName::BitterTriumph | CardName::SnuffOut
-            | CardName::UntimelyMalfunction | CardName::Crash | CardName::CouncilsJudgment
-            | CardName::SunderingEruption => {
+            | CardName::UntimelyMalfunction | CardName::Crash | CardName::CouncilsJudgment => {
                 // Nature's Claim: destroyed permanent's controller gains 4 life
                 let target_controller = if card_name == CardName::NaturesClaim {
                     if let Some(Target::Object(target_id)) = targets.first() {
@@ -1233,6 +1251,18 @@ impl GameState {
                 }
                 if let Some(tc) = target_controller {
                     self.players[tc as usize].life += 4;
+                }
+            }
+
+            CardName::SunderingEruption => {
+                // Destroy target artifact or enchantment, then deal 3 damage to each opponent.
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    self.destroy_permanent(*target_id);
+                }
+                for pid in 0..self.num_players {
+                    if pid != controller {
+                        self.players[pid as usize].life -= 3;
+                    }
                 }
             }
 
