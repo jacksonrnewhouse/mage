@@ -92,6 +92,18 @@ impl GameState {
                     vec![],
                 );
             }
+            CardName::IchorWellspring => {
+                // When Ichor Wellspring is put into a graveyard from the battlefield, draw a card.
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: died_id,
+                        source_name: died_name,
+                        effect: TriggeredEffect::DrawCards(1),
+                    },
+                    controller,
+                    vec![],
+                );
+            }
             CardName::HaywireMite => {
                 // When Haywire Mite dies, you gain 2 life.
                 self.stack.push(
