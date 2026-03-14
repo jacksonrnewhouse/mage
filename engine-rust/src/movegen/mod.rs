@@ -1248,6 +1248,8 @@ impl GameState {
             CardName::HedgeMaze => vec![Some(Color::Green), Some(Color::Blue)],
             // MDFC land back face: {T}: Add {R}
             CardName::ShatterskullTheHammerPass | CardName::VolcanicFissure => vec![Some(Color::Red)],
+            // MDFC land back face: {T}: Add {W}
+            CardName::WitchBlessedMeadow => vec![Some(Color::White)],
 
             // Other utility lands producing colored mana
             CardName::Karakas => vec![Some(Color::White)],
@@ -1532,6 +1534,7 @@ impl GameState {
             // MDFC land back faces
             | CardName::ShatterskullTheHammerPass
             | CardName::VolcanicFissure
+            | CardName::WitchBlessedMeadow
             // Other colored-producing lands
             | CardName::Karakas
             | CardName::OtawaraSoaringCity

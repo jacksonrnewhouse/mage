@@ -164,6 +164,8 @@ pub enum CardName {
     SealOfCleansing,
     StonySilence,
     WitchEnchanter,
+    /// Back face of Witch Enchanter — MDFC land
+    WitchBlessedMeadow,
 
     // === White Planeswalkers ===
     GideonOfTheTrials,
@@ -1582,9 +1584,48 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Sacrifice Seal of Cleansing: Destroy target artifact or enchantment.");
     card!(StonySilence, "Stony Silence", ManaCost { white: 1, generic: 1, ..c }, &[Enchantment], &[], None, None, None, kw(), &[White],
         "Activated abilities of artifacts can't be activated.");
-    card!(CT(&[CreatureType::Human, CreatureType::Knight]) WitchEnchanter, "Witch Enchanter", ManaCost { white: 1, generic: 1, ..c }, &[Creature], &[],
-        Some(2), Some(1), None, kw(), &[White],
-        "When Witch Enchanter enters, destroy target artifact or enchantment.");
+    db.push(CardDef {
+        name: CardName::WitchEnchanter,
+        display_name: "Witch Enchanter",
+        mana_cost: ManaCost { white: 1, generic: 3, ..c },
+        has_x_cost: false,
+        x_multiplier: 0,
+        card_types: &[Creature],
+        supertypes: &[],
+        power: Some(2),
+        toughness: Some(2),
+        loyalty: None,
+        keywords: kw(),
+        color_identity: &[White],
+        oracle_text: "When this creature enters, destroy target artifact or enchantment an opponent controls.",
+        flashback_cost: None,
+        madness_cost: None,
+        creature_types: &[CreatureType::Human, CreatureType::Warlock],
+        is_changeling: false,
+        adventure: None,
+        back_face: Some(CardName::WitchBlessedMeadow),
+    });
+    db.push(CardDef {
+        name: CardName::WitchBlessedMeadow,
+        display_name: "Witch-Blessed Meadow",
+        mana_cost: ManaCost::ZERO,
+        has_x_cost: false,
+        x_multiplier: 0,
+        card_types: &[Land],
+        supertypes: &[],
+        power: None,
+        toughness: None,
+        loyalty: None,
+        keywords: kw(),
+        color_identity: &[White],
+        oracle_text: "As this land enters, you may pay 3 life. If you don't, it enters tapped. {T}: Add {W}.",
+        flashback_cost: None,
+        madness_cost: None,
+        creature_types: &[],
+        is_changeling: false,
+        adventure: None,
+        back_face: None,
+    });
 
     // === White Planeswalkers ===
     card!(GideonOfTheTrials, "Gideon of the Trials", ManaCost { white: 2, generic: 1, ..c }, &[Planeswalker], &[Legendary],
@@ -2544,6 +2585,7 @@ pub fn is_land_card(name: CardName) -> bool {
         | CardName::UrzasSaga | CardName::BazaarOfBaghdad | CardName::DryadArbor | CardName::CavernOfSouls
         | CardName::ShatterskullTheHammerPass
         | CardName::VolcanicFissure
+        | CardName::WitchBlessedMeadow
     )
 }
 

@@ -2606,7 +2606,7 @@ impl GameState {
             }
             // Shatterskull, the Hammer Pass (MDFC back face): enters tapped
             // (simplified: always enters tapped, skip the "pay 3 life" option)
-            CardName::ShatterskullTheHammerPass | CardName::VolcanicFissure => {
+            CardName::ShatterskullTheHammerPass | CardName::VolcanicFissure | CardName::WitchBlessedMeadow => {
                 if let Some(perm) = self.find_permanent_mut(_card_id) {
                     perm.tapped = true;
                 }
