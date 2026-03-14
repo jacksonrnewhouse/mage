@@ -1444,9 +1444,10 @@ impl GameState {
         }
         let controller = perm.controller;
         let card_name = perm.card_name;
+        let is_artifact = perm.is_artifact();
 
         // Collector Ouphe / Null Rod / Stony Silence: activated abilities of artifacts can't be activated
-        if perm.is_artifact() {
+        if is_artifact {
             let artifact_lockdown = self.battlefield.iter().any(|p| {
                 matches!(p.card_name, CardName::CollectorOuphe | CardName::NullRod | CardName::StonySilence)
             });
@@ -1467,7 +1468,7 @@ impl GameState {
             return true;
         }
 
-        match card_name {
+        let success = match card_name {
             // Basics and duals: tap for 1 of the chosen color
             CardName::Plains
             | CardName::Island
@@ -1850,7 +1851,15 @@ impl GameState {
             CardName::KrarkClanIronworks => false, // Not a tap ability
 
             _ => false,
+        };
+
+        // Avalanche of Sector 7: triggers when an opponent activates any ability of an artifact
+        // (including mana abilities).
+        if success && is_artifact {
+            self.check_avalanche_trigger(controller);
         }
+
+        success
     }
 
     /// Non-mana activated abilities available on a permanent.

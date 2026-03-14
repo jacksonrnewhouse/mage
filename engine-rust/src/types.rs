@@ -228,6 +228,7 @@ pub enum CreatureType {
     Ogre,
     Eldrazi,
     Thrull,
+    Rebel,
 }
 
 impl CreatureType {
@@ -301,6 +302,7 @@ impl CreatureType {
         CreatureType::Ogre,
         CreatureType::Eldrazi,
         CreatureType::Thrull,
+        CreatureType::Rebel,
     ];
 }
 

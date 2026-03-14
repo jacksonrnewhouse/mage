@@ -174,6 +174,9 @@ pub enum TriggeredEffect {
     /// Harsh Mentor: whenever an opponent activates an ability of an artifact, creature, or land
     /// that isn't a mana ability, deal 2 damage to that player.
     HarshMentorDamage { target_player: PlayerId },
+    /// Avalanche of Sector 7: whenever an opponent activates an ability of an artifact they
+    /// control, deal 1 damage to that player.
+    AvalancheDamage { target_player: PlayerId },
     /// Magebane Lizard: whenever a player casts a noncreature spell, deal damage to that player
     /// equal to the number of noncreature spells they've cast this turn.
     MagebaneLizardDamage { target_player: PlayerId, damage: u16 },

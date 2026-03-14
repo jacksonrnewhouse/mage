@@ -2570,17 +2570,8 @@ impl GameState {
                     vec![Target::Player(opp)],
                 );
             }
-            // Avalanche of Sector 7: deal damage equal to its power to target creature/planeswalker
-            CardName::AvalancheOfSector7 => {
-                let power = self.find_permanent(_card_id).map(|p| p.power()).unwrap_or(3);
-                let opp = self.opponent(controller);
-                let target: Option<ObjectId> = self.battlefield.iter()
-                    .find(|p| p.controller == opp && (p.is_creature() || p.card_types.contains(&CardType::Planeswalker)))
-                    .map(|p| p.id);
-                if let Some(tid) = target {
-                    self.deal_damage_to_target(Target::Object(tid), power as u16, controller);
-                }
-            }
+            // Avalanche of Sector 7: no ETB (triggered ability handled in triggers.rs)
+            CardName::AvalancheOfSector7 => {}
             // Mana Vault / Grim Monolith / Time Vault: set doesnt_untap flag
             CardName::ManaVault | CardName::GrimMonolith | CardName::TimeVault => {
                 if let Some(perm) = self.find_permanent_mut(_card_id) {
@@ -4218,6 +4209,11 @@ impl GameState {
             TriggeredEffect::HarshMentorDamage { target_player } => {
                 // Harsh Mentor deals 2 damage to the opponent who activated the ability
                 self.players[target_player as usize].life -= 2;
+            }
+
+            TriggeredEffect::AvalancheDamage { target_player } => {
+                // Avalanche of Sector 7 deals 1 damage to the opponent who activated an artifact ability
+                self.players[target_player as usize].life -= 1;
             }
 
             TriggeredEffect::MagebaneLizardDamage { target_player, damage } => {

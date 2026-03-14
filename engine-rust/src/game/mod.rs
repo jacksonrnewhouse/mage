@@ -1514,6 +1514,15 @@ impl GameState {
                     + perm.counters.get(CounterType::PlusOnePlusOne)
                     - perm.counters.get(CounterType::MinusOneMinusOne)
             }
+            CardName::AvalancheOfSector7 => {
+                let opp = self.opponent(perm.controller);
+                let artifact_count = self.battlefield.iter()
+                    .filter(|p| p.controller == opp && p.is_artifact())
+                    .count() as i16;
+                artifact_count + perm.power_mod
+                    + perm.counters.get(CounterType::PlusOnePlusOne)
+                    - perm.counters.get(CounterType::MinusOneMinusOne)
+            }
             _ => perm.power() + self.nettlecyst_bonus(perm),
         }
     }

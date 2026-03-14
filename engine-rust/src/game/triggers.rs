@@ -822,4 +822,28 @@ impl GameState {
             );
         }
     }
+
+    /// Check Avalanche of Sector 7 triggered ability: whenever an opponent activates an ability
+    /// of an artifact they control, Avalanche of Sector 7 deals 1 damage to that player.
+    /// Called after any artifact ability is activated (including mana abilities).
+    pub(crate) fn check_avalanche_trigger(&mut self, activator: PlayerId) {
+        let avalanche_triggers: Vec<(ObjectId, PlayerId)> = self
+            .battlefield
+            .iter()
+            .filter(|p| p.card_name == CardName::AvalancheOfSector7)
+            .filter(|p| p.controller != activator)
+            .map(|p| (p.id, p.controller))
+            .collect();
+        for (source_id, controller) in avalanche_triggers {
+            self.stack.push(
+                StackItemKind::TriggeredAbility {
+                    source_id,
+                    source_name: CardName::AvalancheOfSector7,
+                    effect: TriggeredEffect::AvalancheDamage { target_player: activator },
+                },
+                controller,
+                vec![Target::Player(activator)],
+            );
+        }
+    }
 }

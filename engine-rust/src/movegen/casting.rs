@@ -939,10 +939,15 @@ impl GameState {
         // Harsh Mentor: triggers when an opponent activates a non-mana ability of an
         // artifact, creature, or land. All abilities handled in apply_activated_ability are
         // non-mana abilities (mana abilities use activate_mana_ability instead).
-        if let Some(source_perm) = self.find_permanent(permanent_id) {
-            if source_perm.is_artifact() || source_perm.is_creature() || source_perm.is_land() {
-                self.check_harsh_mentor_trigger(controller);
-            }
+        let (is_harsh_mentor_source, is_artifact_source) = self.find_permanent(permanent_id)
+            .map(|p| (p.is_artifact() || p.is_creature() || p.is_land(), p.is_artifact()))
+            .unwrap_or((false, false));
+        if is_harsh_mentor_source {
+            self.check_harsh_mentor_trigger(controller);
+        }
+        // Avalanche of Sector 7: triggers when an opponent activates any ability of an artifact.
+        if is_artifact_source {
+            self.check_avalanche_trigger(controller);
         }
 
         match card_name {

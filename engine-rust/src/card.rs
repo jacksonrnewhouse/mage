@@ -1899,7 +1899,7 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(CT(&[CreatureType::Goblin]) NameStickerGoblin, "Name Sticker Goblin", ManaCost { red: 1, generic: 2, ..c }, &[Creature], &[],
         Some(2), Some(2), None, kw(), &[Red],
         "When this creature enters from anywhere other than a graveyard or exile, roll a 20-sided die. 1-6: Add RRRR. 7-14: Add RRRRR. 15-20: Add RRRRRR.");
-    card!(CT(&[CreatureType::Human]) AvalancheOfSector7, "Avalanche of Sector 7", ManaCost { red: 1, generic: 2, ..c }, &[Creature], &[Legendary],
+    card!(CT(&[CreatureType::Human, CreatureType::Rebel]) AvalancheOfSector7, "Avalanche of Sector 7", ManaCost { red: 1, generic: 2, ..c }, &[Creature], &[Legendary],
         Some(0), Some(3), None, menace(), &[Red],
         "Menace. Avalanche of Sector 7's power is equal to the number of artifacts your opponents control. Whenever an opponent activates an ability of an artifact they control, Avalanche of Sector 7 deals 1 damage to that player.");
     card!(ADVENTURE(AdventureDef {
