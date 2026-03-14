@@ -2537,16 +2537,6 @@ impl GameState {
                     self.destroy_permanent(tid);
                 }
             }
-            // Doorkeeper Thrull: exile target artifact/enchantment an opponent controls
-            CardName::DoorkeeperThrull => {
-                let target_id = self.battlefield.iter()
-                    .find(|p| p.controller != controller && (p.is_artifact() || p.is_enchantment()))
-                    .map(|p| p.id);
-                if let Some(tid) = target_id {
-                    self.exile_linked.push((_card_id, tid));
-                    self.remove_permanent_to_zone(tid, DestinationZone::Exile);
-                }
-            }
             // Seasoned Pyromancer: discard 2, draw 2, create tokens for nonland discards
             CardName::SeasonedPyromancer => {
                 self.stack.push(
