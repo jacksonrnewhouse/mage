@@ -1941,8 +1941,8 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Double strike. When Fury enters, it deals 4 damage divided as you choose among any number of target creatures and/or planeswalkers. Evoke - Exile a red card from your hand.");
 
     // === Red Spells ===
-    card!(RedirectLightning, "Redirect Lightning", ManaCost { red: 1, generic: 2, ..c }, &[Instant], &[], None, None, None, kw(), &[Red],
-        "Redirect Lightning deals 4 damage to target creature or planeswalker. If you control an artifact, instead it deals 5 damage.");
+    card!(RedirectLightning, "Redirect Lightning", ManaCost { red: 1, ..c }, &[Instant], &[], None, None, None, kw(), &[Red],
+        "As an additional cost to cast this spell, pay 5 life or pay {2}. Change the target of target spell or ability with a single target.");
     card!(Abrade, "Abrade", ManaCost { red: 1, generic: 1, ..c }, &[Instant], &[], None, None, None, kw(), &[Red],
         "Choose one: Abrade deals 3 damage to target creature. Destroy target artifact.");
     card!(ShrapnelBlast, "Shrapnel Blast", ManaCost { red: 1, generic: 1, ..c }, &[Instant], &[], None, None, None, kw(), &[Red],

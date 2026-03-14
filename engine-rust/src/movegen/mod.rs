@@ -2621,7 +2621,7 @@ impl GameState {
             }
 
             // Target creature or planeswalker (damage-based removal)
-            CardName::Abrade | CardName::RedirectLightning => {
+            CardName::Abrade => {
                 let mut targets = Vec::new();
                 for perm in &self.battlefield {
                     if (perm.is_creature() || perm.is_planeswalker() || perm.is_artifact())
@@ -2706,7 +2706,8 @@ impl GameState {
             CardName::Counterspell | CardName::ManaDrain | CardName::MentalMisstep
             | CardName::ForceOfWill | CardName::ForceOfNegation | CardName::Flusterstorm
             | CardName::Daze | CardName::ManaLeak | CardName::MemoryLapse | CardName::Remand
-            | CardName::SpellPierce | CardName::MysticalDispute => {
+            | CardName::SpellPierce | CardName::MysticalDispute
+            | CardName::RedirectLightning => {
                 self.stack
                     .items()
                     .iter()

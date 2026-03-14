@@ -425,11 +425,9 @@ impl GameState {
                 }
             }
             CardName::RedirectLightning => {
-                if let Some(target) = targets.first() {
-                    let controls_artifact = self.battlefield.iter().any(|p| p.controller == controller && p.card_types.contains(&CardType::Artifact));
-                    let damage = if controls_artifact { 5 } else { 4 };
-                    self.deal_damage_to_target(*target, damage, controller);
-                }
+                // "Change the target of target spell or ability with a single target."
+                // Target redirection is complex to model; treated as a no-op for game tree search.
+                // The additional cost (pay 5 life or {2}) is handled at cast time.
             }
             // Shatterskull Smashing: deals X damage divided among up to two targets.
             // If X is 6 or more, deals twice X damage instead.
