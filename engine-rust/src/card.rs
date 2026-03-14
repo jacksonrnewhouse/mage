@@ -1525,11 +1525,17 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(CT(&[CreatureType::Spirit]) SpiritOfTheLabyrinth, "Spirit of the Labyrinth", ManaCost { white: 1, generic: 1, ..c }, &[Creature, Enchantment], &[],
         Some(3), Some(1), None, kw(), &[White],
         "Each player can't draw more than one card each turn.");
-    card!(CT(&[CreatureType::Human, CreatureType::Bard]) VoiceOfVictory, "Voice of Victory", ManaCost { white: 1, generic: 1, ..c }, &[Creature], &[],
+    card!(CT(&[CreatureType::Human]) VoiceOfVictory, "Voice of Victory", ManaCost { white: 1, generic: 1, ..c }, &[Creature], &[],
         Some(1), Some(3), None, kw(), &[White],
-        "Mobilize 2 (Whenever this creature attacks, create two tapped and attacking 1/1 red Warrior creature tokens. Sacrifice them at the beginning of the next end step.) Your opponents can't cast spells during your turn.");    card!(CT(&[CreatureType::Spirit]) WhiteOrchidPhantom, "White Orchid Phantom", ManaCost { white: 1, generic: 1, ..c }, &[Creature], &[],
-        Some(2), Some(2), None, flying(), &[White],
-        "Flying. When White Orchid Phantom enters, destroy target nonbasic land an opponent controls. That land's controller may search for a basic land card, put it tapped.");
+        "Mobilize 2 (Whenever this creature attacks, create two tapped and attacking 1/1 red Warrior creature tokens. Sacrifice them at the beginning of the next end step.) Your opponents can't cast spells during your turn.");
+    card!(CT(&[CreatureType::Spirit, CreatureType::Knight]) WhiteOrchidPhantom, "White Orchid Phantom", ManaCost { white: 2, ..c }, &[Creature], &[],
+        Some(2), Some(2), None, {
+            let mut k = Keywords::empty();
+            k.add(Keyword::Flying);
+            k.add(Keyword::FirstStrike);
+            k
+        }, &[White],
+        "Flying, first strike. When this creature enters, destroy up to one target nonbasic land. Its controller may search their library for a basic land card, put it onto the battlefield tapped, then shuffle.");
     card!(CT(&[CreatureType::Archon]) ArchonOfEmeria, "Archon of Emeria", ManaCost { white: 1, generic: 2, ..c }, &[Creature], &[],
         Some(2), Some(3), None, flying(), &[White],
         "Flying. Each player can't cast more than one spell each turn. Nonbasic lands enter tapped.");
@@ -1872,13 +1878,14 @@ pub fn build_card_db() -> Vec<CardDef> {
         Some(2), Some(2), None, kw(), &[Red],
         "Whenever a player casts a spell with mana value 3 or less, Eidolon of the Great Revel deals 2 damage to that player.");
     card!(GenerousPlunderer, "Generous Plunderer", ManaCost { red: 1, generic: 1, ..c }, &[Creature], &[],
-    card!(GenerousPlunderer, "Generous Plunderer", ManaCost { red: 1, generic: 1, ..c }, &[Creature], &[],
         Some(2), Some(2), None, {
             let mut k = Keywords::empty();
             k.add(Keyword::Menace);
             k
         }, &[Red],
-        "Menace. At the beginning of your upkeep, you may create a Treasure token. When you do, target opponent creates a tapped Treasure token. Whenever this creature attacks, it deals damage to defending player equal to the number of artifacts they control.");        Some(2), Some(2), None, kw(), &[Red],
+        "Menace. At the beginning of your upkeep, you may create a Treasure token. When you do, target opponent creates a tapped Treasure token. Whenever this creature attacks, it deals damage to defending player equal to the number of artifacts they control.");
+    card!(HarshMentor, "Harsh Mentor", ManaCost { red: 1, generic: 1, ..c }, &[Creature], &[],
+        Some(2), Some(2), None, kw(), &[Red],
         "Whenever an opponent activates an ability of an artifact, creature, or land on the battlefield, if it's not a mana ability, Harsh Mentor deals 2 damage to that player.");
     card!(MagebaneLizard, "Magebane Lizard", ManaCost { red: 1, generic: 1, ..c }, &[Creature], &[],
         Some(1), Some(4), None, kw(), &[Red],
