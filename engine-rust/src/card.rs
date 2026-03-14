@@ -239,7 +239,6 @@ pub enum CardName {
     EchoOfEons,
     MindsDesire,
     Tinker,
-    UntimelyMalfunction,
 
     // === Blue Enchantments/Artifacts ===
     AetherSpellbomb,
@@ -338,6 +337,7 @@ pub enum CardName {
     Abrade,
     ShrapnelBlast,
     Crash,
+    UntimelyMalfunction,
     Meltdown,
     ShatteringSpree,
     Vandalblast,
@@ -1760,8 +1760,6 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Shuffle your library. Then exile the top card of your library. Until end of turn, you may play that card without paying its mana cost. Storm.");
     card!(Tinker, "Tinker", ManaCost { blue: 1, generic: 2, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Blue],
         "As an additional cost to cast this spell, sacrifice an artifact. Search your library for an artifact card and put it onto the battlefield. Then shuffle.");
-    card!(UntimelyMalfunction, "Untimely Malfunction", ManaCost { blue: 1, generic: 1, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Blue],
-        "Destroy target artifact or creature.");
 
     // === Blue Enchantments/Artifacts ===
     card!(AetherSpellbomb, "Aether Spellbomb", ManaCost::generic(1), &[Artifact], &[], None, None, None, kw(), &[Blue],
@@ -1947,7 +1945,8 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Choose one: Abrade deals 3 damage to target creature. Destroy target artifact.");
     card!(ShrapnelBlast, "Shrapnel Blast", ManaCost { red: 1, generic: 1, ..c }, &[Instant], &[], None, None, None, kw(), &[Red],
         "As an additional cost, sacrifice an artifact. Shrapnel Blast deals 5 damage to any target.");
-    // Note: Untimely Malfunction is blue ({1}{U} Sorcery), defined above in blue section.
+    card!(UntimelyMalfunction, "Untimely Malfunction", ManaCost { red: 1, generic: 1, ..c }, &[Instant], &[], None, None, None, kw(), &[Red],
+        "Choose one — Destroy target artifact. Change the target of target spell or ability with a single target. One or two target creatures can't block this turn.");
     card!(Crash, "Crash", ManaCost { red: 1, generic: 2, ..c }, &[Instant], &[], None, None, None, kw(), &[Red],
         "You may sacrifice a Mountain rather than pay this spell's mana cost. Destroy target artifact.");
     card!(X(1) Meltdown, "Meltdown", ManaCost { red: 1, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Red],
