@@ -2368,7 +2368,9 @@ impl GameState {
                 }
             }
             // Satyr Wayfinder: ETB reveal top 4, may put a land into hand, rest to graveyard.
-            CardName::SatyrWayfinder => {
+            // Town Greeter: ETB mill 4, may put a land from among them into hand.
+            // Mechanically identical: top 4 cards go to graveyard, optionally a land goes to hand.
+            CardName::SatyrWayfinder | CardName::TownGreeter => {
                 self.stack.push(
                     StackItemKind::TriggeredAbility {
                         source_id: _card_id,
