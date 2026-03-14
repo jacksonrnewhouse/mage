@@ -3199,6 +3199,20 @@ impl GameState {
                 });
             }
 
+            // Oath of Druids: register recurring upkeep trigger.
+            // At the beginning of each player's upkeep, if their opponent controls more creatures,
+            // reveal cards from library until finding a creature, put it onto the battlefield,
+            // and put the rest into the graveyard.
+            CardName::OathOfDruids => {
+                self.add_delayed_trigger(crate::types::DelayedTrigger {
+                    condition: crate::types::DelayedTriggerCondition::AtBeginningOfNextUpkeep,
+                    effect: TriggeredEffect::OathOfDruidsReveal,
+                    controller,
+                    fires_once: false,
+                    source_id: None,
+                });
+            }
+
             // Phyrexian Dreadnought: sacrifice unless you sacrifice 12 power of creatures.
             // Simplified: just sacrifice it (the combo with Stifle/Show and Tell is handled elsewhere).
             CardName::PhyrexianDreadnought => {
@@ -4290,6 +4304,68 @@ impl GameState {
                 // Underworld Breach: sacrifice at the beginning of the end step
                 if self.find_permanent(permanent_id).is_some() {
                     self.remove_permanent_to_zone(permanent_id, DestinationZone::Graveyard);
+                }
+            }
+
+            TriggeredEffect::OathOfDruidsReveal => {
+                // Oath of Druids: at the beginning of each player's upkeep, if their opponent
+                // controls more creatures, reveal cards from library until finding a creature,
+                // put it onto the battlefield, and put the rest into the graveyard.
+                let active = self.active_player;
+                let opponent = self.opponent(active);
+                let active_creatures = self.battlefield.iter()
+                    .filter(|p| p.controller == active && p.is_creature())
+                    .count();
+                let opponent_creatures = self.battlefield.iter()
+                    .filter(|p| p.controller == opponent && p.is_creature())
+                    .count();
+                if opponent_creatures > active_creatures {
+                    let pid = active as usize;
+                    let mut revealed_non_creatures = Vec::new();
+                    let mut found_creature: Option<ObjectId> = None;
+                    while let Some(id) = self.players[pid].library.pop() {
+                        let is_creature = self.card_name_for_id(id)
+                            .and_then(|cn| find_card(db, cn))
+                            .map(|def| def.card_types.contains(&CardType::Creature))
+                            .unwrap_or(false);
+                        if is_creature {
+                            found_creature = Some(id);
+                            break;
+                        } else {
+                            revealed_non_creatures.push(id);
+                        }
+                    }
+                    // Put all non-creature cards revealed this way into the graveyard
+                    for id in revealed_non_creatures {
+                        let cn = self.card_name_for_id(id).unwrap_or(CardName::Plains);
+                        self.send_to_graveyard(id, cn, active);
+                    }
+                    // Put the creature onto the battlefield
+                    if let Some(creature_id) = found_creature {
+                        if let Some(cn) = self.card_name_for_id(creature_id) {
+                            if let Some(def) = find_card(db, cn) {
+                                let cage_active = self.grafdiggers_cage_active();
+                                let priest_active = self.containment_priest_active();
+                                if cage_active || priest_active {
+                                    // Grafdigger's Cage / Containment Priest: exile instead
+                                    self.exile.push((creature_id, cn, active));
+                                } else {
+                                    let mut perm = Permanent::new(
+                                        creature_id, cn, active, active,
+                                        def.power, def.toughness, def.loyalty, def.keywords, def.card_types,
+                                    );
+                                    if def.is_changeling {
+                                        perm.creature_types = crate::types::CreatureType::ALL.to_vec();
+                                    } else {
+                                        perm.creature_types = def.creature_types.to_vec();
+                                    }
+                                    perm.colors = def.color_identity.to_vec();
+                                    self.battlefield.push(perm);
+                                    self.handle_etb(cn, creature_id, active);
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
