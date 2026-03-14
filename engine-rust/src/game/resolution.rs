@@ -2563,6 +2563,10 @@ impl GameState {
             CardName::CavesOfChaosAdventurer => {
                 self.take_initiative(controller);
             }
+            // Undermountain Adventurer: take the initiative on ETB
+            CardName::UndermountainAdventurer => {
+                self.take_initiative(controller);
+            }
             // Broadside Bombardiers: deal 3 damage to any target on ETB
             CardName::BroadsideBombardiers => {
                 let opp = self.opponent(controller);
