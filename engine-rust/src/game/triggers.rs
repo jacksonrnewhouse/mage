@@ -16,7 +16,24 @@ impl GameState {
         is_artifact: bool,
         last_known_power: i16,
     ) {
+        // Dress Down: creatures that die while Dress Down is active had no abilities,
+        // so their own dies triggers don't fire. We check if the dying permanent was
+        // a creature; if so and Dress Down is active, skip the "self" dies triggers.
+        // Note: we look up whether the dying card is a creature via the card database.
+        let dress_down = self.dress_down_active();
+        let dying_is_creature = {
+            let db = crate::card::build_card_db();
+            find_card(&db, died_name)
+                .map(|def| def.card_types.contains(&CardType::Creature))
+                .unwrap_or(false)
+        };
+        let suppress_creature_triggers = dress_down && dying_is_creature;
+
         // --- Triggers on the dying permanent itself ---
+        // Dress Down suppresses creature dies triggers.
+        if suppress_creature_triggers {
+            // Skip self-triggers for creatures under Dress Down.
+        } else {
         match died_name {
             CardName::WurmcoilEngine => {
                 // Create two tokens: 3/3 lifelink and 3/3 deathtouch
@@ -106,6 +123,7 @@ impl GameState {
             }
             _ => {}
         }
+        } // end else (not suppress_creature_triggers)
 
         // --- Triggers on other permanents that care about things dying ---
 
@@ -264,6 +282,12 @@ impl GameState {
     /// Check for draw triggers (Sheoldred, Orcish Bowmasters).
     /// Called after each individual card draw.
     pub(crate) fn check_draw_triggers(&mut self, drawing_player: PlayerId) {
+        // Dress Down: creatures on the battlefield lose all abilities,
+        // so their triggered abilities don't fire.
+        if self.dress_down_active() {
+            return;
+        }
+
         // Sheoldred, the Apocalypse: controller gains 2 life on own draw,
         // opponent loses 2 life on opponent draw.
         let sheoldred_triggers: Vec<(ObjectId, PlayerId)> = self
@@ -346,27 +370,33 @@ impl GameState {
     /// Handles Young Pyromancer (1/1 red Elemental), Monastery Mentor (1/1 white Monk with prowess),
     /// and Cindervines (deal 1 damage to opponent when they cast noncreature spell).
     pub(crate) fn check_noncreature_cast_triggers(&mut self, caster: PlayerId) {
+        let dress_down = self.dress_down_active();
+
         // Collect triggers to fire: (source_id, source_name, effect, controller)
-        let mut triggers: Vec<(ObjectId, CardName, TriggeredEffect, PlayerId)> = self
-            .battlefield
-            .iter()
-            .filter(|p| p.controller == caster)
-            .filter_map(|p| match p.card_name {
-                CardName::YoungPyromancer => Some((
-                    p.id,
-                    p.card_name,
-                    TriggeredEffect::YoungPyromancerCast,
-                    p.controller,
-                )),
-                CardName::MonasteryMentor => Some((
-                    p.id,
-                    p.card_name,
-                    TriggeredEffect::MonasteryMentorCast,
-                    p.controller,
-                )),
-                _ => None,
-            })
-            .collect();
+        // Dress Down suppresses creature triggered abilities.
+        let mut triggers: Vec<(ObjectId, CardName, TriggeredEffect, PlayerId)> = if dress_down {
+            Vec::new()
+        } else {
+            self.battlefield
+                .iter()
+                .filter(|p| p.controller == caster)
+                .filter_map(|p| match p.card_name {
+                    CardName::YoungPyromancer => Some((
+                        p.id,
+                        p.card_name,
+                        TriggeredEffect::YoungPyromancerCast,
+                        p.controller,
+                    )),
+                    CardName::MonasteryMentor => Some((
+                        p.id,
+                        p.card_name,
+                        TriggeredEffect::MonasteryMentorCast,
+                        p.controller,
+                    )),
+                    _ => None,
+                })
+                .collect()
+        };
 
         // Cindervines: whenever an opponent casts a noncreature spell, deal 1 damage to them
         let cindervines_triggers: Vec<(ObjectId, PlayerId)> = self
@@ -402,50 +432,60 @@ impl GameState {
         }
 
         // Mai, Scornful Striker: whenever a player casts a noncreature spell, they lose 2 life
-        let mai_triggers: Vec<(ObjectId, PlayerId)> = self
-            .battlefield
-            .iter()
-            .filter(|p| p.card_name == CardName::MaiScornfulStriker)
-            .map(|p| (p.id, p.controller))
-            .collect();
-        for (source_id, controller) in mai_triggers {
-            triggers.push((
-                source_id,
-                CardName::MaiScornfulStriker,
-                TriggeredEffect::MaiNoncreatureSpellCast { target_player: caster },
-                controller,
-            ));
+        // (creature — suppressed by Dress Down)
+        if !dress_down {
+            let mai_triggers: Vec<(ObjectId, PlayerId)> = self
+                .battlefield
+                .iter()
+                .filter(|p| p.card_name == CardName::MaiScornfulStriker)
+                .map(|p| (p.id, p.controller))
+                .collect();
+            for (source_id, controller) in mai_triggers {
+                triggers.push((
+                    source_id,
+                    CardName::MaiScornfulStriker,
+                    TriggeredEffect::MaiNoncreatureSpellCast { target_player: caster },
+                    controller,
+                ));
+            }
         }
 
         // Magebane Lizard: whenever a player casts a noncreature spell, deal damage to that
         // player equal to the number of noncreature spells they've cast this turn.
-        let noncreature_count = self.players[caster as usize].noncreature_spells_cast_this_turn;
-        let lizard_triggers: Vec<(ObjectId, PlayerId)> = self
-            .battlefield
-            .iter()
-            .filter(|p| p.card_name == CardName::MagebaneLizard)
-            .map(|p| (p.id, p.controller))
-            .collect();
-        for (source_id, controller) in lizard_triggers {
-            triggers.push((
-                source_id,
-                CardName::MagebaneLizard,
-                TriggeredEffect::MagebaneLizardDamage {
-                    target_player: caster,
-                    damage: noncreature_count,
-                },
-                controller,
-            ));
+        // (creature — suppressed by Dress Down)
+        if !dress_down {
+            let noncreature_count = self.players[caster as usize].noncreature_spells_cast_this_turn;
+            let lizard_triggers: Vec<(ObjectId, PlayerId)> = self
+                .battlefield
+                .iter()
+                .filter(|p| p.card_name == CardName::MagebaneLizard)
+                .map(|p| (p.id, p.controller))
+                .collect();
+            for (source_id, controller) in lizard_triggers {
+                triggers.push((
+                    source_id,
+                    CardName::MagebaneLizard,
+                    TriggeredEffect::MagebaneLizardDamage {
+                        target_player: caster,
+                        damage: noncreature_count,
+                    },
+                    controller,
+                ));
+            }
         }
 
         // Displacer Kitten: whenever you cast a noncreature spell, exile up to one target
         // nonland permanent you control, then return it to the battlefield under its owner's control.
-        let kitten_triggers: Vec<(ObjectId, PlayerId)> = self
-            .battlefield
-            .iter()
-            .filter(|p| p.card_name == CardName::DisplacerKitten && p.controller == caster)
-            .map(|p| (p.id, p.controller))
-            .collect();
+        // (creature — suppressed by Dress Down)
+        let kitten_triggers: Vec<(ObjectId, PlayerId)> = if dress_down {
+            Vec::new()
+        } else {
+            self.battlefield
+                .iter()
+                .filter(|p| p.card_name == CardName::DisplacerKitten && p.controller == caster)
+                .map(|p| (p.id, p.controller))
+                .collect()
+        };
         for (source_id, controller) in kitten_triggers {
             // Find a nonland permanent the controller controls to blink (not the Kitten itself)
             let blink_targets: Vec<ObjectId> = self
@@ -593,6 +633,11 @@ impl GameState {
     ///
     /// `targeted_creature_ids` is the set of creature ObjectIds being targeted.
     pub(crate) fn check_nadu_targeting_triggers(&mut self, targeted_creature_ids: &[ObjectId]) {
+        // Dress Down: creatures lose all abilities (Nadu is a creature).
+        if self.dress_down_active() {
+            return;
+        }
+
         // Find all Nadu permanents on the battlefield
         let nadus: Vec<(ObjectId, PlayerId)> = self
             .battlefield
@@ -660,6 +705,10 @@ impl GameState {
         targeted_permanent_ids: &[ObjectId],
         spell_controller: PlayerId,
     ) {
+        // Dress Down: creatures lose all abilities (Bonecrusher Giant is a creature).
+        if self.dress_down_active() {
+            return;
+        }
         for &target_id in targeted_permanent_ids {
             // Check if the targeted permanent is a Bonecrusher Giant on the battlefield
             let bonecrusher = self
@@ -695,6 +744,11 @@ impl GameState {
         targets: &[Target],
         source_controller: PlayerId,
     ) {
+        // Dress Down: creatures lose all abilities (Leovold is a creature).
+        if self.dress_down_active() {
+            return;
+        }
+
         // Find all Leovold permanents on the battlefield
         let leovolds: Vec<(ObjectId, PlayerId)> = self
             .battlefield
@@ -752,6 +806,10 @@ impl GameState {
     /// with mana value 3 or less, Eidolon deals 2 damage to that player.
     /// Called after any spell is pushed to the stack.
     pub(crate) fn check_eidolon_trigger(&mut self, caster: PlayerId, spell_cmc: u8) {
+        // Dress Down: creatures lose all abilities (Eidolon is a creature).
+        if self.dress_down_active() {
+            return;
+        }
         if spell_cmc > 3 {
             return;
         }
@@ -778,6 +836,10 @@ impl GameState {
     /// artifact, creature, or land that isn't a mana ability, Harsh Mentor deals 2 damage to
     /// that player. Called after a non-mana activated ability is activated.
     pub(crate) fn check_harsh_mentor_trigger(&mut self, activator: PlayerId) {
+        // Dress Down: creatures lose all abilities (Harsh Mentor is a creature).
+        if self.dress_down_active() {
+            return;
+        }
         let mentor_triggers: Vec<(ObjectId, PlayerId)> = self
             .battlefield
             .iter()

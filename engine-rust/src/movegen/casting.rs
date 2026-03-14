@@ -517,8 +517,9 @@ impl GameState {
                 let defending_player = self.opponent(self.active_player);
                 self.attackers.push((*creature_id, defending_player));
                 let card_name = self.find_permanent(*creature_id).map(|p| p.card_name);
+                let dress_down = self.dress_down_active();
                 if let Some(perm) = self.find_permanent_mut(*creature_id) {
-                    if !perm.keywords.has(Keyword::Vigilance) {
+                    if dress_down || !perm.keywords.has(Keyword::Vigilance) {
                         perm.tapped = true;
                     }
                     perm.attacked_this_turn = true;

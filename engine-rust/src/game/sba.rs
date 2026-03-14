@@ -34,10 +34,12 @@ impl GameState {
 
             // Creatures with 0 or less toughness die
             let mut to_die = Vec::new();
+            let dress_down = self.dress_down_active();
             for perm in &self.battlefield {
                 if perm.is_creature() {
                     let toughness = self.effective_toughness(perm.id, db);
-                    let has_lethal = perm.damage >= toughness && !perm.keywords.has(Keyword::Indestructible);
+                    let indestructible = !dress_down && perm.keywords.has(Keyword::Indestructible);
+                    let has_lethal = perm.damage >= toughness && !indestructible;
                     if toughness <= 0 || has_lethal {
                         to_die.push(perm.id);
                     }

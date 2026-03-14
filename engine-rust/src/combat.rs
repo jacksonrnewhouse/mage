@@ -17,15 +17,20 @@ impl GameState {
         // Collect initiative-steal events to apply after the loop (avoids borrow conflict).
         let mut initiative_taken_by: Option<PlayerId> = None;
 
+        // Dress Down: creatures lose all abilities (including combat keywords).
+        let dress_down = self.dress_down_active();
+
         for &(attacker_id, defending_player) in &self.attackers {
             let attacker = match self.find_permanent(attacker_id) {
                 Some(p) => p,
                 None => continue,
             };
 
-            let has_first_strike = attacker.keywords.has(Keyword::FirstStrike)
-                || attacker.keywords.has(Keyword::DoubleStrike);
-            let has_regular_strike = !attacker.keywords.has(Keyword::FirstStrike)
+            let has_first_strike = !dress_down
+                && (attacker.keywords.has(Keyword::FirstStrike)
+                    || attacker.keywords.has(Keyword::DoubleStrike));
+            let has_regular_strike = dress_down
+                || !attacker.keywords.has(Keyword::FirstStrike)
                 || attacker.keywords.has(Keyword::DoubleStrike);
 
             let should_deal_damage = if first_strike_only {
@@ -43,9 +48,9 @@ impl GameState {
                 Some(p) => p,
                 None => continue,
             };
-            let attacker_has_trample = attacker.keywords.has(Keyword::Trample);
-            let attacker_has_deathtouch = attacker.keywords.has(Keyword::Deathtouch);
-            let attacker_has_lifelink = attacker.keywords.has(Keyword::Lifelink);
+            let attacker_has_trample = !dress_down && attacker.keywords.has(Keyword::Trample);
+            let attacker_has_deathtouch = !dress_down && attacker.keywords.has(Keyword::Deathtouch);
+            let attacker_has_lifelink = !dress_down && attacker.keywords.has(Keyword::Lifelink);
             let attacker_controller = attacker.controller;
             let attacker_colors = attacker.colors.clone();
 
@@ -66,13 +71,18 @@ impl GameState {
                 damage_to_players.push((defending_player, attacker_power as i32));
 
                 // Fire combat-damage-to-player triggers for unblocked attackers
-                let trigger_effect = match attacker.card_name {
-                    CardName::RagavanNimblePilferer => Some(TriggeredEffect::RagavanCombatDamage),
-                    CardName::ScrawlingCrawler => Some(TriggeredEffect::ScrawlingCrawlerCombatDamage),
-                    CardName::PsychicFrog => Some(TriggeredEffect::PsychicFrogCombatDamage),
-                    CardName::Barrowgoyf => Some(TriggeredEffect::BarrowgoyfCombatDamage { damage: attacker_power }),
-                    CardName::VesselOfTheAllConsuming => Some(TriggeredEffect::VesselDealsDamage { vessel_id: attacker_id }),
-                    _ => None,
+                // Dress Down suppresses creature triggered abilities
+                let trigger_effect = if dress_down {
+                    None
+                } else {
+                    match attacker.card_name {
+                        CardName::RagavanNimblePilferer => Some(TriggeredEffect::RagavanCombatDamage),
+                        CardName::ScrawlingCrawler => Some(TriggeredEffect::ScrawlingCrawlerCombatDamage),
+                        CardName::PsychicFrog => Some(TriggeredEffect::PsychicFrogCombatDamage),
+                        CardName::Barrowgoyf => Some(TriggeredEffect::BarrowgoyfCombatDamage { damage: attacker_power }),
+                        CardName::VesselOfTheAllConsuming => Some(TriggeredEffect::VesselDealsDamage { vessel_id: attacker_id }),
+                        _ => None,
+                    }
                 };
                 if let Some(effect) = trigger_effect {
                     let attacker_name = attacker.card_name;
@@ -129,6 +139,7 @@ impl GameState {
                         // Check if attacker has protection from the blocker
                         let blocker_colors = blocker.colors.clone();
                         let blocker_controller = blocker.controller;
+                        let blocker_has_lifelink = !dress_down && blocker.keywords.has(Keyword::Lifelink);
                         let attacker_protected = {
                             // We need attacker's protections; re-fetch attacker
                             self.find_permanent(attacker_id)
@@ -138,7 +149,7 @@ impl GameState {
                         };
                         if blocker_power > 0 && !attacker_protected {
                             damage_to_creatures.push((attacker_id, blocker_power));
-                            if blocker.keywords.has(Keyword::Lifelink) {
+                            if blocker_has_lifelink {
                                 damage_to_players.push((blocker.controller, blocker_power as i32));
                             }
                         }

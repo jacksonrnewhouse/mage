@@ -456,7 +456,8 @@ impl GameState {
             (Phase::Combat, Some(Step::DeclareBlockers)) => {
                 self.action_context = ActionContext::Priority;
                 // Check for first strike
-                let has_first_strike = self.attackers.iter().any(|(id, _)| {
+                let dress_down = self.dress_down_active();
+                let has_first_strike = !dress_down && self.attackers.iter().any(|(id, _)| {
                     self.find_permanent(*id)
                         .map(|p| p.keywords.has(Keyword::FirstStrike) || p.keywords.has(Keyword::DoubleStrike))
                         .unwrap_or(false)
@@ -687,6 +688,21 @@ impl GameState {
     }
 
     // --- Battlefield queries ---
+
+    /// Returns true if Dress Down is on the battlefield (creatures lose all abilities).
+    pub fn dress_down_active(&self) -> bool {
+        self.battlefield.iter().any(|p| p.card_name == CardName::DressDown)
+    }
+
+    /// Check whether a creature permanent has a given keyword, respecting Dress Down.
+    /// When Dress Down is active, creatures have no keywords.
+    /// For non-creature permanents, this falls through to the permanent's own keywords.
+    pub fn creature_has_keyword(&self, perm: &Permanent, kw: Keyword) -> bool {
+        if perm.is_creature() && self.dress_down_active() {
+            return false;
+        }
+        perm.keywords.has(kw)
+    }
 
     pub fn find_permanent(&self, id: ObjectId) -> Option<&Permanent> {
         self.battlefield.iter().find(|p| p.id == id)

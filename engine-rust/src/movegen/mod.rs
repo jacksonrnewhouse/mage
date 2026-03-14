@@ -889,9 +889,23 @@ impl GameState {
         actions.push(Action::ConfirmAttackers);
 
         // Can declare each eligible creature as attacker
+        // Dress Down: creatures lose all abilities (haste, defender).
+        // Without haste, creatures with summoning sickness can't attack.
+        // Without defender, the defender restriction is lifted.
         let defending_player = self.opponent(self.active_player);
+        let dress_down = self.dress_down_active();
         for perm in self.permanents_controlled_by(self.active_player) {
-            if perm.can_attack() {
+            let can_attack = if dress_down {
+                // Under Dress Down: no haste (summoning sickness applies),
+                // no defender (defender restriction removed)
+                perm.is_creature()
+                    && !perm.tapped
+                    && !perm.attacked_this_turn
+                    && !perm.entered_this_turn
+            } else {
+                perm.can_attack()
+            };
+            if can_attack {
                 // Check if already declared as attacker
                 if !self.attackers.iter().any(|(id, _)| *id == perm.id) {
                     actions.push(Action::DeclareAttacker {
@@ -915,6 +929,7 @@ impl GameState {
         actions.push(Action::ConfirmBlockers);
 
         let blocking_player = self.opponent(self.active_player);
+        let dress_down = self.dress_down_active();
         for perm in self.permanents_controlled_by(blocking_player) {
             if !perm.can_block() {
                 continue;
@@ -927,18 +942,23 @@ impl GameState {
             for &(attacker_id, _) in &self.attackers {
                 if let Some(attacker) = self.find_permanent(attacker_id) {
                     // Can't be blocked: creatures with this keyword cannot be blocked at all.
-                    if attacker.keywords.has(Keyword::CantBeBlocked) {
+                    // Dress Down removes this keyword.
+                    if !dress_down && attacker.keywords.has(Keyword::CantBeBlocked) {
                         continue;
                     }
                     // Shadow: creatures with shadow can only be blocked by creatures with shadow,
                     // and creatures without shadow cannot block creatures with shadow (and vice versa).
-                    let attacker_has_shadow = attacker.keywords.has(Keyword::Shadow);
-                    let blocker_has_shadow = perm.keywords.has(Keyword::Shadow);
-                    if attacker_has_shadow != blocker_has_shadow {
-                        continue;
+                    // Dress Down removes shadow from all creatures, so all can block each other.
+                    if !dress_down {
+                        let attacker_has_shadow = attacker.keywords.has(Keyword::Shadow);
+                        let blocker_has_shadow = perm.keywords.has(Keyword::Shadow);
+                        if attacker_has_shadow != blocker_has_shadow {
+                            continue;
+                        }
                     }
-                    let can_block_flight = if attacker.keywords.has(Keyword::Flying) {
-                        perm.can_block_flyer()
+                    let can_block_flight = if !dress_down && attacker.keywords.has(Keyword::Flying) {
+                        // Blocker also needs flying/reach (which Dress Down would remove)
+                        !dress_down && (perm.keywords.has(Keyword::Flying) || perm.keywords.has(Keyword::Reach))
                     } else {
                         true
                     };
@@ -1159,6 +1179,10 @@ impl GameState {
 
     /// What mana can a permanent produce?
     fn mana_ability_options(&self, perm: &crate::permanent::Permanent) -> Vec<Option<Color>> {
+        // Dress Down: creatures lose all abilities, including mana abilities.
+        if perm.is_creature() && self.dress_down_active() {
+            return vec![];
+        }
         let base = self.mana_ability_options_base(perm);
         self.apply_land_type_effects(perm, base)
     }
@@ -1899,6 +1923,11 @@ impl GameState {
     ) -> Vec<(u8, Vec<Target>)> {
         let mut abilities = Vec::new();
 
+        // Dress Down: creatures lose all abilities (including activated abilities).
+        if perm.is_creature() && self.dress_down_active() {
+            return abilities;
+        }
+
         // Sacrifice abilities (Black Lotus, Lotus Petal, Lion's Eye Diamond, Treasure tokens)
         match perm.card_name {
             CardName::BlackLotus if !perm.tapped => {
@@ -2389,8 +2418,10 @@ impl GameState {
                     // +1: Put three +1/+1 counters on up to one target creature with trample or haste.
                     // "up to one" means we can activate with no target
                     abilities.push((0, vec![]));
+                    let dd = self.dress_down_active();
                     for target in &self.battlefield {
                         if target.is_creature()
+                            && !dd
                             && (target.keywords.has(Keyword::Trample) || target.keywords.has(Keyword::Haste))
                         {
                             abilities.push((0, vec![Target::Object(target.id)]));
@@ -2579,12 +2610,15 @@ impl GameState {
         caster: PlayerId,
         source_colors: &[Color],
     ) -> bool {
+        // Dress Down: creatures lose all abilities including hexproof/shroud.
+        let dress_down = self.dress_down_active();
+        let is_creature = target.is_creature();
         // Hexproof: can't be targeted by opponents' spells/abilities.
-        if target.keywords.has(Keyword::Hexproof) && target.controller != caster {
+        if !(dress_down && is_creature) && target.keywords.has(Keyword::Hexproof) && target.controller != caster {
             return false;
         }
         // Shroud: can't be targeted by any spells/abilities.
-        if target.keywords.has(Keyword::Shroud) {
+        if !(dress_down && is_creature) && target.keywords.has(Keyword::Shroud) {
             return false;
         }
         // Veil of Summer: permanents you control gain hexproof from blue and from black.
