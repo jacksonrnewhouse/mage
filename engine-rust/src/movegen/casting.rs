@@ -1908,6 +1908,21 @@ impl GameState {
                 self.reset_priority_passes();
             }
 
+            // Memory Jar: {T}, Sacrifice: Each player exiles hand and draws 7. (ability_index 0)
+            CardName::MemoryJar if ability_index == 0 => {
+                self.destroy_permanent(permanent_id);
+                self.stack.push(
+                    StackItemKind::ActivatedAbility {
+                        source_id: permanent_id,
+                        source_name: card_name,
+                        effect: ActivatedEffect::MemoryJarActivate,
+                    },
+                    controller,
+                    vec![],
+                );
+                self.reset_priority_passes();
+            }
+
             // Tormod's Crypt: {T}, Sacrifice: Exile target player's graveyard. (ability_index 0)
             CardName::TormodsCrypt if ability_index == 0 => {
                 self.destroy_permanent(permanent_id);

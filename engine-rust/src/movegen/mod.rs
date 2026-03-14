@@ -2144,6 +2144,11 @@ impl GameState {
             }
         }
 
+        // Memory Jar: {T}, Sacrifice: Each player exiles hand and draws 7 cards. (ability_index 0)
+        if perm.card_name == CardName::MemoryJar {
+            abilities.push((0, vec![]));
+        }
+
         // Tormod's Crypt: {T}, Sacrifice: Exile target player's graveyard. (ability_index 0)
         if perm.card_name == CardName::TormodsCrypt {
             for pid in 0..self.players.len() {

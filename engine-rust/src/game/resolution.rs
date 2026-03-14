@@ -5870,6 +5870,23 @@ impl GameState {
                 // "up to one" — if no target, nothing happens
             }
 
+            // === Memory Jar ===
+            ActivatedEffect::MemoryJarActivate => {
+                // Each player exiles their hand face down and draws seven cards.
+                // Simplified: exile hand, draw 7 (no delayed trigger to return cards).
+                for pid in 0..self.players.len() {
+                    let player_id = pid as PlayerId;
+                    // Exile all cards from hand
+                    let hand_cards: Vec<ObjectId> = self.players[pid].hand.drain(..).collect();
+                    for card_id in hand_cards {
+                        let card_name = self.card_name_for_id(card_id).unwrap_or(CardName::Plains);
+                        self.exile.push((card_id, card_name, player_id));
+                    }
+                    // Draw 7 cards
+                    self.draw_cards(player_id, 7);
+                }
+            }
+
             // === Tormod's Crypt ===
             ActivatedEffect::TormodsCryptExile => {
                 // Exile target player's graveyard

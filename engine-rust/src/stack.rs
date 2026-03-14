@@ -440,6 +440,8 @@ pub enum ActivatedEffect {
     GorillaShamanDestroy { target_mv: u8 },
     /// Mana Vault / Grim Monolith: {4}: Untap this artifact.
     UntapSelf { permanent_id: ObjectId },
+    /// Memory Jar: {T}, Sacrifice: Each player exiles hand and draws 7 cards.
+    MemoryJarActivate,
 }
 
 /// The game stack.
