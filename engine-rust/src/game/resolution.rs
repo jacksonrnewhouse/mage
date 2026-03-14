@@ -332,40 +332,17 @@ impl GameState {
                 }
             }
             CardName::ConsignToMemory => {
-                // Hard counter with Storm
-                if let Some(Target::Object(spell_id)) = targets.first() {
+                // Counter target triggered ability or colorless spell (Replicate {1})
+                if let Some(Target::Object(target_id)) = targets.first() {
                     let is_uncounterable = self.stack.items()
                         .iter()
-                        .find(|item| item.id == *spell_id)
+                        .find(|item| item.id == *target_id)
                         .map(|item| item.cant_be_countered)
                         .unwrap_or(false);
                     if !is_uncounterable {
-                        if let Some(item) = self.stack.remove(*spell_id) {
+                        if let Some(item) = self.stack.remove(*target_id) {
                             self.route_countered_spell(item);
                         }
-                    }
-                }
-                // Storm: push storm_count copies onto the stack
-                if !is_copy {
-                    let storm = self.storm_count;
-                    let template = crate::stack::StackItem {
-                        id: 0,
-                        kind: crate::stack::StackItemKind::Spell {
-                            card_name: CardName::ConsignToMemory,
-                            card_id: 0,
-                            cast_via_evoke: false,
-                        },
-                        controller,
-                        targets: targets.to_vec(),
-                        cant_be_countered: false,
-                        x_value: 0,
-                        cast_from_graveyard: false,
-                        cast_as_adventure: false,
-                        modes: vec![],
-                        is_copy: false,
-                    };
-                    for _ in 0..storm {
-                        self.stack.push_copy(&template);
                     }
                 }
             }

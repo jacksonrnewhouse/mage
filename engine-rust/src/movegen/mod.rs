@@ -2814,21 +2814,20 @@ impl GameState {
                 target_sets
             }
 
-            // Target artifact or enchantment spell on stack
+            // Target triggered ability or colorless spell on stack
             CardName::ConsignToMemory => {
                 self.stack
                     .items()
                     .iter()
                     .filter(|item| {
-                        if let StackItemKind::Spell { card_name: cn, .. } = &item.kind {
-                            find_card(db, *cn)
-                                .map(|def| {
-                                    def.card_types.contains(&CardType::Artifact)
-                                        || def.card_types.contains(&CardType::Enchantment)
-                                })
-                                .unwrap_or(false)
-                        } else {
-                            false
+                        match &item.kind {
+                            StackItemKind::TriggeredAbility { .. } => true,
+                            StackItemKind::Spell { card_name: cn, .. } => {
+                                find_card(db, *cn)
+                                    .map(|def| def.color_identity.is_empty())
+                                    .unwrap_or(false)
+                            }
+                            _ => false,
                         }
                     })
                     .map(|item| vec![Target::Object(item.id)])
