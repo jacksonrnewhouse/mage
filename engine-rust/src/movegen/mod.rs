@@ -2047,6 +2047,17 @@ impl GameState {
             }
         }
 
+        // Mana Vault / Grim Monolith: {4}: Untap (ability_index 0 for non-mana ability)
+        // Only available when tapped and controller has 4 mana
+        if (perm.card_name == CardName::ManaVault || perm.card_name == CardName::GrimMonolith)
+            && perm.tapped
+        {
+            let player = &self.players[perm.controller as usize];
+            if player.mana_pool.total() >= 4 {
+                abilities.push((0, vec![]));
+            }
+        }
+
         // Time Vault: {T}: Take an extra turn after this one (ability_index 0)
         if perm.card_name == CardName::TimeVault && !perm.tapped {
             abilities.push((0, vec![]));

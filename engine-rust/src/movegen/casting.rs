@@ -1827,6 +1827,22 @@ impl GameState {
                 self.reset_priority_passes();
             }
 
+            // Mana Vault / Grim Monolith: {4}: Untap (ability_index 0)
+            CardName::ManaVault | CardName::GrimMonolith if ability_index == 0 => {
+                // Pay {4}
+                self.players[controller as usize].mana_pool.pay_generic(4);
+                self.stack.push(
+                    StackItemKind::ActivatedAbility {
+                        source_id: permanent_id,
+                        source_name: card_name,
+                        effect: ActivatedEffect::UntapSelf { permanent_id },
+                    },
+                    controller,
+                    vec![],
+                );
+                self.reset_priority_passes();
+            }
+
             // Krark-Clan Ironworks: Sacrifice an artifact: Add {C}{C} (ability_index 0)
             // This is a mana ability, so it resolves immediately (doesn't use the stack).
             CardName::KrarkClanIronworks if ability_index == 0 => {

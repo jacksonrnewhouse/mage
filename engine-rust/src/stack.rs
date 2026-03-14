@@ -272,6 +272,8 @@ pub enum TriggeredEffect {
     /// Vengevine: when a player casts their second creature spell this turn,
     /// return Vengevine from their graveyard to the battlefield.
     VengevineReturn { vengevine_id: ObjectId, owner: PlayerId },
+    /// Mana Vault draw-step trigger: if Mana Vault is tapped, deal 1 damage to its controller.
+    ManaVaultDrawStep { vault_id: ObjectId },
 }
 
 /// Activated ability effects.
@@ -431,6 +433,8 @@ pub enum ActivatedEffect {
     BoromirSacrifice,
     /// Gorilla Shaman: {X}{X}{1}: Destroy target noncreature artifact with mana value X.
     GorillaShamanDestroy { target_mv: u8 },
+    /// Mana Vault / Grim Monolith: {4}: Untap this artifact.
+    UntapSelf { permanent_id: ObjectId },
 }
 
 /// The game stack.

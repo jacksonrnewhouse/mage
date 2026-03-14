@@ -411,6 +411,7 @@ impl GameState {
             }
             (Phase::Beginning, Some(Step::Upkeep)) => {
                 self.step = Some(Step::Draw);
+                self.check_delayed_triggers();
                 // Active player draws a card (skip on turn 1 for first player in 2-player)
                 // Necropotence: skip the draw step entirely
                 let skip_draw = self.players[self.active_player as usize].necropotence_active;
@@ -1172,6 +1173,9 @@ impl GameState {
                     }
                     DelayedTriggerCondition::AtBeginningOfOpponentUpkeep { controller } => {
                         phase == Phase::Beginning && step == Some(Step::Upkeep) && active != controller
+                    }
+                    DelayedTriggerCondition::AtBeginningOfDrawStep { player } => {
+                        phase == Phase::Beginning && step == Some(Step::Draw) && active == player
                     }
                 }
             })

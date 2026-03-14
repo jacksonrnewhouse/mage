@@ -2585,6 +2585,18 @@ impl GameState {
                 if let Some(perm) = self.find_permanent_mut(_card_id) {
                     perm.doesnt_untap = true;
                 }
+                // Mana Vault: register draw-step damage trigger
+                if card_name == CardName::ManaVault {
+                    self.add_delayed_trigger(crate::types::DelayedTrigger {
+                        condition: crate::types::DelayedTriggerCondition::AtBeginningOfDrawStep {
+                            player: controller,
+                        },
+                        effect: TriggeredEffect::ManaVaultDrawStep { vault_id: _card_id },
+                        controller,
+                        fires_once: false,
+                        source_id: Some(_card_id),
+                    });
+                }
             }
             // Shatterskull, the Hammer Pass (MDFC back face): enters tapped
             // (simplified: always enters tapped, skip the "pay 3 life" option)
@@ -4944,6 +4956,17 @@ impl GameState {
                 self.draw_cards(controller, 1);
             }
 
+            TriggeredEffect::ManaVaultDrawStep { vault_id } => {
+                // Mana Vault: at the beginning of your draw step, if Mana Vault is tapped,
+                // it deals 1 damage to you.
+                let is_tapped = self.find_permanent(vault_id)
+                    .map(|p| p.tapped)
+                    .unwrap_or(false);
+                if is_tapped {
+                    self.players[controller as usize].life -= 1;
+                }
+            }
+
             _ => {}
         }
         let _ = db; // suppress unused warning when db not used in all arms
@@ -5688,6 +5711,13 @@ impl GameState {
             ActivatedEffect::TimeVaultUntap { vault_id } => {
                 // Untap Time Vault (skip turn cost already paid at activation)
                 if let Some(perm) = self.find_permanent_mut(vault_id) {
+                    perm.tapped = false;
+                }
+            }
+
+            // === Mana Vault / Grim Monolith: {4}: Untap ===
+            ActivatedEffect::UntapSelf { permanent_id } => {
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
                     perm.tapped = false;
                 }
             }

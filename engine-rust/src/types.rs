@@ -369,6 +369,9 @@ pub enum DelayedTriggerCondition {
     /// Fires at the beginning of the upkeep of any player who is NOT `controller`.
     /// Used by White Plume Adventurer's "at the beginning of each opponent's upkeep" trigger.
     AtBeginningOfOpponentUpkeep { controller: PlayerId },
+    /// Fires at the beginning of the draw step for the specified player.
+    /// Used by Mana Vault's draw-step damage trigger.
+    AtBeginningOfDrawStep { player: PlayerId },
 }
 
 /// A delayed triggered ability that will fire at a later point in the game.

@@ -1165,7 +1165,7 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(ManaCrypt, "Mana Crypt", c, &[Artifact], &[], None, None, None, kw(), &[],
         "At the beginning of your upkeep, flip a coin. If you lose the flip, Mana Crypt deals 3 damage to you. {T}: Add {C}{C}.");
     card!(ManaVault, "Mana Vault", ManaCost::generic(1), &[Artifact], &[], None, None, None, kw(), &[],
-        "{T}: Add {C}{C}{C}. Mana Vault doesn't untap during your untap step.");
+        "Mana Vault doesn't untap during your untap step. At the beginning of your draw step, if Mana Vault is tapped, it deals 1 damage to you. {4}: Untap Mana Vault. {T}: Add {C}{C}{C}.");
     card!(LotusPetal, "Lotus Petal", c, &[Artifact], &[], None, None, None, kw(), &[],
         "{T}, Sacrifice Lotus Petal: Add one mana of any color.");
     card!(LionEyeDiamond, "Lion's Eye Diamond", c, &[Artifact], &[], None, None, None, kw(), &[],
