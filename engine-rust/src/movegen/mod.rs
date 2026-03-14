@@ -1235,7 +1235,7 @@ impl GameState {
             CardName::ThunderingFalls => vec![Some(Color::Blue), Some(Color::Red)],
             CardName::HedgeMaze => vec![Some(Color::Green), Some(Color::Blue)],
             // MDFC land back face: {T}: Add {R}
-            CardName::ShatterskullTheHammerPass => vec![Some(Color::Red)],
+            CardName::ShatterskullTheHammerPass | CardName::VolcanicFissure => vec![Some(Color::Red)],
 
             // Other utility lands producing colored mana
             CardName::Karakas => vec![Some(Color::White)],
@@ -1509,6 +1509,7 @@ impl GameState {
             | CardName::HedgeMaze
             // MDFC land back faces
             | CardName::ShatterskullTheHammerPass
+            | CardName::VolcanicFissure
             // Other colored-producing lands
             | CardName::Karakas
             | CardName::OtawaraSoaringCity
@@ -2789,10 +2790,19 @@ impl GameState {
             CardName::Disenchant | CardName::NaturesClaim
             | CardName::AncientGrudge | CardName::ShatteringSpree
             | CardName::UntimelyMalfunction | CardName::Crash
-            | CardName::SunderingEruption => {
+            => {
                 self.battlefield
                     .iter()
                     .filter(|p| p.is_artifact() || p.is_enchantment())
+                    .map(|p| vec![Target::Object(p.id)])
+                    .collect()
+            }
+
+            // Target land (land destruction sorcery)
+            CardName::SunderingEruption => {
+                self.battlefield
+                    .iter()
+                    .filter(|p| p.is_land())
                     .map(|p| vec![Target::Object(p.id)])
                     .collect()
             }

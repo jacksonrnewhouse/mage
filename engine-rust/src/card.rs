@@ -357,6 +357,8 @@ pub enum CardName {
     /// Back face of Shatterskull Smashing — MDFC land
     ShatterskullTheHammerPass,
     SunderingEruption,
+    /// Back face of Sundering Eruption — MDFC land
+    VolcanicFissure,
     ExperimentalFrenzy,
 
     // === Red/Green extra creatures (madness/pitch) ===
@@ -2051,8 +2053,48 @@ pub fn build_card_db() -> Vec<CardDef> {
         adventure: None,
         back_face: None,
     });
-    card!(SunderingEruption, "Sundering Eruption", ManaCost { red: 1, generic: 2, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Red],
-        "Destroy target artifact or enchantment. Sundering Eruption deals 3 damage to each opponent.");
+    db.push(CardDef {
+        name: CardName::SunderingEruption,
+        display_name: "Sundering Eruption",
+        mana_cost: ManaCost { red: 1, generic: 2, ..c },
+        has_x_cost: false,
+        x_multiplier: 0,
+        card_types: &[CardType::Sorcery],
+        supertypes: &[],
+        power: None,
+        toughness: None,
+        loyalty: None,
+        keywords: kw(),
+        color_identity: &[Color::Red],
+        oracle_text: "Destroy target land. Its controller may search their library for a basic land card, put it onto the battlefield tapped, then shuffle. Creatures without flying can't block this turn.",
+        flashback_cost: None,
+        madness_cost: None,
+        creature_types: &[],
+        is_changeling: false,
+        adventure: None,
+        back_face: Some(CardName::VolcanicFissure),
+    });
+    db.push(CardDef {
+        name: CardName::VolcanicFissure,
+        display_name: "Volcanic Fissure",
+        mana_cost: ManaCost::ZERO,
+        has_x_cost: false,
+        x_multiplier: 0,
+        card_types: &[CardType::Land],
+        supertypes: &[],
+        power: None,
+        toughness: None,
+        loyalty: None,
+        keywords: kw(),
+        color_identity: &[Color::Red],
+        oracle_text: "As this land enters, you may pay 3 life. If you don't, it enters tapped.\n{T}: Add {R}.",
+        flashback_cost: None,
+        madness_cost: None,
+        creature_types: &[],
+        is_changeling: false,
+        adventure: None,
+        back_face: None,
+    });
     card!(ExperimentalFrenzy, "Experimental Frenzy", ManaCost { red: 1, generic: 3, ..c }, &[Enchantment], &[], None, None, None, kw(), &[Red],
         "You may look at the top card of your library any time. You may cast spells from the top of your library. You can't cast spells from your hand. {3}{R}: Destroy Experimental Frenzy.");
 
@@ -2502,6 +2544,7 @@ pub fn is_land_card(name: CardName) -> bool {
         | CardName::ShelldockIsle | CardName::MosswortBridge | CardName::TheMycoSynthGardens
         | CardName::UrzasSaga | CardName::BazaarOfBaghdad | CardName::DryadArbor | CardName::CavernOfSouls
         | CardName::ShatterskullTheHammerPass
+        | CardName::VolcanicFissure
     )
 }
 

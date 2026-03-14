@@ -1255,13 +1255,49 @@ impl GameState {
             }
 
             CardName::SunderingEruption => {
-                // Destroy target artifact or enchantment, then deal 3 damage to each opponent.
+                // Destroy target land. Its controller may search their library for a basic land card,
+                // put it onto the battlefield tapped, then shuffle.
+                // (Creatures without flying can't block this turn — not yet modeled.)
                 if let Some(Target::Object(target_id)) = targets.first() {
+                    let land_controller = self.find_permanent(*target_id).map(|p| p.controller);
                     self.destroy_permanent(*target_id);
-                }
-                for pid in 0..self.num_players {
-                    if pid != controller {
-                        self.players[pid as usize].life -= 3;
+                    // The destroyed land's controller may search for a basic land (enters tapped)
+                    if let Some(land_owner) = land_controller {
+                        if !self.library_search_restricted(land_owner) {
+                            let searchable: Vec<ObjectId> = self.players[land_owner as usize]
+                                .library
+                                .iter()
+                                .filter(|&&id| {
+                                    self.card_name_for_id(id)
+                                        .map(|cn| crate::card::is_basic_land_card(cn))
+                                        .unwrap_or(false)
+                                })
+                                .copied()
+                                .collect();
+                            if !searchable.is_empty() {
+                                // For simplicity, put the first basic land onto the battlefield tapped
+                                let chosen = searchable[0];
+                                self.players[land_owner as usize].library.retain(|&id| id != chosen);
+                                if let Some(cn) = self.card_name_for_id(chosen) {
+                                    if let Some(def) = find_card(db, cn) {
+                                        let mut perm = crate::permanent::Permanent::new(
+                                            chosen,
+                                            cn,
+                                            land_owner,
+                                            land_owner,
+                                            def.power,
+                                            def.toughness,
+                                            def.loyalty,
+                                            def.keywords,
+                                            def.card_types,
+                                        );
+                                        perm.colors = def.color_identity.to_vec();
+                                        perm.tapped = true;
+                                        self.battlefield.push(perm);
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -2571,7 +2607,7 @@ impl GameState {
             }
             // Shatterskull, the Hammer Pass (MDFC back face): enters tapped
             // (simplified: always enters tapped, skip the "pay 3 life" option)
-            CardName::ShatterskullTheHammerPass => {
+            CardName::ShatterskullTheHammerPass | CardName::VolcanicFissure => {
                 if let Some(perm) = self.find_permanent_mut(_card_id) {
                     perm.tapped = true;
                 }
