@@ -677,12 +677,20 @@ impl GameState {
         let artifact_lockdown = self.battlefield.iter().any(|p| {
             matches!(p.card_name, CardName::CollectorOuphe | CardName::NullRod | CardName::StonySilence)
         });
+        // Clarion Conqueror: activated abilities of artifacts, creatures, and planeswalkers can't be activated
+        let clarion_lockdown = self.battlefield.iter().any(|p| {
+            p.card_name == CardName::ClarionConqueror
+        });
         for perm in self.permanents_controlled_by(player_id) {
             if perm.tapped {
                 continue;
             }
             // Collector Ouphe / Null Rod / Stony Silence: artifact activated abilities can't be activated
             if artifact_lockdown && perm.is_artifact() {
+                continue;
+            }
+            // Clarion Conqueror: artifact/creature/planeswalker activated abilities can't be activated
+            if clarion_lockdown && (perm.is_artifact() || perm.is_creature() || perm.is_planeswalker()) {
                 continue;
             }
             let mana_options = self.mana_ability_options(perm);
@@ -698,6 +706,10 @@ impl GameState {
         for perm in self.permanents_controlled_by(player_id) {
             // Collector Ouphe / Null Rod / Stony Silence: artifact activated abilities can't be activated
             if artifact_lockdown && perm.is_artifact() {
+                continue;
+            }
+            // Clarion Conqueror: artifact/creature/planeswalker activated abilities can't be activated
+            if clarion_lockdown && (perm.is_artifact() || perm.is_creature() || perm.is_planeswalker()) {
                 continue;
             }
             let abilities = self.activatable_abilities(perm, sorcery_speed, db);
@@ -1452,6 +1464,16 @@ impl GameState {
                 matches!(p.card_name, CardName::CollectorOuphe | CardName::NullRod | CardName::StonySilence)
             });
             if artifact_lockdown {
+                return false;
+            }
+        }
+
+        // Clarion Conqueror: activated abilities of artifacts, creatures, and planeswalkers can't be activated
+        if is_artifact || perm.is_creature() || perm.is_planeswalker() {
+            let clarion_lockdown = self.battlefield.iter().any(|p| {
+                p.card_name == CardName::ClarionConqueror
+            });
+            if clarion_lockdown {
                 return false;
             }
         }

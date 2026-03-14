@@ -337,8 +337,6 @@ impl GameState {
                             self.check_chalice_trigger(spell_id, def.mana_cost.cmc());
                             // Eidolon of the Great Revel: deal 2 to caster if MV <= 3.
                             self.check_eidolon_trigger(player_id, def.mana_cost.cmc());
-                            // Clarion Conqueror: whenever an opponent casts a spell during your turn.
-                            self.check_clarion_conqueror_trigger(player_id);
                             self.players[player_id as usize].spells_cast_this_turn += 1;
                             self.players[player_id as usize].spells_cast_this_game += 1;
                             if !def.card_types.contains(&CardType::Artifact) {
@@ -729,7 +727,6 @@ impl GameState {
                                 self.check_chalice_trigger(adventure_spell_id, adv.cost.cmc());
                             }
                             self.check_eidolon_trigger(player_id, adv.cost.cmc());
-                            self.check_clarion_conqueror_trigger(player_id);
                             self.players[player_id as usize].spells_cast_this_turn += 1;
                             self.players[player_id as usize].spells_cast_this_game += 1;
                             self.players[player_id as usize].nonartifact_spells_cast_this_turn += 1;
@@ -776,7 +773,6 @@ impl GameState {
                         // Chalice of the Void: counter spells with MV equal to charge counters.
                         self.check_chalice_trigger(spell_id, def.mana_cost.cmc());
                         self.check_eidolon_trigger(player_id, def.mana_cost.cmc());
-                        self.check_clarion_conqueror_trigger(player_id);
                         self.players[player_id as usize].spells_cast_this_turn += 1;
                         self.players[player_id as usize].spells_cast_this_game += 1;
                         if !def.card_types.contains(&CardType::Artifact) {

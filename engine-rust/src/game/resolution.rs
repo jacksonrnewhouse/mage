@@ -4802,26 +4802,6 @@ impl GameState {
                 }
             }
 
-            TriggeredEffect::ClarionConquerorOpponentCast => {
-                // Create a 1/1 white Soldier creature token.
-                let token_id = self.new_object_id();
-                let mut token = Permanent::new(
-                    token_id,
-                    card_name_for_token(),
-                    controller,
-                    controller,
-                    Some(1),
-                    Some(1),
-                    None,
-                    Keywords::empty(),
-                    &[CardType::Creature],
-                );
-                token.is_token = true;
-                token.creature_types = vec![CreatureType::Soldier];
-                token.colors = vec![Color::White];
-                self.battlefield.push(token);
-            }
-
             TriggeredEffect::WhitePlumeAdventurerUntap => {
                 // At the beginning of each opponent's upkeep, untap a creature you control.
                 // If you've completed a dungeon (undercity_room >= 4), untap all creatures instead.

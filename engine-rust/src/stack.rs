@@ -243,9 +243,6 @@ pub enum TriggeredEffect {
     /// Seasoned Dungeoneer: attack trigger — target creature explores and gains
     /// protection from creatures until end of turn.
     SeasonedDungeoneerAttack,
-    /// Clarion Conqueror: whenever an opponent casts a spell during your turn,
-    /// create a 1/1 white Soldier creature token.
-    ClarionConquerorOpponentCast,
     /// White Plume Adventurer: at the beginning of each opponent's upkeep, untap a creature
     /// you control. If you've completed a dungeon, untap all creatures you control instead.
     WhitePlumeAdventurerUntap,

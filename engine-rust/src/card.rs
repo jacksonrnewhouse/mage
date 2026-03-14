@@ -1544,9 +1544,9 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(CT(&[CreatureType::Human, CreatureType::Soldier]) BoromirWardenOfTheTower, "Boromir, Warden of the Tower", ManaCost { white: 1, generic: 2, ..c }, &[Creature], &[Legendary],
         Some(3), Some(3), None, vigilance(), &[White],
         "Vigilance. Whenever an opponent casts a spell, if no mana was spent to cast it, counter that spell. Sacrifice Boromir: Creatures you control gain indestructible until end of turn. The Ring tempts you.");
-    card!(CT(&[CreatureType::Human, CreatureType::Knight]) ClarionConqueror, "Clarion Conqueror", ManaCost { white: 2, generic: 2, ..c }, &[Creature], &[],
-        Some(3), Some(3), None, kw(), &[White],
-        "Whenever an opponent casts a spell during your turn, create a 1/1 white Soldier creature token.");
+    card!(CT(&[CreatureType::Dragon]) ClarionConqueror, "Clarion Conqueror", ManaCost { white: 1, generic: 2, ..c }, &[Creature], &[],
+        Some(3), Some(3), None, flying(), &[White],
+        "Flying. Activated abilities of artifacts, creatures, and planeswalkers can't be activated.");
     card!(CT(&[CreatureType::Human, CreatureType::Artificer]) LoranOfTheThirdPath, "Loran of the Third Path", ManaCost { white: 1, generic: 2, ..c }, &[Creature], &[Legendary],
         Some(2), Some(1), None, vigilance(), &[White],
         "Vigilance. When Loran enters, destroy target artifact or enchantment an opponent controls. {T}: You and target opponent each draw a card.");
