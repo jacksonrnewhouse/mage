@@ -1488,9 +1488,9 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(CT(&[CreatureType::Human, CreatureType::Cleric]) ContainmentPriest, "Containment Priest", ManaCost { white: 1, generic: 1, ..c }, &[Creature], &[],
         Some(2), Some(2), None, flash(), &[White],
         "Flash. If a nontoken creature would enter the battlefield and it wasn't cast, exile it instead.");
-    card!(CT(&[CreatureType::Cat, CreatureType::Artificer]) DauntlessDismantler, "Dauntless Dismantler", ManaCost { white: 1, generic: 1, ..c }, &[Creature], &[],
-        Some(1), Some(1), None, kw(), &[White],
-        "{X}, {T}, Sacrifice Dauntless Dismantler: Destroy each artifact with mana value X or less.");
+    card!(CT(&[CreatureType::Human, CreatureType::Artificer]) DauntlessDismantler, "Dauntless Dismantler", ManaCost { white: 1, generic: 1, ..c }, &[Creature], &[],
+        Some(1), Some(4), None, kw(), &[White],
+        "Artifacts your opponents control enter tapped. {X}{X}{W}, Sacrifice this creature: Destroy each artifact with mana value X.");
     card!(CT(&[CreatureType::Thrull]) DoorkeeperThrull, "Doorkeeper Thrull", ManaCost { white: 1, generic: 1, ..c }, &[Creature], &[],
         Some(1), Some(3), None, flash(), &[White],
         "Flash. When Doorkeeper Thrull enters, exile target artifact or enchantment an opponent controls until Doorkeeper Thrull leaves the battlefield.");
@@ -1772,7 +1772,7 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Play with the top card of your library revealed. You may play the top card of your library.");
 
     // === Black Creatures ===
-    card!(Nethergoyf, "Nethergoyf", ManaCost { black: 1, generic: 1, ..c }, &[Creature], &[],
+    card!(Nethergoyf, "Nethergoyf", ManaCost { black: 1, ..c }, &[Creature], &[],
         Some(0), None, None, kw(), &[Black],
         "Nethergoyf's power is equal to the number of card types among cards in your graveyard and its toughness is equal to that number plus 1. Escape - {2}{B}, exile any number of other cards from your graveyard with four or more card types among them.");
     card!(DauthiVoidwalker, "Dauthi Voidwalker", ManaCost { black: 2, ..c }, &[Creature], &[],
@@ -1880,9 +1880,9 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(ZhaoTheMoonSlayer, "Zhao, the Moon Slayer", ManaCost { red: 1, generic: 1, ..c }, &[Creature], &[Legendary],
         Some(2), Some(2), None, kw(), &[Red],
         "Whenever Zhao attacks, exile the top card of your library. You may play it this turn. Whenever you play a land or cast a spell from exile, put a +1/+1 counter on Zhao.");
-    card!(CT(&[CreatureType::Goblin]) NameStickerGoblin, "Name Sticker Goblin", ManaCost { red: 1, generic: 1, ..c }, &[Creature], &[],
-        Some(2), Some(2), None, haste(), &[Red],
-        "Haste. When Name Sticker Goblin enters, you may add a name sticker to a nonland permanent you own.");
+    card!(CT(&[CreatureType::Goblin]) NameStickerGoblin, "Name Sticker Goblin", ManaCost { red: 1, generic: 2, ..c }, &[Creature], &[],
+        Some(2), Some(2), None, kw(), &[Red],
+        "When this creature enters from anywhere other than a graveyard or exile, roll a 20-sided die. 1-6: Add RRRR. 7-14: Add RRRRR. 15-20: Add RRRRRR.");
     card!(AvalancheOfSector7, "Avalanche of Sector 7", ManaCost { red: 1, generic: 2, ..c }, &[Creature], &[],
         Some(3), Some(3), None, kw(), &[Red],
         "When Avalanche of Sector 7 enters, it deals damage equal to its power to target creature or planeswalker an opponent controls.");
@@ -2085,9 +2085,9 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(CT(&[CreatureType::Beast]) Manglehorn, "Manglehorn", ManaCost { green: 1, generic: 2, ..c }, &[Creature], &[],
         Some(2), Some(2), None, kw(), &[Green],
         "When Manglehorn enters, you may destroy target artifact. Artifacts your opponents control enter tapped.");
-    card!(IcetillExplorer, "Icetill Explorer", ManaCost { green: 1, generic: 3, ..c }, &[Creature], &[],
-        Some(3), Some(4), None, kw(), &[Green],
-        "When Icetill Explorer enters, search your library for a basic land card, put it onto the battlefield tapped, then shuffle.");
+    card!(CT(&[CreatureType::Insect, CreatureType::Scout]) IcetillExplorer, "Icetill Explorer", ManaCost { green: 2, generic: 2, ..c }, &[Creature], &[],
+        Some(2), Some(4), None, kw(), &[Green],
+        "You may play an additional land on each of your turns. You may play lands from your graveyard. Landfall — Whenever a land you control enters, mill a card.");
     card!(UndermountainAdventurer, "Undermountain Adventurer", ManaCost { green: 1, generic: 3, ..c }, &[Creature], &[],
         Some(3), Some(4), None, vigilance(), &[Green],
         "Vigilance. When Undermountain Adventurer enters, you take the initiative. {T}: Add {G}{G}.");
