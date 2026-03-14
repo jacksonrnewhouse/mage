@@ -1499,8 +1499,8 @@ pub fn build_card_db() -> Vec<CardDef> {
         Some(1), Some(4), None, kw(), &[White],
         "Artifacts your opponents control enter tapped. {X}{X}{W}, Sacrifice this creature: Destroy each artifact with mana value X.");
     card!(CT(&[CreatureType::Thrull]) DoorkeeperThrull, "Doorkeeper Thrull", ManaCost { white: 1, generic: 1, ..c }, &[Creature], &[],
-        Some(1), Some(3), None, flash(), &[White],
-        "Flash. When Doorkeeper Thrull enters, exile target artifact or enchantment an opponent controls until Doorkeeper Thrull leaves the battlefield.");
+        Some(1), Some(2), None, flash_flying(), &[White],
+        "Flash. Flying. Artifacts and creatures entering don't cause abilities to trigger.");
     card!(CT(&[CreatureType::Human, CreatureType::Wizard]) DrannithMagistrate, "Drannith Magistrate", ManaCost { white: 1, generic: 1, ..c }, &[Creature], &[],
         Some(1), Some(3), None, kw(), &[White],
         "Your opponents can't cast spells from anywhere other than their hands.");
