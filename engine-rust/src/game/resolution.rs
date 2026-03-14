@@ -3249,6 +3249,7 @@ impl GameState {
             CardName::PinnacleEmissary => {}
 
             // Portal to Phyrexia: each opponent sacrifices three creatures
+            // + register recurring upkeep trigger to reanimate a creature from any graveyard
             CardName::PortalToPhyrexia => {
                 for pid in 0..self.num_players {
                     if pid != controller {
@@ -3263,6 +3264,16 @@ impl GameState {
                         }
                     }
                 }
+                // Register recurring upkeep trigger: reanimate a creature from any graveyard
+                self.add_delayed_trigger(crate::types::DelayedTrigger {
+                    condition: crate::types::DelayedTriggerCondition::AtBeginningOfUpkeep {
+                        player: controller,
+                    },
+                    effect: TriggeredEffect::PortalToPhyrexiaUpkeep,
+                    controller,
+                    fires_once: false,
+                    source_id: Some(_card_id),
+                });
             }
 
             _ => {}
@@ -5027,6 +5038,59 @@ impl GameState {
                         attachments: Vec::new(),
                     };
                     self.battlefield.push(token);
+                }
+            }
+
+            TriggeredEffect::PortalToPhyrexiaUpkeep => {
+                // Portal to Phyrexia: at the beginning of your upkeep, put target creature card
+                // from a graveyard onto the battlefield under your control.
+                // Simplified: find the best creature card in any graveyard (highest mana value).
+                let db_local = crate::card::build_card_db();
+                let cage_active = self.grafdiggers_cage_active();
+                let priest_active = self.containment_priest_active();
+                let mut best_card_id: Option<ObjectId> = None;
+                let mut best_pid: Option<usize> = None;
+                let mut best_cmc: u8 = 0;
+                for pid in 0..self.num_players as usize {
+                    for &gid in &self.players[pid].graveyard {
+                        if let Some(cn) = self.card_name_for_id(gid) {
+                            if let Some(def) = find_card(&db_local, cn) {
+                                if def.card_types.contains(&CardType::Creature) {
+                                    let cmc = def.mana_cost.cmc();
+                                    if best_card_id.is_none() || cmc > best_cmc {
+                                        best_card_id = Some(gid);
+                                        best_pid = Some(pid);
+                                        best_cmc = cmc;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if let (Some(card_id), Some(pid)) = (best_card_id, best_pid) {
+                    if let Some(pos) = self.players[pid].graveyard.iter().position(|&id| id == card_id) {
+                        let card_id = self.players[pid].graveyard.remove(pos);
+                        self.check_kishla_skimmer_trigger(pid as PlayerId);
+                        if let Some(cn) = self.card_name_for_id(card_id) {
+                            if cage_active || priest_active {
+                                // Grafdigger's Cage / Containment Priest: exile instead
+                                self.exile.push((card_id, cn, pid as PlayerId));
+                            } else if let Some(def) = find_card(&db_local, cn) {
+                                let mut perm = Permanent::new(
+                                    card_id, cn, controller, pid as PlayerId,
+                                    def.power, def.toughness, def.loyalty, def.keywords, def.card_types,
+                                );
+                                if def.is_changeling {
+                                    perm.creature_types = crate::types::CreatureType::ALL.to_vec();
+                                } else {
+                                    perm.creature_types = def.creature_types.to_vec();
+                                }
+                                perm.colors = def.color_identity.to_vec();
+                                self.battlefield.push(perm);
+                                self.handle_etb(cn, card_id, controller);
+                            }
+                        }
+                    }
                 }
             }
 

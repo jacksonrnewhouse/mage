@@ -277,6 +277,9 @@ pub enum TriggeredEffect {
     /// Minsc & Boo ETB/upkeep: you may create Boo, a legendary 1/1 red Hamster creature token
     /// with trample and haste.
     MinscCreateBoo { minsc_id: ObjectId },
+    /// Portal to Phyrexia upkeep: put target creature card from a graveyard onto the battlefield
+    /// under your control.
+    PortalToPhyrexiaUpkeep,
 }
 
 /// Activated ability effects.
