@@ -1795,7 +1795,7 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(ShowAndTell, "Show and Tell", ManaCost { blue: 1, generic: 2, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Blue],
         "Each player may put an artifact, creature, enchantment, or land card from their hand onto the battlefield.");
     card!(StockUp, "Stock Up", ManaCost { blue: 1, generic: 2, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Blue],
-        "Draw three cards. If you control a token, draw four cards instead.");
+        "Look at the top five cards of your library. Put two of them into your hand and the rest on the bottom of your library in any order.");
     card!(Windfall, "Windfall", ManaCost { blue: 1, generic: 2, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Blue],
         "Each player discards their hand, then draws cards equal to the greatest number of cards a player discarded this way.");
     card!(LorienRevealed, "Lorien Revealed", ManaCost { blue: 2, generic: 3, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Blue],

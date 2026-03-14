@@ -840,8 +840,12 @@ impl GameState {
                     self.discard_card(id, controller, db);
                 }
             }
-            CardName::TreasureCruise | CardName::StockUp | CardName::LorienRevealed => {
+            CardName::TreasureCruise | CardName::LorienRevealed => {
                 self.draw_cards(controller, 3);
+            }
+            CardName::StockUp => {
+                // Look at top 5, put 2 into hand, rest on bottom - simplified: draw 2
+                self.draw_cards(controller, 2);
             }
             CardName::DigThroughTime => {
                 // Look at top 7, take 2 - simplified: draw 2
