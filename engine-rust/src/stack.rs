@@ -196,6 +196,8 @@ pub enum TriggeredEffect {
     /// Oath of Druids upkeep: if opponent controls more creatures, reveal cards from library
     /// until finding a creature, put it onto the battlefield, rest to graveyard.
     OathOfDruidsReveal,
+    /// Energy Flux upkeep: each artifact's controller pays {2} or sacrifices it.
+    EnergyFluxUpkeep,
     /// Roiling Vortex upkeep: deal 1 damage to each player.
     RoilingVortexUpkeep,
     /// Roiling Vortex: whenever a player casts a spell without paying its mana cost, deal 5 damage to that player.

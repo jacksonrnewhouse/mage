@@ -3225,6 +3225,18 @@ impl GameState {
                 });
             }
 
+            // Energy Flux: all artifacts have "At the beginning of your upkeep, sacrifice this
+            // artifact unless you pay {2}." Register a recurring upkeep trigger.
+            CardName::EnergyFlux => {
+                self.add_delayed_trigger(crate::types::DelayedTrigger {
+                    condition: crate::types::DelayedTriggerCondition::AtBeginningOfNextUpkeep,
+                    effect: TriggeredEffect::EnergyFluxUpkeep,
+                    controller,
+                    fires_once: false,
+                    source_id: Some(_card_id),
+                });
+            }
+
             // Oath of Druids: register recurring upkeep trigger.
             // At the beginning of each player's upkeep, if their opponent controls more creatures,
             // reveal cards from library until finding a creature, put it onto the battlefield,
@@ -4396,6 +4408,58 @@ impl GameState {
                                     self.handle_etb(cn, creature_id, active);
                                 }
                             }
+                        }
+                    }
+                }
+            }
+
+            TriggeredEffect::EnergyFluxUpkeep => {
+                // Energy Flux: for each artifact the active player controls,
+                // auto-pay {2} if they have enough mana, otherwise sacrifice it.
+                // For game tree search simplification, we process all artifacts at once.
+                let active = self.active_player;
+                let artifact_ids: Vec<crate::types::ObjectId> = self
+                    .battlefield
+                    .iter()
+                    .filter(|p| p.controller == active && p.is_artifact())
+                    .map(|p| p.id)
+                    .collect();
+                for art_id in artifact_ids {
+                    let pool_mana = self.players[active as usize].mana_pool.total();
+                    let untapped_land_count = self
+                        .battlefield
+                        .iter()
+                        .filter(|p| p.controller == active && !p.tapped && p.is_land())
+                        .count() as u16;
+                    let available = pool_mana + untapped_land_count;
+                    if available >= 2 {
+                        // Auto-pay {2}: tap lands if needed, then spend from pool
+                        let mut remaining_cost: u16 = 2;
+                        // First spend from mana pool
+                        let from_pool = remaining_cost.min(pool_mana);
+                        if from_pool > 0 {
+                            self.players[active as usize]
+                                .mana_pool
+                                .remove(None, from_pool as u8);
+                            remaining_cost -= from_pool;
+                        }
+                        // Then tap lands for the rest
+                        if remaining_cost > 0 {
+                            let mut tapped = 0u16;
+                            for perm in self.battlefield.iter_mut() {
+                                if tapped >= remaining_cost {
+                                    break;
+                                }
+                                if perm.controller == active && !perm.tapped && perm.is_land() {
+                                    perm.tapped = true;
+                                    tapped += 1;
+                                }
+                            }
+                        }
+                    } else {
+                        // Can't pay — sacrifice the artifact
+                        if self.find_permanent(art_id).is_some() {
+                            self.remove_permanent_to_zone(art_id, DestinationZone::Graveyard);
                         }
                     }
                 }
