@@ -2308,9 +2308,9 @@ pub fn build_card_db() -> Vec<CardDef> {
         "This spell can't be countered. When you cast this spell, take an extra turn after this one. Flying, protection from spells that are one or more colors, annihilator 6. When Emrakul is put into a graveyard from anywhere, its owner shuffles their graveyard into their library.");
 
     // === Colorless Planeswalkers ===
-    card!(TezzeretCruelCaptain, "Tezzeret, Cruel Captain", ManaCost { blue: 1, black: 1, generic: 2, ..c }, &[Planeswalker], &[Legendary],
-        None, None, Some(4), kw(), &[Blue, Black],
-        "+1: Draw a card if you control an artifact. -2: Create a 1/1 colorless Thopter artifact creature token with flying. -7: You get an emblem with \"Whenever you cast an artifact spell, search your library for an artifact card, put it onto the battlefield, then shuffle.\"");
+    card!(TezzeretCruelCaptain, "Tezzeret, Cruel Captain", ManaCost::generic(3), &[Planeswalker], &[Legendary],
+        None, None, Some(4), kw(), &[],
+        "Whenever an artifact you control enters, put a loyalty counter on Tezzeret. 0: Untap target artifact or creature. If it's an artifact creature, put a +1/+1 counter on it. -3: Search your library for an artifact card with mana value 1 or less, reveal it, put it into your hand, then shuffle. -7: You get an emblem with \"At the beginning of combat on your turn, put three +1/+1 counters on target artifact you control. If it's not a creature, it becomes a 0/0 Robot artifact creature.\"");
     card!(KarnTheGreatCreator, "Karn, the Great Creator", ManaCost::generic(4), &[Planeswalker], &[Legendary],
         None, None, Some(5), kw(), &[],
         "Activated abilities of artifacts your opponents control can't be activated. +1: Until your next turn, up to one target noncreature artifact becomes an artifact creature with power and toughness each equal to its mana value. -2: You may reveal an artifact card you own from outside the game or in exile and put it into your hand.");

@@ -3239,6 +3239,29 @@ impl GameState {
 
             _ => {}
         }
+
+        // Tezzeret, Cruel Captain: "Whenever an artifact you control enters, put a loyalty counter on Tezzeret."
+        // Check if the entering permanent is an artifact and its controller has a Tezzeret on the battlefield.
+        let entering_is_artifact = self.find_permanent(_card_id)
+            .map(|p| p.is_artifact())
+            .unwrap_or(false);
+        if entering_is_artifact {
+            let tezzeret_ids: Vec<ObjectId> = self.battlefield.iter()
+                .filter(|p| p.card_name == CardName::TezzeretCruelCaptain && p.controller == controller)
+                .map(|p| p.id)
+                .collect();
+            for tezz_id in tezzeret_ids {
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: tezz_id,
+                        source_name: CardName::TezzeretCruelCaptain,
+                        effect: TriggeredEffect::TezzeretArtifactEnters { tezzeret_id: tezz_id },
+                    },
+                    controller,
+                    vec![],
+                );
+            }
+        }
     }
 
     fn resolve_triggered(&mut self, effect: TriggeredEffect, controller: PlayerId, targets: &[Target], db: &[CardDef]) {
@@ -3646,30 +3669,37 @@ impl GameState {
                     self.gain_control(*target_id, controller);
                 }
             }
-            TriggeredEffect::TezzeretEmblemArtifact => {
-                // Tezzeret, Cruel Captain emblem: search library for an artifact, put it
-                // onto the battlefield. Simplified: present as a search choice.
-                if !self.library_search_restricted(controller) {
-                    let options: Vec<ObjectId> = self.players[controller as usize]
-                        .library
-                        .iter()
-                        .filter(|&&id| {
-                            self.card_name_for_id(id)
-                                .and_then(|cn| crate::card::find_card(db, cn))
-                                .map(|def| def.card_types.contains(&crate::types::CardType::Artifact))
-                                .unwrap_or(false)
-                        })
-                        .copied()
-                        .collect();
-                    if !options.is_empty() {
-                        self.pending_choice = Some(PendingChoice {
-                            player: controller,
-                            kind: ChoiceKind::ChooseFromList {
-                                options,
-                                reason: ChoiceReason::GenericSearch,
-                            },
-                        });
+            TriggeredEffect::TezzeretEmblemCombat => {
+                // Tezzeret emblem: put three +1/+1 counters on target artifact you control.
+                // If it's not a creature, it becomes a 0/0 Robot artifact creature.
+                // Simplified: pick the best artifact the controller owns.
+                let target = self.battlefield.iter()
+                    .filter(|p| p.controller == controller && p.is_artifact())
+                    .max_by_key(|p| {
+                        // Prefer artifact creatures, then highest power
+                        if p.is_creature() { 1000 + p.power() as i32 } else { 0 }
+                    })
+                    .map(|p| p.id);
+                if let Some(target_id) = target {
+                    let is_creature = self.find_permanent(target_id).map(|p| p.is_creature()).unwrap_or(false);
+                    if let Some(perm) = self.find_permanent_mut(target_id) {
+                        perm.counters.add(CounterType::PlusOnePlusOne, 3);
+                        if !is_creature {
+                            // Becomes a 0/0 Robot artifact creature
+                            perm.base_power = 0;
+                            perm.base_toughness = 0;
+                            if !perm.card_types.contains(&CardType::Creature) {
+                                perm.card_types.push(CardType::Creature);
+                            }
+                            perm.creature_types.push(crate::types::CreatureType::Robot);
+                        }
                     }
+                }
+            }
+            TriggeredEffect::TezzeretArtifactEnters { tezzeret_id } => {
+                // Whenever an artifact you control enters, put a loyalty counter on Tezzeret.
+                if let Some(perm) = self.find_permanent_mut(tezzeret_id) {
+                    perm.loyalty += 1;
                 }
             }
             TriggeredEffect::SacrificeTarget { permanent_id } => {
@@ -5464,53 +5494,59 @@ impl GameState {
             }
 
             // === Tezzeret, Cruel Captain ===
-            ActivatedEffect::TezzeretDraw => {
-                // +1: Draw a card if you control an artifact.
-                let controls_artifact = self.battlefield.iter()
-                    .any(|p| p.controller == controller && p.is_artifact());
-                if controls_artifact {
-                    self.draw_cards(controller, 1);
+            ActivatedEffect::TezzeretUntap { target_id } => {
+                // 0: Untap target artifact or creature. If it's an artifact creature, put a +1/+1 counter on it.
+                if let Some(perm) = self.find_permanent_mut(target_id) {
+                    perm.tapped = false;
+                    if perm.is_artifact() && perm.is_creature() {
+                        perm.counters.add(CounterType::PlusOnePlusOne, 1);
+                    }
                 }
             }
-            ActivatedEffect::TezzeretThopter => {
-                // -2: Create a 1/1 colorless Thopter artifact creature token with flying.
-                let token_id = self.new_object_id();
-                let mut kw = Keywords::empty();
-                kw.add(Keyword::Flying);
-                let token = Permanent {
-                    id: token_id,
-                    card_name: CardName::ThopterToken,
-                    controller,
-                    owner: controller,
-                    tapped: false,
-                    base_power: 1,
-                    base_toughness: 1,
-                    power_mod: 0,
-                    toughness_mod: 0,
-                    damage: 0,
-                    keywords: kw,
-                    counters: Counters::default(),
-                    entered_this_turn: true,
-                    attacked_this_turn: false,
-                    doesnt_untap: false,
-                    loyalty: 0,
-                    loyalty_activated_this_turn: false,
-                    card_types: vec![CardType::Artifact, CardType::Creature],
-                    creature_types: vec![CreatureType::Thopter],
-                    cavern_creature_type: None,
-                    protections: Vec::new(),
-                    colors: Vec::new(),
-                    transformed: false,
-                    is_token: true,
-                    attached_to: None,
-                    attachments: Vec::new(),
-                };
-                self.battlefield.push(token);
+            ActivatedEffect::TezzeretSearch => {
+                // -3: Search library for an artifact card with mana value 1 or less, put into hand.
+                if !self.library_search_restricted(controller) {
+                    let db_local = crate::card::build_card_db();
+                    let options: Vec<ObjectId> = self.players[controller as usize]
+                        .library
+                        .iter()
+                        .filter(|&&id| {
+                            self.card_name_for_id(id)
+                                .and_then(|cn| crate::card::find_card(&db_local, cn))
+                                .map(|def| {
+                                    def.card_types.contains(&crate::types::CardType::Artifact)
+                                        && def.mana_cost.cmc() <= 1
+                                })
+                                .unwrap_or(false)
+                        })
+                        .copied()
+                        .collect();
+                    if !options.is_empty() {
+                        self.pending_choice = Some(PendingChoice {
+                            player: controller,
+                            kind: ChoiceKind::ChooseFromList {
+                                options,
+                                reason: ChoiceReason::DemonicTutorSearch,
+                            },
+                        });
+                    }
+                }
             }
             ActivatedEffect::TezzeretUltimate => {
-                // -7: You get an emblem with "Whenever you cast an artifact spell, search your
-                // library for an artifact card, put it onto the battlefield, then shuffle."
+                // -7: You get an emblem with "At the beginning of combat on your turn, put three
+                // +1/+1 counters on target artifact you control. If it's not a creature, it becomes
+                // a 0/0 Robot artifact creature."
                 self.create_emblem(controller, Emblem::TezzeretCruelCaptain);
+                // Register a recurring beginning-of-combat trigger for the emblem.
+                self.add_delayed_trigger(crate::types::DelayedTrigger {
+                    condition: crate::types::DelayedTriggerCondition::AtBeginningOfCombat {
+                        player: controller,
+                    },
+                    effect: TriggeredEffect::TezzeretEmblemCombat,
+                    controller,
+                    fires_once: false,
+                    source_id: None,
+                });
             }
 
             // === Gideon of the Trials ===

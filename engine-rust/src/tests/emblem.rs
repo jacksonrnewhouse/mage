@@ -172,50 +172,30 @@ fn test_tezzeret_ultimate_creates_emblem() {
     assert_eq!(state.find_permanent(tezz_id).unwrap().loyalty, 3);
 }
 
-// === Tezzeret emblem effect: search library for artifact when casting artifact spell ===
+// === Tezzeret emblem effect: beginning of combat +1/+1 counters on artifact ===
 
 #[test]
-fn test_tezzeret_emblem_triggers_on_artifact_cast() {
+fn test_tezzeret_ultimate_registers_combat_trigger() {
     let db = build_card_db();
     let mut state = GameState::new_two_player();
 
-    // Player 0 has the Tezzeret emblem
-    state.create_emblem(0, Emblem::TezzeretCruelCaptain);
+    let tezz_id = put_permanent(&mut state, &db, CardName::TezzeretCruelCaptain, 0);
+    state.find_permanent_mut(tezz_id).unwrap().loyalty = 10;
 
-    // Put an artifact spell in hand
-    let mox_id = state.new_object_id();
-    state.card_registry.push((mox_id, CardName::MoxSapphire));
-    state.players[0].hand.push(mox_id);
-
-    // Put an artifact in library to find (the trigger gives a pending search choice)
-    seed_library(&mut state, 0, CardName::SolRing);
-    seed_library(&mut state, 0, CardName::Counterspell); // non-artifact, shouldn't be searchable
-
-    // Set up mana for player 0 to cast Mox (free)
-    state.active_player = 0;
-    state.priority_player = 0;
-    state.phase = Phase::PreCombatMain;
-
-    // Cast Mox Sapphire (free artifact)
+    // Activate ultimate
     state.apply_action(
-        &Action::CastSpell {
-            card_id: mox_id,
+        &Action::ActivateAbility {
+            permanent_id: tezz_id,
+            ability_index: 2,
             targets: vec![],
-            x_value: 0,
-            from_graveyard: false,
-            from_library_top: false,
-            alt_cost: None,
-        modes: vec![],
         },
         &db,
     );
+    state.resolve_top(&db);
 
-    // The Tezzeret emblem trigger should be on the stack
-    let has_tezz_trigger = state.stack.items().iter().any(|item| {
-        matches!(&item.kind, StackItemKind::TriggeredAbility { effect, .. }
-            if matches!(effect, crate::stack::TriggeredEffect::TezzeretEmblemArtifact))
-    });
-    assert!(has_tezz_trigger, "Tezzeret emblem trigger should fire when casting artifact");
+    assert!(state.has_emblem(0, Emblem::TezzeretCruelCaptain), "Tezzeret emblem should be created");
+    // A delayed trigger for beginning of combat should be registered
+    assert!(!state.delayed_triggers.is_empty(), "Should have registered a combat delayed trigger");
 }
 
 // === Dack emblem effect: gain control when targeting permanents ===
@@ -338,52 +318,57 @@ fn test_gideon_emblem_does_not_prevent_loss_without_gideon_permanent() {
     assert!(state.players[0].has_lost, "Emblem alone doesn't prevent loss if Gideon is not on battlefield");
 }
 
-// === Tezzeret +1 ability ===
+// === Tezzeret 0 ability: untap target artifact or creature ===
 
 #[test]
-fn test_tezzeret_plus1_draws_card_with_artifact() {
+fn test_tezzeret_zero_untaps_artifact_creature() {
     let db = build_card_db();
     let mut state = GameState::new_two_player();
 
     let tezz_id = put_permanent(&mut state, &db, CardName::TezzeretCruelCaptain, 0);
     state.find_permanent_mut(tezz_id).unwrap().loyalty = 4;
 
-    // Put an artifact on battlefield so the draw triggers
-    put_permanent(&mut state, &db, CardName::MoxSapphire, 0);
+    // Put a tapped artifact creature on the battlefield
+    let ballista_id = put_permanent(&mut state, &db, CardName::WalkingBallista, 0);
+    state.find_permanent_mut(ballista_id).unwrap().tapped = true;
+    state.find_permanent_mut(ballista_id).unwrap().counters.add(CounterType::PlusOnePlusOne, 2);
 
-    // Seed library
-    seed_library(&mut state, 0, CardName::LightningBolt);
-    let initial_hand = state.players[0].hand.len();
+    let initial_counters = state.find_permanent(ballista_id).unwrap().counters.get(CounterType::PlusOnePlusOne);
 
     state.apply_action(
         &Action::ActivateAbility {
             permanent_id: tezz_id,
             ability_index: 0,
-            targets: vec![],
+            targets: vec![Target::Object(ballista_id)],
         },
         &db,
     );
     state.resolve_top(&db);
 
+    let ballista = state.find_permanent(ballista_id).unwrap();
+    assert!(!ballista.tapped, "Tezzeret 0 should untap the target");
     assert_eq!(
-        state.players[0].hand.len(),
-        initial_hand + 1,
-        "Tezzeret +1 should draw a card when you control an artifact"
+        ballista.counters.get(CounterType::PlusOnePlusOne),
+        initial_counters + 1,
+        "Tezzeret 0 should add a +1/+1 counter to artifact creature"
     );
-    assert_eq!(state.find_permanent(tezz_id).unwrap().loyalty, 5);
+    // Loyalty should stay at 4 (0 loyalty ability)
+    assert_eq!(state.find_permanent(tezz_id).unwrap().loyalty, 4);
 }
 
-// === Tezzeret -2 ability: create Thopter token ===
+// === Tezzeret -3 ability: search for artifact with MV <= 1 ===
 
 #[test]
-fn test_tezzeret_minus2_creates_thopter() {
+fn test_tezzeret_minus3_searches_for_artifact() {
     let db = build_card_db();
     let mut state = GameState::new_two_player();
 
     let tezz_id = put_permanent(&mut state, &db, CardName::TezzeretCruelCaptain, 0);
     state.find_permanent_mut(tezz_id).unwrap().loyalty = 4;
 
-    let initial_battlefield = state.battlefield.len();
+    // Seed library with a MV<=1 artifact and a non-artifact
+    seed_library(&mut state, 0, CardName::MoxSapphire); // MV 0 artifact
+    seed_library(&mut state, 0, CardName::Counterspell); // non-artifact
 
     state.apply_action(
         &Action::ActivateAbility {
@@ -395,20 +380,7 @@ fn test_tezzeret_minus2_creates_thopter() {
     );
     state.resolve_top(&db);
 
-    // A new token should be on the battlefield
-    assert_eq!(
-        state.battlefield.len(),
-        initial_battlefield + 1,
-        "Tezzeret -2 should create a Thopter token"
-    );
-    let thopter = state.battlefield.iter()
-        .find(|p| p.card_name == CardName::ThopterToken)
-        .expect("Should have a Thopter token");
-    assert_eq!(thopter.base_power, 1);
-    assert_eq!(thopter.base_toughness, 1);
-    assert!(thopter.keywords.has(Keyword::Flying), "Thopter should have flying");
-    assert!(thopter.is_artifact(), "Thopter should be an artifact");
-    assert!(thopter.is_creature(), "Thopter should be a creature");
-    assert!(thopter.is_token, "Thopter should be a token");
-    assert_eq!(state.find_permanent(tezz_id).unwrap().loyalty, 2);
+    // Should have a pending choice to search for an artifact with MV <= 1
+    assert!(state.pending_choice.is_some(), "Should have a pending search choice");
+    assert_eq!(state.find_permanent(tezz_id).unwrap().loyalty, 1, "Loyalty should be 4 - 3 = 1");
 }

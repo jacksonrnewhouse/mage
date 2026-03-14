@@ -126,8 +126,11 @@ pub enum TriggeredEffect {
     EmrakulCast,
     /// Dack Fayden emblem: gain control of a permanent (targets[0] is the permanent).
     DackEmblemControl,
-    /// Tezzeret, Cruel Captain emblem: search library for an artifact and put it onto the battlefield.
-    TezzeretEmblemArtifact,
+    /// Tezzeret, Cruel Captain emblem: at beginning of combat, put three +1/+1 counters on target artifact.
+    /// If it's not a creature, it becomes a 0/0 Robot artifact creature.
+    TezzeretEmblemCombat,
+    /// Tezzeret, Cruel Captain: whenever an artifact you control enters, put a loyalty counter on Tezzeret.
+    TezzeretArtifactEnters { tezzeret_id: ObjectId },
     /// Delayed sacrifice: sacrifice a specific permanent (used by Sneak Attack and similar).
     SacrificeTarget { permanent_id: ObjectId },
     /// The One Ring ETB: controller gains protection from everything until their next turn.
@@ -350,10 +353,10 @@ pub enum ActivatedEffect {
     DackSteal,
     /// Dack Fayden -6: create the Dack Fayden emblem.
     DackUltimate,
-    /// Tezzeret, Cruel Captain +1: draw a card if you control an artifact.
-    TezzeretDraw,
-    /// Tezzeret, Cruel Captain -2: create a 1/1 Thopter artifact creature token with flying.
-    TezzeretThopter,
+    /// Tezzeret, Cruel Captain 0: untap target artifact or creature, +1/+1 counter if artifact creature.
+    TezzeretUntap { target_id: ObjectId },
+    /// Tezzeret, Cruel Captain -3: search library for artifact with MV <= 1, put into hand.
+    TezzeretSearch,
     /// Tezzeret, Cruel Captain -7: create the Tezzeret emblem.
     TezzeretUltimate,
     /// The One Ring {T}: put a burden counter on The One Ring, draw cards equal to burden counters.

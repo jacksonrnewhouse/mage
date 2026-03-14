@@ -2359,10 +2359,14 @@ impl GameState {
                     }
                 }
                 CardName::TezzeretCruelCaptain => {
-                    // +1: Draw a card if you control an artifact
-                    abilities.push((0, vec![]));
-                    // -2: Create a 1/1 colorless Thopter artifact creature token with flying
-                    if perm.loyalty >= 2 {
+                    // 0: Untap target artifact or creature. If artifact creature, +1/+1 counter.
+                    for target in &self.battlefield {
+                        if target.is_artifact() || target.is_creature() {
+                            abilities.push((0, vec![Target::Object(target.id)]));
+                        }
+                    }
+                    // -3: Search library for artifact with MV <= 1, put into hand
+                    if perm.loyalty >= 3 {
                         abilities.push((1, vec![]));
                     }
                     // -7: Create emblem

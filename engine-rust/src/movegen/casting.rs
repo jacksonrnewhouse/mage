@@ -431,21 +431,8 @@ impl GameState {
                             if !targets.is_empty() {
                                 self.check_leovold_targeting_triggers(&targets, player_id);
                             }
-                            // Tezzeret, Cruel Captain emblem: "Whenever you cast an artifact spell,
-                            // search your library for an artifact card, put it onto the battlefield."
-                            if def.card_types.contains(&CardType::Artifact)
-                                && self.has_emblem(player_id, crate::game::Emblem::TezzeretCruelCaptain)
-                            {
-                                self.stack.push(
-                                    crate::stack::StackItemKind::TriggeredAbility {
-                                        source_id: 0,
-                                        source_name: crate::card::CardName::Plains,
-                                        effect: crate::stack::TriggeredEffect::TezzeretEmblemArtifact,
-                                    },
-                                    player_id,
-                                    vec![],
-                                );
-                            }
+                            // (Tezzeret emblem is now a beginning-of-combat delayed trigger,
+                            // not a cast trigger — handled via delayed_triggers.)
                             // Patchwork Automaton: "Whenever you cast an artifact spell,
                             // put a +1/+1 counter on Patchwork Automaton."
                             if def.card_types.contains(&CardType::Artifact) {
@@ -1345,24 +1332,27 @@ impl GameState {
                     perm.loyalty_activated_this_turn = true;
                     match ability_index {
                         0 => {
-                            perm.loyalty += 1;
+                            // 0: Untap target artifact or creature
+                            let target_id = targets.first().copied().unwrap_or(Target::Object(0));
+                            let tid = match target_id { Target::Object(id) => id, _ => 0 };
                             self.stack.push(
                                 StackItemKind::ActivatedAbility {
                                     source_id: permanent_id,
                                     source_name: card_name,
-                                    effect: ActivatedEffect::TezzeretDraw,
+                                    effect: ActivatedEffect::TezzeretUntap { target_id: tid },
                                 },
                                 controller,
-                                vec![],
+                                vec![target_id],
                             );
                         }
                         1 => {
-                            perm.loyalty -= 2;
+                            // -3: Search library for artifact with MV <= 1
+                            perm.loyalty -= 3;
                             self.stack.push(
                                 StackItemKind::ActivatedAbility {
                                     source_id: permanent_id,
                                     source_name: card_name,
-                                    effect: ActivatedEffect::TezzeretThopter,
+                                    effect: ActivatedEffect::TezzeretSearch,
                                 },
                                 controller,
                                 vec![],

@@ -22,8 +22,9 @@ pub enum Emblem {
     DackFayden,
     /// Wrenn and Six -7: "Instant and sorcery cards in your graveyard have retrace."
     WrennAndSix,
-    /// Tezzeret, Cruel Captain -7: "Whenever you cast an artifact spell, search your library
-    /// for an artifact card, put it onto the battlefield, then shuffle."
+    /// Tezzeret, Cruel Captain -7: "At the beginning of combat on your turn, put three +1/+1
+    /// counters on target artifact you control. If it's not a creature, it becomes a 0/0 Robot
+    /// artifact creature."
     TezzeretCruelCaptain,
     /// Gideon of the Trials +0 emblem: "As long as you control a Gideon planeswalker,
     /// you can't lose the game and your opponents can't win the game."
