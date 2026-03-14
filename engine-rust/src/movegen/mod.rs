@@ -143,9 +143,10 @@ impl GameState {
                     }
 
                     // --- Cast-restriction statics ---
-                    // Archon of Emeria: each player can cast only one spell per turn
+                    // Archon of Emeria / High Noon: each player can cast only one spell per turn
                     let archon_active = self.battlefield.iter().any(|p| {
                         p.card_name == CardName::ArchonOfEmeria
+                            || p.card_name == CardName::HighNoon
                     });
                     if archon_active && player.spells_cast_this_turn >= 1 {
                         continue;
@@ -446,6 +447,7 @@ impl GameState {
                         // Apply cast-restriction statics
                         let archon_active = self.battlefield.iter().any(|p| {
                             p.card_name == CardName::ArchonOfEmeria
+                                || p.card_name == CardName::HighNoon
                         });
                         if archon_active && player.spells_cast_this_turn >= 1 {
                             continue;

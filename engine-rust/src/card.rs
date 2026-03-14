@@ -1577,7 +1577,7 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(DeafeningSilence, "Deafening Silence", ManaCost::w(1), &[Enchantment], &[], None, None, None, kw(), &[White],
         "Each player can't cast more than one noncreature spell each turn.");
     card!(HighNoon, "High Noon", ManaCost { white: 1, generic: 1, ..c }, &[Enchantment], &[], None, None, None, kw(), &[White],
-        "Players can't cast spells during other players' turns. At the beginning of each player's end step, that player may pay {2}. If they don't, they sacrifice High Noon.");
+        "Each player can't cast more than one spell each turn. {4}{R}, Sacrifice this enchantment: It deals 5 damage to any target.");
     card!(RestInPeace, "Rest in Peace", ManaCost { white: 1, generic: 1, ..c }, &[Enchantment], &[], None, None, None, kw(), &[White],
         "When Rest in Peace enters, exile all graveyards. If a card or token would be put into a graveyard from anywhere, exile it instead.");
     card!(SealOfCleansing, "Seal of Cleansing", ManaCost { white: 1, generic: 1, ..c }, &[Enchantment], &[], None, None, None, kw(), &[White],
