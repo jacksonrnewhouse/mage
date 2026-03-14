@@ -2270,7 +2270,7 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(FoundryInspector, "Foundry Inspector", ManaCost::generic(3), &[Artifact, Creature], &[],
         Some(3), Some(2), None, kw(), &[],
         "Artifact spells you cast cost {1} less to cast.");
-    card!(GlaringFleshraker, "Glaring Fleshraker", ManaCost { colorless: 1, generic: 2, ..c }, &[Artifact, Creature], &[],
+    card!(CT(&[CreatureType::Eldrazi, CreatureType::Drone]) GlaringFleshraker, "Glaring Fleshraker", ManaCost { colorless: 1, generic: 2, ..c }, &[Creature], &[],
         Some(2), Some(2), None, kw(), &[],
         "Whenever you cast a colorless spell, create a 0/1 colorless Eldrazi Spawn creature token with \"Sacrifice this creature: Add {C}.\" Whenever another colorless creature you control enters, Glaring Fleshraker deals 1 damage to each opponent.");
     card!(PhyrexianMetamorph, "Phyrexian Metamorph", ManaCost { blue: 1, generic: 3, ..c }, &[Artifact, Creature], &[],
