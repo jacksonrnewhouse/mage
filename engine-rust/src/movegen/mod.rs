@@ -3010,12 +3010,23 @@ impl GameState {
             }
 
             // Target card in own graveyard
-            CardName::Regrowth | CardName::NoxiousRevival => {
+            CardName::Regrowth => {
                 self.players[controller as usize]
                     .graveyard
                     .iter()
                     .map(|&id| vec![Target::Object(id)])
                     .collect()
+            }
+
+            // Noxious Revival: target card in any graveyard
+            CardName::NoxiousRevival => {
+                let mut targets = Vec::new();
+                for pid in 0..self.num_players as usize {
+                    for &card_id in &self.players[pid].graveyard {
+                        targets.push(vec![Target::Object(card_id)]);
+                    }
+                }
+                targets
             }
 
             // Memory's Journey: target player + card from that player's graveyard
@@ -3396,6 +3407,30 @@ impl GameState {
                         let target_sets = self.generate_targets(card_name, player_id, db);
                         if target_sets.is_empty() {
                             // No graveyard targets available; cannot cast
+                            continue;
+                        }
+                        let normal_cost = ManaCost::ZERO;
+                        let alt = AltCost::PhyrexianMana { life_paid: 2, normal_cost };
+                        for targets in &target_sets {
+                            actions.push(Action::CastSpell {
+                                card_id,
+                                targets: targets.clone(),
+                                x_value: 0,
+                                from_graveyard: false,
+                from_library_top: false,
+                                alt_cost: Some(alt.clone()),
+                                modes: vec![],
+                            });
+                        }
+                    }
+                }
+
+                // NoxiousRevival {G/P}: can pay 2 life instead of {G}, instant speed
+                // NoxiousRevival requires a graveyard target; no target → cannot be cast
+                CardName::NoxiousRevival => {
+                    if player.life > 2 {
+                        let target_sets = self.generate_targets(card_name, player_id, db);
+                        if target_sets.is_empty() {
                             continue;
                         }
                         let normal_cost = ManaCost::ZERO;
