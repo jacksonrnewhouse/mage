@@ -2336,8 +2336,8 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(X(2) ChaliceOfTheVoid, "Chalice of the Void", c, &[Artifact], &[], None, None, None, kw(), &[],
         "Chalice of the Void enters with X charge counters on it. Whenever a player casts a spell with mana value equal to the number of charge counters on Chalice of the Void, counter that spell.");
     // Clown Car: {X} — X appears once
-    card!(X(1) ClownCar, "Clown Car", c, &[Artifact], &[], None, None, None, kw(), &[],
-        "When Clown Car enters, roll X six-sided dice. For each odd result, create a 1/1 white Clown Robot artifact creature token. Crew 2.");
+    card!(X(1) ClownCar, "Clown Car", c, &[Artifact], &[], Some(1), Some(1), None, kw(), &[],
+        "When this Vehicle enters, roll X six-sided dice. For each odd result, create a 1/1 white Clown Robot artifact creature token. For each even result, put a +1/+1 counter on this Vehicle.\nCrew 2");
     // Engineered Explosives: {X} — X appears once (sunburst adds charge counters based on colors)
     card!(X(1) EngineeredExplosives, "Engineered Explosives", c, &[Artifact], &[], None, None, None, kw(), &[],
         "Sunburst. {2}, Sacrifice Engineered Explosives: Destroy each nonland permanent with mana value equal to the number of charge counters on Engineered Explosives.");
