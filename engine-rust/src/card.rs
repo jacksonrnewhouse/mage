@@ -1901,8 +1901,8 @@ pub fn build_card_db() -> Vec<CardDef> {
         Some(4), Some(3), None, kw(), &[Red],
         "Whenever Bonecrusher Giant becomes the target of a spell, Bonecrusher Giant deals 2 damage to that spell's controller. Adventure - Stomp {1}{R}: Deal 2 damage to any target. Damage can't be prevented this turn.");
     card!(BroadsideBombardiers, "Broadside Bombardiers", ManaCost { red: 1, generic: 2, ..c }, &[Creature], &[],
-        Some(3), Some(2), None, menace(), &[Red],
-        "Menace. When Broadside Bombardiers enters or dies, it deals 3 damage to any target.");
+        Some(2), Some(2), None, menace_haste(), &[Red],
+        "Menace, haste. Boast — Sacrifice another creature or artifact: Broadside Bombardiers deals damage equal to 2 plus the sacrificed permanent's mana value to any target.");
     card!(CT(&[CreatureType::Goblin, CreatureType::Shaman]) GutTrueSoulZealot, "Gut, True Soul Zealot", ManaCost { red: 1, generic: 2, ..c }, &[Creature], &[Legendary],
         Some(2), Some(2), None, kw(), &[Red],
         "Whenever you attack, you may sacrifice another creature or an artifact. If you do, create a 4/1 black Skeleton creature token with menace that's tapped and attacking. Choose a Background.");
