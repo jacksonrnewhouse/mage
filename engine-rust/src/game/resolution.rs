@@ -5821,6 +5821,22 @@ impl GameState {
                 }
             }
 
+            // === Cathar Commando ===
+            ActivatedEffect::CatharCommandoDestroy => {
+                // Destroy target artifact or enchantment.
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    self.destroy_permanent(*target_id);
+                }
+            }
+
+            // === Seal of Cleansing ===
+            ActivatedEffect::SealOfCleansingDestroy => {
+                // Destroy target artifact or enchantment.
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    self.destroy_permanent(*target_id);
+                }
+            }
+
             // === Gorilla Shaman ===
             ActivatedEffect::GorillaShamanDestroy { target_mv } => {
                 // Destroy target noncreature artifact with mana value X.

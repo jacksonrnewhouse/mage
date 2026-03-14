@@ -415,6 +415,10 @@ pub enum ActivatedEffect {
     HaywireMiteExile,
     /// Outland Liberator: {1}, Sacrifice: Destroy target artifact or enchantment.
     OutlandLiberatorDestroy,
+    /// Cathar Commando: {1}, Sacrifice: Destroy target artifact or enchantment.
+    CatharCommandoDestroy,
+    /// Seal of Cleansing: Sacrifice: Destroy target artifact or enchantment.
+    SealOfCleansingDestroy,
     /// Hermit Druid: {G}, {T}: Reveal cards until basic land, put it in hand, rest to graveyard.
     HermitDruidReveal,
     /// Sylvan Safekeeper: Sacrifice a land: Target creature you control gains shroud until end of turn.

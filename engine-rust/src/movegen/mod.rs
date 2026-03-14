@@ -2464,6 +2464,27 @@ impl GameState {
             }
         }
 
+        // --- Cathar Commando: {1}, Sacrifice: Destroy target artifact or enchantment ---
+        if perm.card_name == CardName::CatharCommando {
+            let player = &self.players[perm.controller as usize];
+            if player.mana_pool.total() >= 1 {
+                for target in &self.battlefield {
+                    if target.is_artifact() || target.is_enchantment() {
+                        abilities.push((0, vec![Target::Object(target.id)]));
+                    }
+                }
+            }
+        }
+
+        // --- Seal of Cleansing: Sacrifice: Destroy target artifact or enchantment ---
+        if perm.card_name == CardName::SealOfCleansing {
+            for target in &self.battlefield {
+                if target.is_artifact() || target.is_enchantment() {
+                    abilities.push((0, vec![Target::Object(target.id)]));
+                }
+            }
+        }
+
         // --- Hermit Druid: {G}, {T}: Reveal until basic land ---
         if perm.card_name == CardName::HermitDruid && !perm.tapped && !perm.entered_this_turn {
             let player = &self.players[perm.controller as usize];

@@ -2009,6 +2009,40 @@ impl GameState {
                 self.reset_priority_passes();
             }
 
+            // Cathar Commando: {1}, Sacrifice: Destroy target artifact or enchantment. (ability_index 0)
+            CardName::CatharCommando if ability_index == 0 => {
+                let cost = crate::mana::ManaCost::generic(1);
+                if !self.players[controller as usize].mana_pool.pay(&cost) {
+                    return;
+                }
+                self.destroy_permanent(permanent_id);
+                self.stack.push(
+                    StackItemKind::ActivatedAbility {
+                        source_id: permanent_id,
+                        source_name: card_name,
+                        effect: ActivatedEffect::CatharCommandoDestroy,
+                    },
+                    controller,
+                    targets.to_vec(),
+                );
+                self.reset_priority_passes();
+            }
+
+            // Seal of Cleansing: Sacrifice: Destroy target artifact or enchantment. (ability_index 0)
+            CardName::SealOfCleansing if ability_index == 0 => {
+                self.destroy_permanent(permanent_id);
+                self.stack.push(
+                    StackItemKind::ActivatedAbility {
+                        source_id: permanent_id,
+                        source_name: card_name,
+                        effect: ActivatedEffect::SealOfCleansingDestroy,
+                    },
+                    controller,
+                    targets.to_vec(),
+                );
+                self.reset_priority_passes();
+            }
+
             // Hermit Druid: {G}, {T}: Reveal cards from top until basic land. (ability_index 0)
             CardName::HermitDruid if ability_index == 0 => {
                 let cost = crate::mana::ManaCost::g(1);
