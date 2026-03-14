@@ -2532,8 +2532,8 @@ pub fn build_card_db() -> Vec<CardDef> {
         "This spell can't be countered. Destroy target nonland permanent with mana value 3 or less.");
 
     // === Boros (RW) ===
-    card!(ForthEorlingas, "Forth Eorlingas!", ManaCost { red: 1, white: 1, generic: 2, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Red, White],
-        "Create two 2/2 red Human Knight creature tokens with trample and haste. You become the monarch.");
+    card!(X(1) ForthEorlingas, "Forth Eorlingas!", ManaCost { red: 1, white: 1, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Red, White],
+        "Create X 2/2 red Human Knight creature tokens with trample and haste. Whenever one or more creatures you control deal combat damage to one or more players this turn, you become the monarch.");
     card!(CometStellarPup, "Comet, Stellar Pup", ManaCost { red: 1, white: 1, generic: 2, ..c }, &[Planeswalker], &[Legendary],
         None, None, Some(5), kw(), &[Red, White],
         "0: Roll a six-sided die. 1-2: +2 loyalty, create two 1/1 green Squirrel creature tokens with haste. 3-4: -1 loyalty, deal damage equal to loyalty to a creature or player. 5-6: +1 loyalty, activate this ability two more times this turn.");

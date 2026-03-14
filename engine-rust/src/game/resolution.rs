@@ -1776,8 +1776,8 @@ impl GameState {
                 }
             }
             CardName::ForthEorlingas => {
-                // Create two 2/2 Human Knight tokens with trample and haste
-                for _ in 0..2 {
+                // Create X 2/2 Human Knight tokens with trample and haste
+                for _ in 0..x_value {
                     let token_id = self.new_object_id();
                     let mut kws = Keywords::empty();
                     kws.add(Keyword::Trample);
