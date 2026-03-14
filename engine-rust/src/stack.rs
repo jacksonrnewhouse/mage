@@ -211,6 +211,8 @@ pub enum TriggeredEffect {
     DisplacerKittenBlink,
     /// Kappa Cannoneer: whenever this or another artifact enters, put a +1/+1 counter on it.
     KappaCannoneerTrigger { cannoneer_id: ObjectId },
+    /// Pinnacle Emissary: whenever you cast an artifact spell, create a 1/1 Drone token with flying.
+    PinnacleEmissaryCast { emissary_controller: PlayerId },
     /// Emry ETB: mill four cards.
     EmryETB,
     /// Chromatic Star: when put into graveyard from the battlefield, draw a card.

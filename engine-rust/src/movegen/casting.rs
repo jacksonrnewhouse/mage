@@ -472,6 +472,25 @@ impl GameState {
                                         vec![],
                                     );
                                 }
+                                // Pinnacle Emissary: "Whenever you cast an artifact spell,
+                                // create a 1/1 colorless Drone artifact creature token with flying."
+                                let emissary_triggers: Vec<(ObjectId, PlayerId)> = self
+                                    .battlefield
+                                    .iter()
+                                    .filter(|p| p.card_name == crate::card::CardName::PinnacleEmissary && p.controller == player_id)
+                                    .map(|p| (p.id, p.controller))
+                                    .collect();
+                                for (emissary_id, controller) in emissary_triggers {
+                                    self.stack.push(
+                                        crate::stack::StackItemKind::TriggeredAbility {
+                                            source_id: emissary_id,
+                                            source_name: crate::card::CardName::PinnacleEmissary,
+                                            effect: crate::stack::TriggeredEffect::PinnacleEmissaryCast { emissary_controller: controller },
+                                        },
+                                        controller,
+                                        vec![],
+                                    );
+                                }
                             }
                             self.reset_priority_passes();
                         }

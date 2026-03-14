@@ -3207,18 +3207,8 @@ impl GameState {
                 self.draw_cards(controller, 1);
             }
 
-            // Pinnacle Emissary: deal 3 damage to target creature or planeswalker
-            CardName::PinnacleEmissary => {
-                // Find the best target: prefer opponent's creature/planeswalker
-                let opp = self.opponent(controller);
-                let target = self.battlefield.iter()
-                    .filter(|p| (p.is_creature() || p.is_planeswalker()) && p.controller == opp)
-                    .min_by_key(|p| p.toughness())
-                    .map(|p| p.id);
-                if let Some(target_id) = target {
-                    self.deal_damage_to_target(Target::Object(target_id), 3, controller);
-                }
-            }
+            // Pinnacle Emissary: no ETB (has a cast trigger instead)
+            CardName::PinnacleEmissary => {}
 
             // Portal to Phyrexia: each opponent sacrifices three creatures
             CardName::PortalToPhyrexia => {
@@ -4468,6 +4458,20 @@ impl GameState {
                 if let Some(perm) = self.find_permanent_mut(cannoneer_id) {
                     perm.counters.add(CounterType::PlusOnePlusOne, 1);
                 }
+            }
+
+            TriggeredEffect::PinnacleEmissaryCast { emissary_controller } => {
+                // Create a 1/1 colorless Drone artifact creature token with flying
+                let token_id = self.new_object_id();
+                let mut kw = Keywords::empty();
+                kw.add(Keyword::Flying);
+                let mut token = Permanent::new(
+                    token_id, CardName::DroneToken, emissary_controller, emissary_controller,
+                    Some(1), Some(1), None, kw, &[CardType::Artifact, CardType::Creature],
+                );
+                token.is_token = true;
+                token.creature_types.push(crate::types::CreatureType::Drone);
+                self.battlefield.push(token);
             }
 
             TriggeredEffect::EmryETB => {

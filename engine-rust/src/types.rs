@@ -190,6 +190,7 @@ pub enum CreatureType {
     Myr,
     Thopter,
     Robot,
+    Drone,
     // Other
     Kor,
     Halfling,
@@ -267,6 +268,7 @@ impl CreatureType {
         CreatureType::Myr,
         CreatureType::Thopter,
         CreatureType::Robot,
+        CreatureType::Drone,
         CreatureType::Kor,
         CreatureType::Halfling,
         CreatureType::Ouphe,

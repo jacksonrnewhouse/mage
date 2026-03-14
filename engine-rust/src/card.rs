@@ -554,6 +554,8 @@ pub enum CardName {
     EldraziSpawnToken,
     /// Represents a Pest token (1/1 black and green creature: "When this creature dies, you gain 1 life.")
     PestToken,
+    /// Represents a Drone token (1/1 colorless Drone artifact creature with flying, can only block flyers).
+    DroneToken,
 
     // Sentinel value for array sizing
     _Count,
@@ -2515,9 +2517,9 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Look at the top three cards of your library. Put one into your hand, put one on the bottom, and exile one. You may play the exiled card this turn.");
     card!(FlameOfAnor, "Flame of Anor", ManaCost { blue: 1, red: 1, generic: 1, ..c }, &[Instant], &[], None, None, None, kw(), &[Blue, Red],
         "Choose one. If you control a Wizard, you may choose two instead. Destroy target artifact. Target player draws two cards. Flame of Anor deals 5 damage to target creature.");
-    card!(PinnacleEmissary, "Pinnacle Emissary", ManaCost { blue: 1, red: 1, generic: 3, ..c }, &[Creature], &[],
-        Some(4), Some(4), None, flash_flying(), &[Blue, Red],
-        "Flash. Flying. When Pinnacle Emissary enters, it deals 3 damage to target creature or planeswalker.");
+    card!(CT(&[CreatureType::Robot]) PinnacleEmissary, "Pinnacle Emissary", ManaCost { blue: 1, red: 1, generic: 1, ..c }, &[Artifact, Creature], &[],
+        Some(3), Some(3), None, kw(), &[Blue, Red],
+        "Whenever you cast an artifact spell, create a 1/1 colorless Drone artifact creature token with flying and \"This token can block only creatures with flying.\"\nWarp {U/R}");
     card!(Twincast, "Twincast", ManaCost { blue: 2, ..c }, &[Instant], &[], None, None, None, kw(), &[Blue, Red],
         "Copy target instant or sorcery spell. You may choose new targets for the copy.");
     card!(GalvanicRelay, "Galvanic Relay", ManaCost { red: 1, ..c }, &[Sorcery], &[], None, None, None, storm(), &[Red],
