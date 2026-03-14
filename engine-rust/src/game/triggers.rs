@@ -87,19 +87,8 @@ impl GameState {
                     vec![],
                 );
             }
-            CardName::BroadsideBombardiers => {
-                // When Broadside Bombardiers dies, it deals 3 damage to any target.
-                let opp = self.opponent(controller);
-                self.stack.push(
-                    StackItemKind::TriggeredAbility {
-                        source_id: died_id,
-                        source_name: died_name,
-                        effect: TriggeredEffect::BroadsideBombardiersDamage,
-                    },
-                    controller,
-                    vec![Target::Player(opp)],
-                );
-            }
+            // Broadside Bombardiers: boast ability (not yet implemented), no dies trigger
+            CardName::BroadsideBombardiers => {}
             CardName::Pyrogoyf => {
                 // When Pyrogoyf dies, it deals damage equal to its power to any target.
                 // Use last-known power; Pyrogoyf is now in the graveyard so graveyard type

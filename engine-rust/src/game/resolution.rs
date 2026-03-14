@@ -2557,19 +2557,8 @@ impl GameState {
             CardName::UndermountainAdventurer => {
                 self.take_initiative(controller);
             }
-            // Broadside Bombardiers: deal 3 damage to any target on ETB
-            CardName::BroadsideBombardiers => {
-                let opp = self.opponent(controller);
-                self.stack.push(
-                    StackItemKind::TriggeredAbility {
-                        source_id: _card_id,
-                        source_name: card_name,
-                        effect: TriggeredEffect::BroadsideBombardiersDamage,
-                    },
-                    controller,
-                    vec![Target::Player(opp)],
-                );
-            }
+            // Broadside Bombardiers: boast ability (not yet implemented), no ETB
+            CardName::BroadsideBombardiers => {}
             // Avalanche of Sector 7: no ETB (triggered ability handled in triggers.rs)
             CardName::AvalancheOfSector7 => {}
             // Mana Vault / Grim Monolith / Time Vault: set doesnt_untap flag
@@ -4766,10 +4755,7 @@ impl GameState {
             }
 
             TriggeredEffect::BroadsideBombardiersDamage => {
-                // Deal 3 damage to any target (ETB or dies)
-                if let Some(target) = targets.first() {
-                    self.deal_damage_to_target(*target, 3, controller);
-                }
+                // Boast ability not yet implemented; this variant is kept for exhaustiveness.
             }
 
             TriggeredEffect::PyrogoyfDeath { power } => {
