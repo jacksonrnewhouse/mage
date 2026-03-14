@@ -2375,8 +2375,8 @@ pub fn build_card_db() -> Vec<CardDef> {
         "If a land is tapped for two or more mana, it produces {C} instead of any other type and amount. Each spell a player casts costs {1} more to cast for each other spell that player has cast this turn.");
     card!(DefenseGrid, "Defense Grid", ManaCost::generic(2), &[Artifact], &[], None, None, None, kw(), &[],
         "Each spell that isn't cast during its controller's turn costs {3} more to cast.");
-    card!(DisruptorFlute, "Disruptor Flute", ManaCost::generic(2), &[Artifact], &[], None, None, None, kw(), &[],
-        "As Disruptor Flute enters, choose a card name. Activated abilities of sources with the chosen name can't be activated. Spells with the chosen name cost {3} more to cast.");
+    card!(DisruptorFlute, "Disruptor Flute", ManaCost::generic(2), &[Artifact], &[], None, None, None, flash(), &[],
+        "Flash. As Disruptor Flute enters, choose a card name. Activated abilities of sources with the chosen name can't be activated. Spells with the chosen name cost {3} more to cast.");
     card!(IchorWellspring, "Ichor Wellspring", ManaCost::generic(2), &[Artifact], &[], None, None, None, kw(), &[],
         "When Ichor Wellspring enters or is put into a graveyard from the battlefield, draw a card.");
     card!(NullRod, "Null Rod", ManaCost::generic(2), &[Artifact], &[], None, None, None, kw(), &[],
