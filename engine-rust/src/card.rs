@@ -1187,7 +1187,7 @@ pub fn build_card_db() -> Vec<CardDef> {
     // === Blue Spells ===
     card!(Counterspell, "Counterspell", ManaCost { blue: 2, ..c }, &[Instant], &[], None, None, None, kw(), &[Blue],
         "Counter target spell.");
-    card!(ForceOfWill, "Force of Will", ManaCost { blue: 1, generic: 3, ..c }, &[Instant], &[], None, None, None, kw(), &[Blue],
+    card!(ForceOfWill, "Force of Will", ManaCost { blue: 2, generic: 3, ..c }, &[Instant], &[], None, None, None, kw(), &[Blue],
         "You may pay 1 life and exile a blue card from your hand rather than pay this spell's mana cost. Counter target spell.");
     card!(Brainstorm, "Brainstorm", ManaCost::u(1), &[Instant], &[], None, None, None, kw(), &[Blue],
         "Draw three cards, then put two cards from your hand on top of your library in any order.");
@@ -1715,7 +1715,7 @@ pub fn build_card_db() -> Vec<CardDef> {
         display_name: "Petty Theft",
         cost: ManaCost { blue: 1, generic: 1, ..c },
         card_types: &[CardType::Instant],
-    }) CT(&[CreatureType::Faerie, CreatureType::Rogue]) BrazenBorrower, "Brazen Borrower", ManaCost { blue: 1, generic: 2, ..c }, &[Creature], &[],
+    }) CT(&[CreatureType::Faerie, CreatureType::Rogue]) BrazenBorrower, "Brazen Borrower", ManaCost { blue: 2, generic: 1, ..c }, &[Creature], &[],
         Some(3), Some(1), None, flash_flying(), &[Blue],
         "Flash. Flying. Brazen Borrower can block only creatures with flying. Adventure - Petty Theft {1}{U}: Return target nonland permanent an opponent controls to its owner's hand.");
     card!(EmryLurkerOfTheLoch, "Emry, Lurker of the Loch", ManaCost { blue: 1, generic: 2, ..c }, &[Creature], &[Legendary],
@@ -1727,7 +1727,7 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(DisplacerKitten, "Displacer Kitten", ManaCost { blue: 1, generic: 3, ..c }, &[Creature], &[],
         Some(2), Some(2), None, kw(), &[Blue],
         "Avoidance. Whenever you cast a noncreature spell, exile up to one target nonland permanent you control, then return it to the battlefield under its owner's control.");
-    card!(KappaCannoneer, "Kappa Cannoneer", ManaCost { blue: 2, generic: 4, ..c }, &[Artifact, Creature], &[],
+    card!(KappaCannoneer, "Kappa Cannoneer", ManaCost { blue: 1, generic: 5, ..c }, &[Artifact, Creature], &[],
         Some(4), Some(4), None, {
             let mut k = Keywords::empty();
             k.add(Keyword::Ward);
@@ -1768,7 +1768,7 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Counter target spell. If that spell is countered this way, put it on top of its owner's library instead of into that player's graveyard.");
     card!(Remand, "Remand", ManaCost { blue: 1, generic: 1, ..c }, &[Instant], &[], None, None, None, kw(), &[Blue],
         "Counter target spell. If that spell is countered this way, put it into its owner's hand instead of into that player's graveyard. Draw a card.");
-    card!(ForceOfNegation, "Force of Negation", ManaCost { blue: 1, generic: 2, ..c }, &[Instant], &[], None, None, None, kw(), &[Blue],
+    card!(ForceOfNegation, "Force of Negation", ManaCost { blue: 2, generic: 1, ..c }, &[Instant], &[], None, None, None, kw(), &[Blue],
         "If it's not your turn, you may exile a blue card from your hand rather than pay this spell's mana cost. Counter target noncreature spell. If that spell is countered this way, exile it instead of putting it into its owner's graveyard.");
     card!(MysticalDispute, "Mystical Dispute", ManaCost { blue: 1, generic: 2, ..c }, &[Instant], &[], None, None, None, kw(), &[Blue],
         "This spell costs {2} less to cast if it targets a blue spell. Counter target spell unless its controller pays {3}.");
@@ -1778,7 +1778,7 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Return any number of target nonland, nontoken permanents you control to their owners' hands. Draw a card for each card returned to your hand this way.");
     card!(Gush, "Gush", ManaCost { blue: 1, generic: 4, ..c }, &[Instant], &[], None, None, None, kw(), &[Blue],
         "You may return two Islands you control to their owner's hand rather than pay this spell's mana cost. Draw two cards.");
-    card!(Misdirection, "Misdirection", ManaCost { blue: 1, generic: 4, ..c }, &[Instant], &[], None, None, None, kw(), &[Blue],
+    card!(Misdirection, "Misdirection", ManaCost { blue: 2, generic: 3, ..c }, &[Instant], &[], None, None, None, kw(), &[Blue],
         "You may exile a blue card from your hand rather than pay this spell's mana cost. Change the target of target spell with a single target.");
     card!(Commandeer, "Commandeer", ManaCost { blue: 2, generic: 5, ..c }, &[Instant], &[], None, None, None, kw(), &[Blue],
         "You may exile two blue cards from your hand rather than pay this spell's mana cost. Gain control of target noncreature spell. You may choose new targets for it.");
@@ -1794,13 +1794,13 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Sacrifice an artifact. If you do, search your library for an artifact card. If that card's mana cost is less than or equal to the sacrificed artifact's, put it onto the battlefield. Otherwise, pay the difference in mana. Then shuffle.");
     card!(ShowAndTell, "Show and Tell", ManaCost { blue: 1, generic: 2, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Blue],
         "Each player may put an artifact, creature, enchantment, or land card from their hand onto the battlefield.");
-    card!(StockUp, "Stock Up", ManaCost { blue: 1, generic: 3, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Blue],
+    card!(StockUp, "Stock Up", ManaCost { blue: 1, generic: 2, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Blue],
         "Draw three cards. If you control a token, draw four cards instead.");
     card!(Windfall, "Windfall", ManaCost { blue: 1, generic: 2, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Blue],
         "Each player discards their hand, then draws cards equal to the greatest number of cards a player discarded this way.");
-    card!(LorienRevealed, "Lorien Revealed", ManaCost { blue: 1, generic: 4, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Blue],
+    card!(LorienRevealed, "Lorien Revealed", ManaCost { blue: 2, generic: 3, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Blue],
         "Draw three cards. Island cycling {1}.");
-    card!(StepThrough, "Step Through", ManaCost { blue: 1, generic: 4, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Blue],
+    card!(StepThrough, "Step Through", ManaCost { blue: 2, generic: 3, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Blue],
         "Return two target creatures to their owners' hands. Wizardcycling {2}.");
     card!(Thoughtcast, "Thoughtcast", ManaCost { blue: 1, generic: 4, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Blue],
         "Affinity for artifacts. Draw two cards.");
@@ -1824,7 +1824,7 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Flash. When Dress Down enters, draw a card. Creatures lose all abilities. At the beginning of the end step, sacrifice Dress Down.");
     card!(EnergyFlux, "Energy Flux", ManaCost { blue: 1, generic: 2, ..c }, &[Enchantment], &[], None, None, None, kw(), &[Blue],
         "All artifacts have \"At the beginning of your upkeep, sacrifice this artifact unless you pay {2}.\"");
-    card!(SinkIntoStupor, "Sink into Stupor", ManaCost { blue: 1, generic: 2, ..c }, &[Instant], &[], None, None, None, kw(), &[Blue],
+    card!(SinkIntoStupor, "Sink into Stupor", ManaCost { blue: 2, generic: 1, ..c }, &[Instant], &[], None, None, None, kw(), &[Blue],
         "Return target spell or nonland permanent to its owner's hand.");
     card!(SharkTyphoon, "Shark Typhoon", ManaCost { blue: 1, generic: 5, ..c }, &[Enchantment], &[], None, None, None, kw(), &[Blue],
         "Whenever you cast a noncreature spell, create an X/X blue Shark creature token with flying, where X is that spell's mana value. Cycling {X}{U}.");
