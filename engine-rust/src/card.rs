@@ -2494,7 +2494,7 @@ pub fn build_card_db() -> Vec<CardDef> {
         "+1: Return up to one target land card from your graveyard to your hand. -1: Wrenn and Six deals 1 damage to any target. -7: You get an emblem with \"Instant and sorcery cards in your graveyard have retrace.\"");
     card!(MinscAndBooTimelessHeroes, "Minsc & Boo, Timeless Heroes", ManaCost { red: 1, green: 1, generic: 2, ..c }, &[Planeswalker], &[Legendary],
         None, None, Some(3), kw(), &[Red, Green],
-        "+1: Create Boo, a legendary 1/1 red Hamster creature token with trample and haste. -2: Target creature you control gets +X/+0 and gains trample and haste until end of turn, where X is its power. -6: You may sacrifice any number of creatures. When you sacrifice one or more creatures this way, Minsc & Boo deals X damage to any target, where X is the total power of those creatures, and you draw X cards.");
+        "When Minsc & Boo enters and at the beginning of your upkeep, you may create Boo, a legendary 1/1 red Hamster creature token with trample and haste. +1: Put three +1/+1 counters on up to one target creature with trample or haste. -2: Sacrifice a creature. When you do, Minsc & Boo deals X damage to any target, where X is that creature's power. If the sacrificed creature was a Hamster, draw X cards.");
 
     // === Selesnya (GW) ===
     // Actual cost {G/W} — hybrid approximated as {1} generic since ManaCost lacks hybrid support

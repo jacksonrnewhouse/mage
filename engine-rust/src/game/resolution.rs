@@ -2906,6 +2906,32 @@ impl GameState {
                 });
             }
 
+            // Minsc & Boo, Timeless Heroes: When Minsc & Boo enters and at the beginning of
+            // your upkeep, you may create Boo, a legendary 1/1 red Hamster creature token with
+            // trample and haste.
+            CardName::MinscAndBooTimelessHeroes => {
+                // ETB: create Boo immediately (push triggered ability to stack)
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id: _card_id,
+                        source_name: card_name,
+                        effect: TriggeredEffect::MinscCreateBoo { minsc_id: _card_id },
+                    },
+                    controller,
+                    vec![],
+                );
+                // Register recurring upkeep trigger
+                self.add_delayed_trigger(crate::types::DelayedTrigger {
+                    condition: crate::types::DelayedTriggerCondition::AtBeginningOfUpkeep {
+                        player: controller,
+                    },
+                    effect: TriggeredEffect::MinscCreateBoo { minsc_id: _card_id },
+                    controller,
+                    fires_once: false,
+                    source_id: Some(_card_id),
+                });
+            }
+
             // Emperor of Bones: register a recurring "at the beginning of combat on your turn"
             // trigger that exiles a card from a graveyard (simplified: auto-exile best creature).
             CardName::EmperorOfBones => {
@@ -4967,6 +4993,48 @@ impl GameState {
                 }
             }
 
+            TriggeredEffect::MinscCreateBoo { minsc_id } => {
+                // Minsc & Boo ETB/upkeep: you may create Boo, a legendary 1/1 red Hamster
+                // creature token with trample and haste. "You may" — always create (optimal).
+                // Only create if Minsc is still on the battlefield.
+                let minsc_on_field = self.battlefield.iter().any(|p| p.id == minsc_id);
+                if minsc_on_field {
+                    let token_id = self.new_object_id();
+                    let mut kw = Keywords::empty();
+                    kw.add(Keyword::Trample);
+                    kw.add(Keyword::Haste);
+                    let token = Permanent {
+                        id: token_id,
+                        card_name: card_name_for_token(),
+                        controller,
+                        owner: controller,
+                        tapped: false,
+                        base_power: 1,
+                        base_toughness: 1,
+                        power_mod: 0,
+                        toughness_mod: 0,
+                        damage: 0,
+                        keywords: kw,
+                        counters: Counters::default(),
+                        entered_this_turn: true,
+                        attacked_this_turn: false,
+                        doesnt_untap: false,
+                        loyalty: 0,
+                        loyalty_activated_this_turn: false,
+                        card_types: vec![CardType::Creature],
+                        creature_types: vec![CreatureType::Hamster],
+                        cavern_creature_type: None,
+                        protections: Vec::new(),
+                        colors: vec![Color::Red],
+                        transformed: false,
+                        is_token: true,
+                        attached_to: None,
+                        attachments: Vec::new(),
+                    };
+                    self.battlefield.push(token);
+                }
+            }
+
             _ => {}
         }
         let _ = db; // suppress unused warning when db not used in all arms
@@ -5245,82 +5313,33 @@ impl GameState {
                     self.players[controller as usize].life += cards_in_exile;
                 }
             }
-            ActivatedEffect::MinscCreateBoo => {
-                // Minsc & Boo +1: Create Boo, a legendary 1/1 red Hamster with trample and haste.
-                let token_id = self.new_object_id();
-                let mut kw = Keywords::empty();
-                kw.add(Keyword::Trample);
-                kw.add(Keyword::Haste);
-                let token = Permanent {
-                    id: token_id,
-                    card_name: card_name_for_token(),
-                    controller,
-                    owner: controller,
-                    tapped: false,
-                    base_power: 1,
-                    base_toughness: 1,
-                    power_mod: 0,
-                    toughness_mod: 0,
-                    damage: 0,
-                    keywords: kw,
-                    counters: Counters::default(),
-                    entered_this_turn: true,
-                    attacked_this_turn: false,
-                    doesnt_untap: false,
-                    loyalty: 0,
-                    loyalty_activated_this_turn: false,
-                    card_types: vec![CardType::Creature],
-                    creature_types: vec![CreatureType::Hamster],
-                    cavern_creature_type: None,
-                    protections: Vec::new(),
-                    colors: vec![Color::Red],
-                    transformed: false,
-                    is_token: true,
-                    attached_to: None,
-                    attachments: Vec::new(),
-                };
-                self.battlefield.push(token);
-            }
-            ActivatedEffect::MinscPump => {
-                // Minsc & Boo -2: Target creature gets +X/+0, trample, and haste until EOT, where X = its power.
+            ActivatedEffect::MinscCounters => {
+                // Minsc & Boo +1: Put three +1/+1 counters on up to one target creature with trample or haste.
                 if let Some(Target::Object(target_id)) = targets.first() {
-                    let power = self.find_permanent(*target_id).map(|p| p.power()).unwrap_or(0);
-                    if power > 0 {
-                        self.temporary_effects.push(TemporaryEffect::ModifyPT {
-                            target: *target_id,
-                            power: power,
-                            toughness: 0,
-                        });
-                        if let Some(perm) = self.find_permanent_mut(*target_id) {
-                            perm.power_mod += power;
-                        }
-                    }
-                    self.temporary_effects.push(TemporaryEffect::GrantKeyword {
-                        target: *target_id,
-                        keyword: Keyword::Trample,
-                    });
                     if let Some(perm) = self.find_permanent_mut(*target_id) {
-                        perm.keywords.add(Keyword::Trample);
-                    }
-                    self.temporary_effects.push(TemporaryEffect::GrantKeyword {
-                        target: *target_id,
-                        keyword: Keyword::Haste,
-                    });
-                    if let Some(perm) = self.find_permanent_mut(*target_id) {
-                        perm.keywords.add(Keyword::Haste);
+                        perm.counters.add(CounterType::PlusOnePlusOne, 3);
                     }
                 }
+                // If no target, that's fine ("up to one").
             }
-            ActivatedEffect::MinscUltimate => {
-                // Minsc & Boo -6: Sacrifice a creature (targets[0]), deal damage equal to its power,
-                // draw that many cards.
-                if let Some(Target::Object(target_id)) = targets.first() {
-                    let power = self.find_permanent(*target_id).map(|p| p.power()).unwrap_or(0);
-                    self.destroy_permanent(*target_id);
+            ActivatedEffect::MinscSacDamage => {
+                // Minsc & Boo -2: Sacrifice a creature. When you do, Minsc & Boo deals X damage
+                // to any target, where X is that creature's power. If the sacrificed creature was
+                // a Hamster, draw X cards.
+                // targets[0] = creature to sacrifice, targets[1] = damage target
+                if let Some(Target::Object(sac_id)) = targets.first() {
+                    let power = self.find_permanent(*sac_id).map(|p| p.power()).unwrap_or(0);
+                    let is_hamster = self.find_permanent(*sac_id)
+                        .map(|p| p.creature_types.contains(&CreatureType::Hamster))
+                        .unwrap_or(false);
+                    self.destroy_permanent(*sac_id);
                     if power > 0 {
-                        let opponent = self.opponent(controller);
-                        self.players[opponent as usize].life -= power as i32;
-                        self.draw_cards(controller, power as usize);
+                        if let Some(damage_target) = targets.get(1) {
+                            self.deal_damage_to_target(*damage_target, power as u16, controller);
+                        }
+                        if is_hamster {
+                            self.draw_cards(controller, power as usize);
+                        }
                     }
                 }
             }

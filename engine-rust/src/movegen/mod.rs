@@ -2386,21 +2386,35 @@ impl GameState {
                     }
                 }
                 CardName::MinscAndBooTimelessHeroes => {
-                    // +1: Create Boo (1/1 Hamster with trample and haste)
+                    // +1: Put three +1/+1 counters on up to one target creature with trample or haste.
+                    // "up to one" means we can activate with no target
                     abilities.push((0, vec![]));
-                    // -2: Target creature you control gets +X/+0, trample, and haste (X = its power)
-                    if perm.loyalty >= 2 {
-                        for target in &self.battlefield {
-                            if target.is_creature() && target.controller == perm.controller {
-                                abilities.push((1, vec![Target::Object(target.id)]));
-                            }
+                    for target in &self.battlefield {
+                        if target.is_creature()
+                            && (target.keywords.has(Keyword::Trample) || target.keywords.has(Keyword::Haste))
+                        {
+                            abilities.push((0, vec![Target::Object(target.id)]));
                         }
                     }
-                    // -6: Sacrifice a creature, deal damage equal to its power, draw that many cards
-                    if perm.loyalty >= 6 {
-                        for target in &self.battlefield {
-                            if target.is_creature() && target.controller == perm.controller {
-                                abilities.push((2, vec![Target::Object(target.id)]));
+                    // -2: Sacrifice a creature. Minsc & Boo deals X damage to any target,
+                    // where X is that creature's power. If the sacrificed creature was a Hamster, draw X cards.
+                    // targets[0] = creature to sacrifice, targets[1] = damage target (player or object)
+                    if perm.loyalty >= 2 {
+                        let controller_id = perm.controller;
+                        let my_creatures: Vec<_> = self.battlefield.iter()
+                            .filter(|t| t.is_creature() && t.controller == controller_id)
+                            .map(|t| t.id)
+                            .collect();
+                        for &sac_target in &my_creatures {
+                            // Can target any player
+                            for pid in 0..self.players.len() {
+                                abilities.push((1, vec![Target::Object(sac_target), Target::Player(pid as PlayerId)]));
+                            }
+                            // Can target any creature or planeswalker
+                            for damage_target in &self.battlefield {
+                                if damage_target.is_creature() || damage_target.card_types.contains(&CardType::Planeswalker) {
+                                    abilities.push((1, vec![Target::Object(sac_target), Target::Object(damage_target.id)]));
+                                }
                             }
                         }
                     }

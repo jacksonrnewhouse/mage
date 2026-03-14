@@ -274,6 +274,9 @@ pub enum TriggeredEffect {
     VengevineReturn { vengevine_id: ObjectId, owner: PlayerId },
     /// Mana Vault draw-step trigger: if Mana Vault is tapped, deal 1 damage to its controller.
     ManaVaultDrawStep { vault_id: ObjectId },
+    /// Minsc & Boo ETB/upkeep: you may create Boo, a legendary 1/1 red Hamster creature token
+    /// with trample and haste.
+    MinscCreateBoo { minsc_id: ObjectId },
 }
 
 /// Activated ability effects.
@@ -383,12 +386,11 @@ pub enum ActivatedEffect {
     KrarkClanIronworksSacrifice,
     /// Engineered Explosives: {2}, Sacrifice: Destroy each nonland permanent with MV equal to charge counters.
     EngineeredExplosivesDestroy { charge_counters: u32 },
-    /// Minsc & Boo +1: Create Boo, a legendary 1/1 red Hamster creature token with trample and haste.
-    MinscCreateBoo,
-    /// Minsc & Boo -2: Target creature gets +X/+0 and gains trample until end of turn, where X is its power.
-    MinscPump,
-    /// Minsc & Boo -6: Sacrifice a creature, deal damage equal to its power, draw that many cards.
-    MinscUltimate,
+    /// Minsc & Boo +1: Put three +1/+1 counters on up to one target creature with trample or haste.
+    MinscCounters,
+    /// Minsc & Boo -2: Sacrifice a creature. Deal X damage to any target (X = sacrificed creature's power).
+    /// If the sacrificed creature was a Hamster, draw X cards.
+    MinscSacDamage,
     /// Comet, Stellar Pup 0: Simplified — create two 1/1 tokens.
     CometCreateTokens,
     /// Dovin, Hand of Control -1: Prevent damage from/to target permanent (simplified: no-op).

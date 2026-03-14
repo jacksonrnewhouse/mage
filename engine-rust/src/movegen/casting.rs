@@ -1589,36 +1589,26 @@ impl GameState {
                     perm.loyalty_activated_this_turn = true;
                     match ability_index {
                         0 => {
+                            // +1: Put three +1/+1 counters on up to one target creature with trample or haste.
                             perm.loyalty += 1;
                             self.stack.push(
                                 StackItemKind::ActivatedAbility {
                                     source_id: permanent_id,
                                     source_name: card_name,
-                                    effect: ActivatedEffect::MinscCreateBoo,
-                                },
-                                controller,
-                                vec![],
-                            );
-                        }
-                        1 => {
-                            perm.loyalty -= 2;
-                            self.stack.push(
-                                StackItemKind::ActivatedAbility {
-                                    source_id: permanent_id,
-                                    source_name: card_name,
-                                    effect: ActivatedEffect::MinscPump,
+                                    effect: ActivatedEffect::MinscCounters,
                                 },
                                 controller,
                                 targets.to_vec(),
                             );
                         }
-                        2 => {
-                            perm.loyalty -= 6;
+                        1 => {
+                            // -2: Sacrifice a creature. Deal X damage to any target.
+                            perm.loyalty -= 2;
                             self.stack.push(
                                 StackItemKind::ActivatedAbility {
                                     source_id: permanent_id,
                                     source_name: card_name,
-                                    effect: ActivatedEffect::MinscUltimate,
+                                    effect: ActivatedEffect::MinscSacDamage,
                                 },
                                 controller,
                                 targets.to_vec(),
