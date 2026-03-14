@@ -45,6 +45,9 @@ pub enum AltCost {
     MindbreakTrap,
     /// Overload: pay the overload cost to change "target" to "each" in the spell's text.
     Overload,
+    /// Redirect Lightning: pay 5 life as additional cost (instead of {2}).
+    /// The base {R} mana cost is still paid from the mana pool.
+    RedirectLightningLife,
 }
 
 /// A game action that can be taken by the active/priority player.

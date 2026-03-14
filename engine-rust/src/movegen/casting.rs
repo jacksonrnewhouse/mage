@@ -224,6 +224,10 @@ impl GameState {
                         } else {
                             // Normal mana cost (with tax effects applied).
                             let mut cost = self.effective_cost(def, player_id);
+                            // Redirect Lightning: additional cost of {2}.
+                            if cn == CardName::RedirectLightning {
+                                cost.generic = cost.generic.saturating_add(2);
+                            }
                             // Mystical Dispute costs {2} less if it targets a blue spell.
                             if cn == CardName::MysticalDispute {
                                 let targets_blue = targets.iter().any(|t| {
@@ -2532,6 +2536,17 @@ impl GameState {
                     return false;
                 }
                 self.players[player_id as usize].mana_pool.pay(&overload_cost);
+                true
+            }
+            AltCost::RedirectLightningLife => {
+                // Pay {R} from mana pool + 5 life as additional cost.
+                let base_cost = crate::mana::ManaCost { red: 1, ..crate::mana::ManaCost::ZERO };
+                let player = &self.players[player_id as usize];
+                if player.life <= 5 || !player.mana_pool.can_pay(&base_cost) {
+                    return false;
+                }
+                self.players[player_id as usize].mana_pool.pay(&base_cost);
+                self.players[player_id as usize].life -= 5;
                 true
             }
         }

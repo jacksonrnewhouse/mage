@@ -214,6 +214,11 @@ impl GameState {
 
                     // Check mana cost (including Thalia tax, etc.)
                     let mut effective_cost = self.effective_cost(def, player_id);
+                    // Redirect Lightning: additional cost of {2} (the mana option).
+                    // The life option is handled as an AltCost below.
+                    if card_name == CardName::RedirectLightning {
+                        effective_cost.generic = effective_cost.generic.saturating_add(2);
+                    }
                     // Mystical Dispute costs {2} less if it targets a blue spell.
                     // For affordability, check if any blue spell is on the stack.
                     if card_name == CardName::MysticalDispute {
@@ -3679,6 +3684,28 @@ impl GameState {
                                 alt_cost: Some(alt.clone()),
                                 modes: vec![],
                             });
+                        }
+                    }
+                }
+
+                // --- Redirect Lightning: pay 5 life as additional cost (instead of {2}) ---
+                CardName::RedirectLightning => {
+                    if player.life > 5 {
+                        // Need to be able to pay {R} from mana pool
+                        let base_cost = crate::mana::ManaCost { red: 1, ..crate::mana::ManaCost::ZERO };
+                        if player.mana_pool.can_pay(&base_cost) {
+                            let target_sets = self.generate_targets(card_name, player_id, db);
+                            for targets in &target_sets {
+                                actions.push(Action::CastSpell {
+                                    card_id,
+                                    targets: targets.clone(),
+                                    x_value: 0,
+                                    from_graveyard: false,
+                                    from_library_top: false,
+                                    alt_cost: Some(AltCost::RedirectLightningLife),
+                                    modes: vec![],
+                                });
+                            }
                         }
                     }
                 }

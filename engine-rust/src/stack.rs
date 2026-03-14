@@ -526,6 +526,11 @@ impl GameStack {
         &self.items
     }
 
+    /// Find a mutable reference to a stack item by its id.
+    pub fn find_mut(&mut self, id: ObjectId) -> Option<&mut StackItem> {
+        self.items.iter_mut().find(|item| item.id == id)
+    }
+
     pub fn next_id(&self) -> ObjectId {
         self.next_id
     }

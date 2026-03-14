@@ -403,8 +403,48 @@ impl GameState {
             }
             CardName::RedirectLightning => {
                 // "Change the target of target spell or ability with a single target."
-                // Target redirection is complex to model; treated as a no-op for game tree search.
-                // The additional cost (pay 5 life or {2}) is handled at cast time.
+                // Find the targeted spell/ability on the stack and redirect its target.
+                // Heuristic for game tree search: redirect the target to the opponent's side.
+                if let Some(Target::Object(stack_item_id)) = targets.first() {
+                    let opponent = 1 - controller;
+                    // First, read the current target from the stack item (immutable borrow)
+                    let current_target = self.stack.items().iter()
+                        .find(|item| item.id == *stack_item_id && item.targets.len() == 1)
+                        .map(|item| item.targets[0]);
+
+                    if let Some(current) = current_target {
+                        let new_target = match current {
+                            Target::Player(pid) => {
+                                // Redirect player targeting: from us to opponent or vice versa
+                                Target::Player(if pid == controller { opponent } else { controller })
+                            }
+                            Target::Object(obj_id) => {
+                                // Redirect object targeting: find a valid alternative
+                                let target_controller = self.find_permanent(obj_id).map(|p| p.controller);
+                                if target_controller == Some(controller) {
+                                    // Currently targeting our permanent; redirect to opponent's creature
+                                    self.battlefield.iter()
+                                        .find(|p| p.controller == opponent && p.is_creature() && p.id != obj_id)
+                                        .map(|p| Target::Object(p.id))
+                                        .unwrap_or(Target::Player(opponent))
+                                } else {
+                                    // Currently targeting opponent's permanent; redirect to our creature
+                                    self.battlefield.iter()
+                                        .find(|p| p.controller == controller && p.is_creature() && p.id != obj_id)
+                                        .map(|p| Target::Object(p.id))
+                                        .unwrap_or(Target::Player(controller))
+                                }
+                            }
+                            Target::None => Target::None,
+                        };
+                        // Now apply the new target (mutable borrow)
+                        if let Some(item) = self.stack.find_mut(*stack_item_id) {
+                            if item.targets.len() == 1 {
+                                item.targets[0] = new_target;
+                            }
+                        }
+                    }
+                }
             }
             // Shatterskull Smashing: deals X damage divided among up to two targets.
             // If X is 6 or more, deals twice X damage instead.
