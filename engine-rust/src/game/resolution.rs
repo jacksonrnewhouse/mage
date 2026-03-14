@@ -2463,16 +2463,8 @@ impl GameState {
                     vec![],
                 );
             }
-            // Mai, Scornful Striker: each player mills 2 cards on ETB
-            CardName::MaiScornfulStriker => {
-                for pid in 0..self.players.len() {
-                    for _ in 0..2 {
-                        if let Some(id) = self.players[pid].library.pop() {
-                            self.players[pid].graveyard.push(id);
-                        }
-                    }
-                }
-            }
+            // Mai, Scornful Striker: no ETB effect (triggers on noncreature spell cast handled in triggers.rs)
+            CardName::MaiScornfulStriker => {}
             // Emry, Lurker of the Loch: mill 4 cards on ETB
             CardName::EmryLurkerOfTheLoch => {
                 for _ in 0..4 {
@@ -3419,12 +3411,9 @@ impl GameState {
                     self.draw_cards(controller, 1);
                 }
             }
-            TriggeredEffect::MaiCombatDamage => {
-                // Mai, Scornful Striker deals combat damage to a player:
-                // you may cast a creature card from a graveyard.
-                // Simplified: draw a card to represent the card advantage from the ability.
-                // Full implementation requires choosing from any graveyard; model as draw for now.
-                self.draw_cards(controller, 1);
+            TriggeredEffect::MaiNoncreatureSpellCast { target_player } => {
+                // Mai, Scornful Striker: whenever a player casts a noncreature spell, they lose 2 life
+                self.players[target_player as usize].life -= 2;
             }
             TriggeredEffect::BarrowgoyfCombatDamage { damage } => {
                 // Barrowgoyf deals combat damage to a player: mill that many cards.

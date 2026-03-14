@@ -103,8 +103,8 @@ pub enum TriggeredEffect {
     ScrawlingCrawlerCombatDamage,
     /// PsychicFrog deals combat damage to a player: you may exile a card from your graveyard; if you do, draw a card
     PsychicFrogCombatDamage,
-    /// Mai, Scornful Striker deals combat damage to a player: you may cast a creature card from a graveyard
-    MaiCombatDamage,
+    /// Mai, Scornful Striker: whenever a player casts a noncreature spell, they lose 2 life
+    MaiNoncreatureSpellCast { target_player: PlayerId },
     /// Barrowgoyf deals combat damage to a player: mill that many cards, may put a creature card among them into hand
     BarrowgoyfCombatDamage { damage: i16 },
     /// Vessel of the All-Consuming deals damage: put a +1/+1 counter on it.

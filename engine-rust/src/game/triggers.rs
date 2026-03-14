@@ -401,6 +401,22 @@ impl GameState {
             ));
         }
 
+        // Mai, Scornful Striker: whenever a player casts a noncreature spell, they lose 2 life
+        let mai_triggers: Vec<(ObjectId, PlayerId)> = self
+            .battlefield
+            .iter()
+            .filter(|p| p.card_name == CardName::MaiScornfulStriker)
+            .map(|p| (p.id, p.controller))
+            .collect();
+        for (source_id, controller) in mai_triggers {
+            triggers.push((
+                source_id,
+                CardName::MaiScornfulStriker,
+                TriggeredEffect::MaiNoncreatureSpellCast { target_player: caster },
+                controller,
+            ));
+        }
+
         // Magebane Lizard: whenever a player casts a noncreature spell, deal damage to that
         // player equal to the number of noncreature spells they've cast this turn.
         let noncreature_count = self.players[caster as usize].noncreature_spells_cast_this_turn;
