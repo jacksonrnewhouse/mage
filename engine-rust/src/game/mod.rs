@@ -1608,6 +1608,22 @@ impl GameState {
             }
         }
 
+        // Makdee and Itla, Skysnarers: "Artifacts and creatures your opponents control enter tapped."
+        let is_artifact_or_creature = self.battlefield.iter()
+            .find(|p| p.id == permanent_id)
+            .map(|p| p.is_artifact() || p.is_creature())
+            .unwrap_or(false);
+
+        if is_artifact_or_creature {
+            let opponent_has_makdee = self.battlefield.iter()
+                .any(|p| p.card_name == CardName::MakdeeAndItlaSkysnarers && p.controller != controller);
+            if opponent_has_makdee {
+                if let Some(perm) = self.find_permanent_mut(permanent_id) {
+                    perm.tapped = true;
+                }
+            }
+        }
+
         // Archon of Emeria: "Nonbasic lands your opponents control enter tapped."
         let is_nonbasic_land = self.battlefield.iter()
             .find(|p| p.id == permanent_id)
