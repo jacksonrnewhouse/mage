@@ -559,6 +559,8 @@ pub enum CardName {
     /// Represents a Construct token from Urza's Saga (0/0 colorless Construct artifact creature,
     /// gets +1/+1 for each artifact its controller controls — continuous effect).
     ConstructToken,
+    /// Represents a Phyrexian Germ token (0/0 black creature, created by living weapon).
+    GermToken,
 
     // Sentinel value for array sizing
     _Count,

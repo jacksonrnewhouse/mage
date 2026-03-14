@@ -2758,6 +2758,28 @@ impl GameState {
                 }
             }
 
+            // Living weapon: When this Equipment enters, create a 0/0 black Phyrexian Germ
+            // creature token, then attach this Equipment to it.
+            CardName::Nettlecyst | CardName::Batterskull => {
+                let token_id = self.new_object_id();
+                let mut token = crate::permanent::Permanent::new(
+                    token_id,
+                    CardName::GermToken,
+                    controller,
+                    controller,
+                    Some(0),
+                    Some(0),
+                    None,
+                    Keywords::empty(),
+                    &[CardType::Creature],
+                );
+                token.is_token = true;
+                token.colors = vec![Color::Black];
+                self.battlefield.push(token);
+                // Attach the equipment to the Germ token
+                self.do_attach_equipment(_card_id, token_id);
+            }
+
             // Cavern of Souls: player chooses a creature type when it enters.
             // The chosen type is stored on the permanent and used for mana abilities.
             CardName::CavernOfSouls => {

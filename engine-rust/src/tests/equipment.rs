@@ -250,3 +250,110 @@ fn test_equip_action_generated() {
     });
     assert!(targets_creature, "Equip action should target our creature");
 }
+
+// -----------------------------------------------------------------------
+// Test: Nettlecyst living weapon ETB creates a Germ token and attaches
+// -----------------------------------------------------------------------
+#[test]
+fn test_nettlecyst_living_weapon_creates_germ() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // Put Nettlecyst on the battlefield — it should trigger living weapon ETB
+    let nettlecyst_id = {
+        let id = state.new_object_id();
+        state.card_registry.push((id, CardName::Nettlecyst));
+        let def = find_card(&db, CardName::Nettlecyst).unwrap();
+        let perm = crate::permanent::Permanent::new(
+            id, CardName::Nettlecyst, 0, 0,
+            def.power, def.toughness, None, def.keywords, def.card_types,
+        );
+        state.battlefield.push(perm);
+        // Fire the ETB
+        state.handle_etb(CardName::Nettlecyst, id, 0);
+        id
+    };
+
+    // There should be a Germ token on the battlefield
+    let germ = state.battlefield.iter().find(|p| p.card_name == CardName::GermToken);
+    assert!(germ.is_some(), "Living weapon should create a Germ token");
+    let germ = germ.unwrap();
+    let germ_id = germ.id;
+
+    // Germ should be a 0/0 black creature token
+    assert!(germ.is_token, "Germ should be a token");
+    assert_eq!(germ.base_power, 0, "Germ base power should be 0");
+    assert_eq!(germ.base_toughness, 0, "Germ base toughness should be 0");
+    assert!(germ.colors.contains(&crate::types::Color::Black), "Germ should be black");
+
+    // Nettlecyst should be attached to the Germ
+    let nettlecyst = state.find_permanent(nettlecyst_id).unwrap();
+    assert_eq!(
+        nettlecyst.attached_to,
+        Some(germ_id),
+        "Nettlecyst should be attached to the Germ token"
+    );
+
+    // Germ's attachments should include Nettlecyst
+    let germ = state.find_permanent(germ_id).unwrap();
+    assert!(
+        germ.attachments.contains(&nettlecyst_id),
+        "Germ's attachments should include Nettlecyst"
+    );
+
+    // Effective P/T should reflect Nettlecyst bonus (count of artifacts+enchantments)
+    // Nettlecyst itself is an artifact, so at minimum the bonus is 1
+    let eff_power = state.effective_power(germ_id, &db);
+    let eff_toughness = state.effective_toughness(germ_id, &db);
+    assert!(
+        eff_power >= 1,
+        "Germ with Nettlecyst should have effective power >= 1 (got {})", eff_power
+    );
+    assert!(
+        eff_toughness >= 1,
+        "Germ with Nettlecyst should have effective toughness >= 1 (got {})", eff_toughness
+    );
+}
+
+// -----------------------------------------------------------------------
+// Test: Batterskull living weapon ETB creates a Germ token and attaches
+// -----------------------------------------------------------------------
+#[test]
+fn test_batterskull_living_weapon_creates_germ() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    let batterskull_id = {
+        let id = state.new_object_id();
+        state.card_registry.push((id, CardName::Batterskull));
+        let def = find_card(&db, CardName::Batterskull).unwrap();
+        let perm = crate::permanent::Permanent::new(
+            id, CardName::Batterskull, 0, 0,
+            def.power, def.toughness, None, def.keywords, def.card_types,
+        );
+        state.battlefield.push(perm);
+        state.handle_etb(CardName::Batterskull, id, 0);
+        id
+    };
+
+    // There should be a Germ token on the battlefield
+    let germ = state.battlefield.iter().find(|p| p.card_name == CardName::GermToken);
+    assert!(germ.is_some(), "Living weapon should create a Germ token");
+    let germ = germ.unwrap();
+    let germ_id = germ.id;
+
+    // Batterskull should be attached to the Germ
+    let batterskull = state.find_permanent(batterskull_id).unwrap();
+    assert_eq!(
+        batterskull.attached_to,
+        Some(germ_id),
+        "Batterskull should be attached to the Germ token"
+    );
+
+    // Germ should have Batterskull's bonuses: +4/+4, vigilance, lifelink
+    let germ = state.find_permanent(germ_id).unwrap();
+    assert_eq!(germ.power(), 4, "Germ with Batterskull should have 4 power (0 + 4)");
+    assert_eq!(germ.toughness(), 4, "Germ with Batterskull should have 4 toughness (0 + 4)");
+    assert!(germ.keywords.has(Keyword::Vigilance), "Germ with Batterskull should have vigilance");
+    assert!(germ.keywords.has(Keyword::Lifelink), "Germ with Batterskull should have lifelink");
+}
