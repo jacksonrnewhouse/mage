@@ -1554,7 +1554,7 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(CT(&[CreatureType::Human, CreatureType::Artificer]) LoranOfTheThirdPath, "Loran of the Third Path", ManaCost { white: 1, generic: 2, ..c }, &[Creature], &[Legendary],
         Some(2), Some(1), None, vigilance(), &[White],
         "Vigilance. When Loran enters, destroy target artifact or enchantment an opponent controls. {T}: You and target opponent each draw a card.");
-    card!(CT(&[CreatureType::Human, CreatureType::Knight]) WhitePlumeAdventurer, "White Plume Adventurer", ManaCost { white: 1, generic: 2, ..c }, &[Creature], &[],
+    card!(CT(&[CreatureType::Orc, CreatureType::Cleric]) WhitePlumeAdventurer, "White Plume Adventurer", ManaCost { white: 1, generic: 2, ..c }, &[Creature], &[],
         Some(3), Some(3), None, kw(), &[White],
         "When White Plume Adventurer enters, you take the initiative. At the beginning of each opponent's upkeep, untap a creature you control. If you've completed a dungeon, untap all creatures you control instead.");
     card!(CT(&[CreatureType::Human, CreatureType::Warrior]) SeasonedDungeoneer, "Seasoned Dungeoneer", ManaCost { white: 1, generic: 3, ..c }, &[Creature], &[],
