@@ -2300,7 +2300,11 @@ pub fn build_card_db() -> Vec<CardDef> {
         "Sacrifice an artifact: Add {C}{C}.");
     card!(MysticForge, "Mystic Forge", ManaCost::generic(4), &[Artifact], &[], None, None, None, kw(), &[],
         "You may look at the top card of your library any time. You may cast artifact spells and colorless spells from the top of your library. {T}, Pay 1 life: Exile the top card of your library.");
-    card!(TheOneRing, "The One Ring", ManaCost::generic(4), &[Artifact], &[Legendary], None, None, None, kw(), &[],
+    card!(TheOneRing, "The One Ring", ManaCost::generic(4), &[Artifact], &[Legendary], None, None, None, {
+            let mut k = Keywords::empty();
+            k.add(Keyword::Indestructible);
+            k
+        }, &[],
         "Indestructible. When The One Ring enters, if you cast it, you gain protection from everything until your next turn. At the beginning of your upkeep, you lose 1 life for each burden counter on The One Ring. {T}: Put a burden counter on The One Ring, then draw a card for each burden counter on it.");
     card!(MemoryJar, "Memory Jar", ManaCost::generic(5), &[Artifact], &[], None, None, None, kw(), &[],
         "{T}, Sacrifice Memory Jar: Each player exiles their hand face down and draws seven cards. At the beginning of the next end step, each player discards their hand and returns cards exiled this way to their hand.");
