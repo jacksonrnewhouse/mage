@@ -1517,8 +1517,8 @@ pub fn build_card_db() -> Vec<CardDef> {
         Some(2), Some(2), None, kw(), &[White],
         "{W}, {T}, Sacrifice an artifact: Search your library for an artifact card with mana value equal to 1 plus the sacrificed artifact's mana value, put it onto the battlefield, then shuffle.");
     card!(CT(&[CreatureType::Dog]) PheliaExuberantShepherd, "Phelia, Exuberant Shepherd", ManaCost { white: 1, generic: 1, ..c }, &[Creature], &[Legendary],
-        Some(2), Some(2), None, kw(), &[White],
-        "Whenever Phelia attacks, exile up to one target nonland permanent. If it was a token, it won't return. Otherwise, return it at the beginning of the next end step with a +1/+1 counter on it if it's a creature.");
+        Some(2), Some(2), None, flash(), &[White],
+        "Flash. Whenever Phelia attacks, exile up to one target nonland permanent. If it was a token, it won't return. Otherwise, return it at the beginning of the next end step with a +1/+1 counter on it if it's a creature.");
     card!(CT(&[CreatureType::Halfling]) SamwiseTheStouthearted, "Samwise the Stouthearted", ManaCost { white: 1, generic: 1, ..c }, &[Creature], &[Legendary],
         Some(2), Some(1), None, flash(), &[White],
         "Flash. When Samwise enters, choose up to one target permanent card in your graveyard that was put there from the battlefield this turn. Return it to your hand.");
@@ -1803,9 +1803,9 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(StreetWraith, "Street Wraith", ManaCost { black: 2, generic: 3, ..c }, &[Creature], &[],
         Some(3), Some(4), None, kw(), &[Black],
         "Swampwalk. Cycling - Pay 2 life.");
-    card!(TrollOfKhazadDum, "Troll of Khazad-dum", ManaCost { black: 2, generic: 4, ..c }, &[Creature], &[],
-        Some(6), Some(5), None, trample(), &[Black],
-        "Trample. Swamp cycling {1}.");
+    card!(TrollOfKhazadDum, "Troll of Khazad-dum", ManaCost { black: 1, generic: 5, ..c }, &[Creature], &[],
+        Some(6), Some(5), None, kw(), &[Black],
+        "This creature can't be blocked except by three or more creatures. Swampcycling {1}.");
     card!(CT(&[CreatureType::Archon]) ArchonOfCruelty, "Archon of Cruelty", ManaCost { black: 2, generic: 6, ..c }, &[Creature], &[],
         Some(6), Some(6), None, flying(), &[Black],
         "Flying. Whenever Archon of Cruelty enters or attacks, target opponent sacrifices a creature, discards a card, and loses 3 life. You draw a card and gain 3 life.");
@@ -1879,14 +1879,14 @@ pub fn build_card_db() -> Vec<CardDef> {
         Some(2), Some(2), None, kw(), &[Red],
         "Whenever an opponent activates an ability of an artifact, creature, or land on the battlefield, if it's not a mana ability, Harsh Mentor deals 2 damage to that player.");
     card!(MagebaneLizard, "Magebane Lizard", ManaCost { red: 1, generic: 1, ..c }, &[Creature], &[],
-        Some(2), Some(2), None, kw(), &[Red],
-        "Whenever a player casts a noncreature spell, Magebane Lizard deals 1 damage to that player.");
+        Some(1), Some(4), None, kw(), &[Red],
+        "Whenever a player casts a noncreature spell, Magebane Lizard deals damage to that player equal to the number of noncreature spells they've cast this turn.");
     card!(RazorkinNeedlehead, "Razorkin Needlehead", ManaCost { red: 1, generic: 1, ..c }, &[Creature], &[],
         Some(2), Some(2), None, kw(), &[Red],
         "Whenever a player draws a card, if it isn't the first card that player has drawn this turn, Razorkin Needlehead deals 2 damage to that player.");
     card!(ZhaoTheMoonSlayer, "Zhao, the Moon Slayer", ManaCost { red: 1, generic: 1, ..c }, &[Creature], &[Legendary],
-        Some(2), Some(2), None, kw(), &[Red],
-        "Whenever Zhao attacks, exile the top card of your library. You may play it this turn. Whenever you play a land or cast a spell from exile, put a +1/+1 counter on Zhao.");
+        Some(2), Some(2), None, menace(), &[Red],
+        "Menace. Nonbasic lands enter tapped. {7}: Put a conqueror counter on Zhao. As long as Zhao has a conqueror counter on him, nonbasic lands are Mountains.");
     card!(CT(&[CreatureType::Goblin]) NameStickerGoblin, "Name Sticker Goblin", ManaCost { red: 1, generic: 2, ..c }, &[Creature], &[],
         Some(2), Some(2), None, kw(), &[Red],
         "When this creature enters from anywhere other than a graveyard or exile, roll a 20-sided die. 1-6: Add RRRR. 7-14: Add RRRRR. 15-20: Add RRRRRR.");
@@ -2059,7 +2059,7 @@ pub fn build_card_db() -> Vec<CardDef> {
         "At the beginning of your upkeep, you may return Squee, Goblin Nabob from your graveyard to your hand.");
 
     // === Green Creatures ===
-    card!(CT(&[CreatureType::Halfling]) DelightedHalfling, "Delighted Halfling", ManaCost::g(1), &[Creature], &[Legendary],
+    card!(CT(&[CreatureType::Halfling]) DelightedHalfling, "Delighted Halfling", ManaCost::g(1), &[Creature], &[],
         Some(1), Some(2), None, kw(), &[Green],
         "{T}: Add {C}. {T}: Add one mana of any color. Spend this mana only to cast a legendary spell, and that spell can't be countered.");
     card!(CT(&[CreatureType::Insect]) HaywireMite, "Haywire Mite", ManaCost::generic(1), &[Artifact, Creature], &[],
@@ -2068,7 +2068,7 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(CT(&[CreatureType::Snake]) Hexdrinker, "Hexdrinker", ManaCost::g(1), &[Creature], &[],
         Some(2), Some(1), None, kw(), &[Green],
         "Level up {1}. Level 3-7: 4/4 with protection from instants. Level 8+: 6/6 with protection from everything.");
-    card!(SylvanSafekeeper, "Sylvan Safekeeper", ManaCost::g(1), &[Creature], &[Legendary],
+    card!(SylvanSafekeeper, "Sylvan Safekeeper", ManaCost::g(1), &[Creature], &[],
         Some(1), Some(1), None, kw(), &[Green],
         "Sacrifice a land: Target creature you control gains shroud until end of turn.");
     card!(CT(&[CreatureType::Human, CreatureType::Druid]) HermitDruid, "Hermit Druid", ManaCost { green: 1, generic: 1, ..c }, &[Creature], &[],
@@ -2083,9 +2083,9 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(CT(&[CreatureType::Lhurgoyf]) Tarmogoyf, "Tarmogoyf", ManaCost { green: 1, generic: 1, ..c }, &[Creature], &[],
         Some(0), Some(1), None, kw(), &[Green],
         "Tarmogoyf's power is equal to the number of card types among cards in all graveyards and its toughness is that number plus 1.");
-    card!(TownGreeter, "Town Greeter", ManaCost { green: 1, generic: 1, ..c }, &[Creature], &[],
-        Some(2), Some(2), None, kw(), &[Green],
-        "When Town Greeter enters, you take the initiative.");
+    card!(CT(&[CreatureType::Human]) TownGreeter, "Town Greeter", ManaCost { green: 1, generic: 1, ..c }, &[Creature], &[],
+        Some(1), Some(1), None, kw(), &[Green],
+        "When this creature enters, mill four cards. You may put a land card from among them into your hand.");
     card!(CT(&[CreatureType::Elf, CreatureType::Spirit]) ElvishSpiritGuide, "Elvish Spirit Guide", ManaCost { green: 1, generic: 2, ..c }, &[Creature], &[],
         Some(2), Some(2), None, kw(), &[Green],
         "Exile Elvish Spirit Guide from your hand: Add {G}.");
