@@ -556,6 +556,9 @@ pub enum CardName {
     PestToken,
     /// Represents a Drone token (1/1 colorless Drone artifact creature with flying, can only block flyers).
     DroneToken,
+    /// Represents a Construct token from Urza's Saga (0/0 colorless Construct artifact creature,
+    /// gets +1/+1 for each artifact its controller controls — continuous effect).
+    ConstructToken,
 
     // Sentinel value for array sizing
     _Count,

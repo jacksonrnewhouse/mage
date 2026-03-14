@@ -3917,13 +3917,10 @@ impl GameState {
                             }
                             // Chapter II: Create a 0/0 colorless Construct artifact creature token.
                             (CardName::UrzasSaga, 2) => {
-                                let artifact_count = self.battlefield.iter()
-                                    .filter(|p| p.controller == controller && p.is_artifact())
-                                    .count() as i16;
                                 let token_id = self.new_object_id();
                                 let mut token = Permanent::new(
                                     token_id,
-                                    card_name_for_token(),
+                                    CardName::ConstructToken,
                                     controller,
                                     controller,
                                     Some(0),
@@ -3933,8 +3930,6 @@ impl GameState {
                                     &[CardType::Artifact, CardType::Creature],
                                 );
                                 token.creature_types.push(CreatureType::Construct);
-                                token.power_mod += artifact_count;
-                                token.toughness_mod += artifact_count;
                                 token.is_token = true;
                                 self.battlefield.push(token);
                             }

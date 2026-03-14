@@ -1528,6 +1528,14 @@ impl GameState {
                     + perm.counters.get(CounterType::PlusOnePlusOne)
                     - perm.counters.get(CounterType::MinusOneMinusOne)
             }
+            CardName::ConstructToken => {
+                let artifact_count = self.battlefield.iter()
+                    .filter(|p| p.controller == perm.controller && p.is_artifact())
+                    .count() as i16;
+                artifact_count + perm.power_mod
+                    + perm.counters.get(CounterType::PlusOnePlusOne)
+                    - perm.counters.get(CounterType::MinusOneMinusOne)
+            }
             _ => perm.power() + self.nettlecyst_bonus(perm),
         }
     }
@@ -1548,6 +1556,14 @@ impl GameState {
             CardName::Nethergoyf => {
                 let count = self.player_graveyard_card_type_count(perm.controller, db);
                 count + 1 + perm.toughness_mod
+                    + perm.counters.get(CounterType::PlusOnePlusOne)
+                    - perm.counters.get(CounterType::MinusOneMinusOne)
+            }
+            CardName::ConstructToken => {
+                let artifact_count = self.battlefield.iter()
+                    .filter(|p| p.controller == perm.controller && p.is_artifact())
+                    .count() as i16;
+                artifact_count + perm.toughness_mod
                     + perm.counters.get(CounterType::PlusOnePlusOne)
                     - perm.counters.get(CounterType::MinusOneMinusOne)
             }
