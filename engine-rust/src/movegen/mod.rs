@@ -2749,8 +2749,9 @@ impl GameState {
                 targets
             }
 
-            // Target creature
-            CardName::SwordsToPlowshares | CardName::PathToExile | CardName::Dismember => {
+            // Target creature (including aura: Unable to Scream)
+            CardName::SwordsToPlowshares | CardName::PathToExile | CardName::Dismember
+            | CardName::UnableToScream => {
                 self.battlefield
                     .iter()
                     .filter(|p| p.is_creature() && self.can_be_targeted(p, controller, &spell_colors))

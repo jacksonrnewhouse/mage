@@ -85,6 +85,26 @@ impl GameState {
                     changes = true;
                 }
             }
+
+            // Auras attached to nonexistent permanents go to graveyard (SBA 704.5n)
+            let mut auras_to_remove = Vec::new();
+            for perm in &self.battlefield {
+                if perm.card_name == CardName::UnableToScream {
+                    if let Some(host_id) = perm.attached_to {
+                        if self.find_permanent(host_id).is_none() {
+                            auras_to_remove.push(perm.id);
+                        }
+                    } else {
+                        // Unattached aura — shouldn't happen normally, but clean up
+                        auras_to_remove.push(perm.id);
+                    }
+                }
+            }
+            for id in auras_to_remove {
+                if self.destroy_permanent(id).is_some() {
+                    changes = true;
+                }
+            }
         }
 
         // Check for game over

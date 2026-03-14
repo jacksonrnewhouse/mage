@@ -2087,6 +2087,27 @@ impl GameState {
                     self.snapcaster_flashback_cards.push(*target_card_id);
                 }
             }
+            CardName::UnableToScream => {
+                // Aura: enchanted creature loses all abilities and is a 0/2.
+                if let Some(Target::Object(target_id)) = targets.first() {
+                    let target_id = *target_id;
+                    // Attach the aura to the target creature
+                    if let Some(aura) = self.find_permanent_mut(_card_id) {
+                        aura.attached_to = Some(target_id);
+                    }
+                    if let Some(host) = self.find_permanent_mut(target_id) {
+                        if !host.attachments.contains(&_card_id) {
+                            host.attachments.push(_card_id);
+                        }
+                        // Apply the effect: loses all abilities, becomes 0/2
+                        host.base_power = 0;
+                        host.base_toughness = 2;
+                        host.power_mod = 0;
+                        host.toughness_mod = 0;
+                        host.keywords = Keywords::empty();
+                    }
+                }
+            }
             _ => {}
         }
     }
