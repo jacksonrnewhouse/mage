@@ -24,7 +24,19 @@ impl GameState {
             Action::PlayLand(card_id) => {
                 let player_id = self.priority_player;
                 let card_name = self.card_name_for_id(*card_id);
-                if self.players[player_id as usize].remove_from_hand(*card_id) {
+                // Try removing from hand first, then graveyard (Crucible of Worlds)
+                let from_hand = self.players[player_id as usize].remove_from_hand(*card_id);
+                let from_graveyard = if !from_hand {
+                    if let Some(pos) = self.players[player_id as usize].graveyard.iter().position(|&id| id == *card_id) {
+                        self.players[player_id as usize].graveyard.remove(pos);
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                };
+                if from_hand || from_graveyard {
                     self.players[player_id as usize].land_plays_remaining -= 1;
                     if let Some(cn) = card_name {
                         if let Some(def) = find_card(db, cn) {

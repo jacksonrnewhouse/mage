@@ -98,6 +98,25 @@ impl GameState {
             }
         }
 
+        // --- Crucible of Worlds: play lands from graveyard ---
+        if sorcery_speed && player.land_plays_remaining > 0 {
+            let crucible_active = self.battlefield.iter().any(|p| {
+                p.card_name == CardName::CrucibleOfWorlds && p.controller == player_id
+            });
+            if crucible_active {
+                let graveyard: Vec<ObjectId> = self.players[player_id as usize].graveyard.clone();
+                for card_id in graveyard {
+                    if let Some(card_name) = self.card_name_for_id(card_id) {
+                        if let Some(def) = find_card(db, card_name) {
+                            if def.card_types.contains(&CardType::Land) {
+                                actions.push(Action::PlayLand(card_id));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // --- Cast spells from hand ---
         for &card_id in &player.hand {
             if let Some(card_name) = self.card_name_for_id(card_id) {
@@ -322,6 +341,13 @@ impl GameState {
                         }
                         // Grafdigger's Cage prevents casting from graveyard entirely.
                         if cage_blocks_graveyard {
+                            continue;
+                        }
+                        // Drannith Magistrate: opponents can't cast spells from anywhere other than their hands.
+                        let drannith_blocks = self.battlefield.iter().any(|p| {
+                            p.card_name == CardName::DrannithMagistrate && p.controller != player_id
+                        });
+                        if drannith_blocks {
                             continue;
                         }
                         // Determine if this card can be cast from graveyard and what cost to use.
@@ -569,6 +595,12 @@ impl GameState {
                                     let can_cast_with_frenzy = experimental_frenzy_active;
                                     let enabled = can_cast_with_citadel || can_cast_with_future_sight
                                         || can_cast_with_forge || can_cast_with_frenzy;
+
+                                    // Drannith Magistrate: opponents can't cast from non-hand zones
+                                    let drannith_blocks_lib = self.battlefield.iter().any(|p| {
+                                        p.card_name == CardName::DrannithMagistrate && p.controller != player_id
+                                    });
+                                    let enabled = enabled && !drannith_blocks_lib;
 
                                     if enabled {
                                         // Affordability check
