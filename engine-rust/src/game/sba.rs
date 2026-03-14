@@ -123,7 +123,6 @@ impl GameState {
             | CardName::RagavanNimblePilferer | CardName::ZhaoTheMoonSlayer
             | CardName::GutTrueSoulZealot | CardName::SqueeGoblinNabob
             // Green creatures
-            | CardName::DelightedHalfling | CardName::SylvanSafekeeper
             | CardName::HogaakArisenNecropolis
             // Colorless creatures
             | CardName::GolosTirelessPilgrim | CardName::KarnSilverGolem
