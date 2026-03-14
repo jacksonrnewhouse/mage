@@ -1,6 +1,6 @@
 /// Tests for exile-until-leaves-battlefield tracking.
-/// Covers Solitude (exile creature, return when Solitude leaves)
-/// and Skyclave Apparition (exile nonland nontoken MV<=4, give opponent X/X token on leaves).
+/// Covers Skyclave Apparition (exile nonland nontoken MV<=4, give opponent X/X token on leaves)
+/// and verifies Solitude's exile is permanent (NOT linked to Solitude leaving).
 
 use crate::card::*;
 use crate::game::*;
@@ -31,9 +31,9 @@ fn add_creature(state: &mut GameState, controller: u8, card_name: CardName, powe
     id
 }
 
-/// When Solitude's ETB exiles a creature, `exile_linked` should record the link.
+/// Solitude's exile is permanent — exile_linked should NOT be recorded.
 #[test]
-fn test_solitude_etb_records_exile_link() {
+fn test_solitude_etb_permanent_exile() {
     let (mut state, db) = setup_base();
 
     // Put Solitude on the battlefield controlled by P0
@@ -49,8 +49,7 @@ fn test_solitude_etb_records_exile_link() {
     // Put an opponent creature on the battlefield
     let target_id = add_creature(&mut state, 1, CardName::GoblinGuide, 2, 2);
 
-    // Manually fire the Solitude ETB trigger resolution (simulates what happens when ETB resolves)
-    // We do this by pushing a SolitudeETB trigger and resolving it
+    // Manually fire the Solitude ETB trigger resolution
     use crate::stack::*;
     state.stack.push(
         StackItemKind::TriggeredAbility {
@@ -72,16 +71,22 @@ fn test_solitude_etb_records_exile_link() {
         "Target creature should be in exile after Solitude ETB"
     );
 
-    // exile_linked should record (solitude_id, target_id)
+    // exile_linked should NOT record anything — Solitude's exile is permanent
     assert!(
-        state.exile_linked.iter().any(|(exiler, exiled)| *exiler == solitude_id && *exiled == target_id),
-        "exile_linked should record (Solitude id, exiled creature id)"
+        !state.exile_linked.iter().any(|(exiler, _)| *exiler == solitude_id),
+        "exile_linked should NOT be recorded for Solitude (permanent exile)"
+    );
+
+    // Controller of exiled creature (P1) should gain life equal to its power (2)
+    assert_eq!(
+        state.players[1].life, 22,
+        "Exiled creature's controller should gain life equal to its power"
     );
 }
 
-/// When Solitude leaves the battlefield, the exiled creature should return.
+/// When Solitude leaves the battlefield, the exiled creature should NOT return.
 #[test]
-fn test_solitude_leaves_returns_exiled_creature() {
+fn test_solitude_leaves_does_not_return_exiled_creature() {
     let (mut state, db) = setup_base();
 
     // Put Solitude on the battlefield
@@ -94,42 +99,25 @@ fn test_solitude_leaves_returns_exiled_creature() {
     );
     state.battlefield.push(perm);
 
-    // Put opponent creature on battlefield, then exile it manually via exile_linked
+    // Put opponent creature in exile (as if Solitude exiled it)
     let goblin_id = state.new_object_id();
     state.card_registry.push((goblin_id, CardName::GoblinGuide));
     state.exile.push((goblin_id, CardName::GoblinGuide, 1));
-    state.exile_linked.push((solitude_id, goblin_id));
+    // No exile_linked entry — Solitude's exile is permanent
 
     // Remove Solitude from the battlefield (destroy it)
-    // This should trigger check_leaves_triggers and push ExileLinkedReturn
     state.remove_permanent_to_zone(solitude_id, DestinationZone::Graveyard);
 
-    // Stack should now have the ExileLinkedReturn trigger
+    // Goblin should still be in exile — it does NOT return
     assert!(
-        !state.stack.is_empty(),
-        "Stack should have ExileLinkedReturn trigger after Solitude leaves"
+        state.exile.iter().any(|(id, _, _)| *id == goblin_id),
+        "GoblinGuide should remain in exile after Solitude leaves (permanent exile)"
     );
 
-    // exile_linked should be cleared for this exiler
+    // Goblin should NOT be on the battlefield
     assert!(
-        !state.exile_linked.iter().any(|(exiler, _)| *exiler == solitude_id),
-        "exile_linked should be cleared after Solitude leaves"
-    );
-
-    // Resolve the return trigger
-    state.pass_priority(&db); // P0 passes
-    state.pass_priority(&db); // P1 passes -> trigger resolves
-
-    // Goblin should no longer be in exile
-    assert!(
-        !state.exile.iter().any(|(id, _, _)| *id == goblin_id),
-        "GoblinGuide should no longer be in exile after return trigger resolves"
-    );
-
-    // Goblin should be back on the battlefield
-    assert!(
-        state.battlefield.iter().any(|p| p.id == goblin_id),
-        "GoblinGuide should be back on the battlefield"
+        !state.battlefield.iter().any(|p| p.id == goblin_id),
+        "GoblinGuide should NOT return to battlefield when Solitude leaves"
     );
 }
 

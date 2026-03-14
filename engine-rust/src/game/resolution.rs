@@ -3537,22 +3537,13 @@ impl GameState {
                 }
             }
             TriggeredEffect::SolitudeETB => {
-                // Exile target creature - opponent gains life equal to its power
-                // Record exile link so the creature returns when Solitude leaves
+                // Exile target creature permanently - its controller gains life equal to its power
+                // Note: Solitude's exile is permanent, NOT linked to Solitude leaving
                 if let Some(Target::Object(creature_id)) = targets.first() {
                     let creature_id = *creature_id;
                     let power = self.find_permanent(creature_id).map(|p| p.power()).unwrap_or(0);
-                    // source_id is the Solitude permanent id (same as card_id when it entered)
-                    // We need the Solitude id: find it on battlefield
-                    let solitude_id = self.battlefield.iter()
-                        .find(|p| p.card_name == CardName::Solitude)
-                        .map(|p| p.id);
                     if let Some(perm) = self.remove_permanent_to_zone(creature_id, DestinationZone::Exile) {
                         self.players[perm.controller as usize].life += power as i32;
-                        // Record exile link: when Solitude leaves, this card returns
-                        if let Some(sol_id) = solitude_id {
-                            self.exile_linked.push((sol_id, perm.id));
-                        }
                     }
                 }
             }
