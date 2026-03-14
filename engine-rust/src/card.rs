@@ -1026,6 +1026,13 @@ pub fn build_card_db() -> Vec<CardDef> {
         k
     };
     #[allow(unused)]
+    let menace_haste = || {
+        let mut k = Keywords::empty();
+        k.add(Keyword::Menace);
+        k.add(Keyword::Haste);
+        k
+    };
+    #[allow(unused)]
     let storm = || {
         let mut k = Keywords::empty();
         k.add(Keyword::Storm);
