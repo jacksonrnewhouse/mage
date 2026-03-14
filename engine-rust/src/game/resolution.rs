@@ -1980,36 +1980,18 @@ impl GameState {
             }
 
             CardName::PestControl => {
-                // Choose one:
-                //   Mode 0: Destroy target artifact or enchantment
-                //   Mode 1: Create two 1/1 black and green Pest creature tokens
-                match modes.first().copied().unwrap_or(0) {
-                    0 => {
-                        if let Some(Target::Object(target_id)) = targets.first() {
-                            self.destroy_permanent(*target_id);
-                        }
-                    }
-                    1 => {
-                        for _ in 0..2 {
-                            let token_id = self.new_object_id();
-                            let mut token = crate::permanent::Permanent::new(
-                                token_id,
-                                CardName::PestToken,
-                                controller,
-                                controller,
-                                Some(1),
-                                Some(1),
-                                None,
-                                Keywords::empty(),
-                                &[CardType::Creature],
-                            );
-                            token.is_token = true;
-                            token.creature_types = vec![CreatureType::Pest];
-                            token.colors = vec![Color::Black, Color::Green];
-                            self.battlefield.push(token);
-                        }
-                    }
-                    _ => {}
+                // Destroy all nonland permanents with mana value 1 or less.
+                let to_destroy: Vec<ObjectId> = self.battlefield.iter()
+                    .filter(|p| {
+                        !p.is_land()
+                            && find_card(db, p.card_name)
+                                .map(|d| d.mana_cost.cmc() <= 1)
+                                .unwrap_or(p.is_token) // tokens with no card def have MV 0
+                    })
+                    .map(|p| p.id)
+                    .collect();
+                for id in to_destroy {
+                    self.destroy_permanent(id);
                 }
             }
 

@@ -3894,44 +3894,6 @@ impl GameState {
                 result
             }
 
-            CardName::PestControl => {
-                // Choose one:
-                //   Mode 0: Destroy target artifact or enchantment
-                //   Mode 1: Create two 1/1 Pest tokens (no target)
-                let spell_colors = find_card(db, card_name)
-                    .map(|d| d.color_identity.to_vec())
-                    .unwrap_or_default();
-                let art_ench: Vec<Target> = self.battlefield.iter()
-                    .filter(|p| (p.is_artifact() || p.is_enchantment()) && self.can_be_targeted(p, player_id, &spell_colors))
-                    .map(|p| Target::Object(p.id))
-                    .collect();
-
-                let mut result = Vec::new();
-                // Mode 0: destroy target artifact or enchantment (needs a valid target)
-                for &t in &art_ench {
-                    result.push(Action::CastSpell {
-                        card_id,
-                        targets: vec![t],
-                        x_value: 0,
-                        from_graveyard: false,
-                        from_library_top: false,
-                        alt_cost: None,
-                        modes: vec![0],
-                    });
-                }
-                // Mode 1: create two Pest tokens (no target needed)
-                result.push(Action::CastSpell {
-                    card_id,
-                    targets: vec![],
-                    x_value: 0,
-                    from_graveyard: false,
-                    from_library_top: false,
-                    alt_cost: None,
-                    modes: vec![1],
-                });
-                result
-            }
-
             CardName::Suplex => {
                 // Choose one:
                 //   Mode 0: Deal 3 damage to target creature (exile if it would die)
@@ -4070,5 +4032,5 @@ pub fn requires_sacrifice_cost(name: CardName) -> bool {
 
 /// Returns true if this card is a modal spell (choose N of M modes).
 pub fn is_modal_spell(name: CardName) -> bool {
-    matches!(name, CardName::KolaghanCommand | CardName::KozileksCommand | CardName::PestControl | CardName::Suplex | CardName::BrotherhoodsEnd)
+    matches!(name, CardName::KolaghanCommand | CardName::KozileksCommand | CardName::Suplex | CardName::BrotherhoodsEnd)
 }

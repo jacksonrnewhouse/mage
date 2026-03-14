@@ -724,6 +724,8 @@ pub fn cycling_ability(card_name: CardName) -> Option<(ManaCost, CyclingKind)> {
         CardName::SharkTyphoon => Some((ManaCost::u(1), CyclingKind::SharkTyphoon)),
         // Hollow One: cycling {2}
         CardName::HollowOne => Some((ManaCost::generic(2), CyclingKind::Basic)),
+        // Pest Control: cycling {2}
+        CardName::PestControl => Some((ManaCost::generic(2), CyclingKind::Basic)),
         _ => None,
     }
 }
@@ -2499,8 +2501,8 @@ pub fn build_card_db() -> Vec<CardDef> {
         "If an instant or sorcery card would be put into a graveyard from anywhere, exile it instead.");
 
     // === Orzhov (WB) ===
-    card!(PestControl, "Pest Control", ManaCost { white: 1, black: 1, ..c }, &[Instant], &[], None, None, None, kw(), &[White, Black],
-        "Choose one: Destroy target artifact or enchantment. Create two 1/1 black and green Pest creature tokens with \"When this creature dies, you gain 1 life.\"");
+    card!(PestControl, "Pest Control", ManaCost { white: 1, black: 1, ..c }, &[Sorcery], &[], None, None, None, kw(), &[White, Black],
+        "Destroy all nonland permanents with mana value 1 or less. Cycling {2}.");
     card!(KayaOrzhovUsurper, "Kaya, Orzhov Usurper", ManaCost { white: 1, black: 1, generic: 1, ..c }, &[Planeswalker], &[Legendary],
         None, None, Some(3), kw(), &[White, Black],
         "+1: Exile up to two cards from each graveyard. You gain 2 life if at least one creature card was exiled this way. -1: Exile target nonland permanent with mana value 1 or less. -5: Kaya deals damage to target player equal to the number of cards that player owns in exile and you gain that much life.");
