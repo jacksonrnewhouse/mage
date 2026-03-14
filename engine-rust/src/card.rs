@@ -1472,7 +1472,7 @@ pub fn build_card_db() -> Vec<CardDef> {
         "{T}: Add {C}. {T}, Pay 1 life: Add one mana of any color. Activate only if you control an artifact.");
     card!(StartingTown, "Starting Town", c, &[Land], &[], None, None, None, kw(), &[],
         "Starting Town enters tapped unless it's turn 1, 2, or 3. {T}: Add {C}. {T}, Pay 1 life: Add one mana of any color.");
-    card!(TalonGatesOfMadara, "Talon Gates of Madara", c, &[Land], &[Legendary], None, None, None, kw(), &[],
+    card!(TalonGatesOfMadara, "Talon Gates of Madara", c, &[Land], &[], None, None, None, kw(), &[],
         "When this land enters, up to one target creature phases out. {T}: Add {C}. {1}, {T}: Add one mana of any color. {4}: Put this card from your hand onto the battlefield.");
     card!(ShelldockIsle, "Shelldock Isle", c, &[Land], &[], None, None, None, kw(), &[],
         "Hideaway 4. {T}: Add {U}. {T}: You may play the exiled card without paying its mana cost if there are twenty or fewer cards in your library.");
