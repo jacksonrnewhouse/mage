@@ -1890,9 +1890,9 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(MagebaneLizard, "Magebane Lizard", ManaCost { red: 1, generic: 1, ..c }, &[Creature], &[],
         Some(1), Some(4), None, kw(), &[Red],
         "Whenever a player casts a noncreature spell, Magebane Lizard deals damage to that player equal to the number of noncreature spells they've cast this turn.");
-    card!(RazorkinNeedlehead, "Razorkin Needlehead", ManaCost { red: 1, generic: 1, ..c }, &[Creature], &[],
-        Some(2), Some(2), None, kw(), &[Red],
-        "Whenever a player draws a card, if it isn't the first card that player has drawn this turn, Razorkin Needlehead deals 2 damage to that player.");
+    card!(CT(&[CreatureType::Human]) RazorkinNeedlehead, "Razorkin Needlehead", ManaCost { red: 2, ..c }, &[Creature], &[],
+        Some(2), Some(2), None, first_strike(), &[Red],
+        "This creature has first strike during your turn. Whenever an opponent draws a card, this creature deals 1 damage to them.");
     card!(ZhaoTheMoonSlayer, "Zhao, the Moon Slayer", ManaCost { red: 1, generic: 1, ..c }, &[Creature], &[Legendary],
         Some(2), Some(2), None, menace(), &[Red],
         "Menace. Nonbasic lands enter tapped. {7}: Put a conqueror counter on Zhao. As long as Zhao has a conqueror counter on him, nonbasic lands are Mountains.");

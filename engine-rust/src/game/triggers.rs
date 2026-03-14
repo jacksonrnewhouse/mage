@@ -328,6 +328,28 @@ impl GameState {
                 );
             }
         }
+
+        // Razorkin Needlehead: whenever an opponent draws a card, deal 1 damage to them
+        let needlehead_triggers: Vec<(ObjectId, PlayerId)> = self
+            .battlefield
+            .iter()
+            .filter(|p| p.card_name == CardName::RazorkinNeedlehead)
+            .map(|p| (p.id, p.controller))
+            .collect();
+        for (source_id, controller) in needlehead_triggers {
+            if drawing_player != controller {
+                let opp = drawing_player;
+                self.stack.push(
+                    StackItemKind::TriggeredAbility {
+                        source_id,
+                        source_name: CardName::RazorkinNeedlehead,
+                        effect: TriggeredEffect::RazorkinNeedleheadOpponentDraw,
+                    },
+                    controller,
+                    vec![Target::Player(opp)],
+                );
+            }
+        }
     }
 
     /// Check for noncreature spell cast triggers.

@@ -3282,6 +3282,10 @@ impl GameState {
                 let opp = self.opponent(controller);
                 self.players[opp as usize].life -= 2;
             }
+            TriggeredEffect::RazorkinNeedleheadOpponentDraw => {
+                let opp = self.opponent(controller);
+                self.players[opp as usize].life -= 1;
+            }
             TriggeredEffect::DarkConfidantUpkeep => {
                 // Reveal top card, put it in hand, lose life equal to its mana value
                 if let Some(id) = self.players[controller as usize].library.pop() {

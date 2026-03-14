@@ -83,6 +83,8 @@ pub enum TriggeredEffect {
     ArchonOfCrueltyTrigger,
     /// Orcish Bowmasters opponent draw trigger
     OrcishBowmastersOpponentDraw,
+    /// Razorkin Needlehead: whenever an opponent draws a card, deal 1 damage to them
+    RazorkinNeedleheadOpponentDraw,
     /// Generic: deal N damage to target
     DealDamage(u16),
     /// Generic: draw N cards
