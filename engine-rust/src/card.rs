@@ -1909,7 +1909,7 @@ pub fn build_card_db() -> Vec<CardDef> {
         Some(2), Some(2), None, kw(), &[Red],
         "Exile Simian Spirit Guide from your hand: Add {R}.");
     card!(CavesOfChaosAdventurer, "Caves of Chaos Adventurer", ManaCost { red: 1, generic: 3, ..c }, &[Creature], &[],
-        Some(5), Some(3), None, kw(), &[Red],
+        Some(5), Some(3), None, trample(), &[Red],
         "When Caves of Chaos Adventurer enters, you take the initiative. Whenever Caves of Chaos Adventurer attacks, exile the top card of your library. You may play it this turn.");
     card!(Pyrogoyf, "Pyrogoyf", ManaCost { red: 1, generic: 3, ..c }, &[Creature], &[],
         Some(0), Some(1), None, kw(), &[Red],
