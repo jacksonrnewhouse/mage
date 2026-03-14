@@ -1525,10 +1525,9 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(CT(&[CreatureType::Spirit]) SpiritOfTheLabyrinth, "Spirit of the Labyrinth", ManaCost { white: 1, generic: 1, ..c }, &[Creature, Enchantment], &[],
         Some(3), Some(1), None, kw(), &[White],
         "Each player can't draw more than one card each turn.");
-    card!(CT(&[CreatureType::Spirit]) VoiceOfVictory, "Voice of Victory", ManaCost { white: 1, generic: 1, ..c }, &[Creature], &[],
-        Some(2), Some(2), None, kw(), &[White],
-        "When Voice of Victory enters, create a 1/1 white Human creature token.");
-    card!(CT(&[CreatureType::Spirit]) WhiteOrchidPhantom, "White Orchid Phantom", ManaCost { white: 1, generic: 1, ..c }, &[Creature], &[],
+    card!(CT(&[CreatureType::Human, CreatureType::Bard]) VoiceOfVictory, "Voice of Victory", ManaCost { white: 1, generic: 1, ..c }, &[Creature], &[],
+        Some(1), Some(3), None, kw(), &[White],
+        "Mobilize 2 (Whenever this creature attacks, create two tapped and attacking 1/1 red Warrior creature tokens. Sacrifice them at the beginning of the next end step.) Your opponents can't cast spells during your turn.");    card!(CT(&[CreatureType::Spirit]) WhiteOrchidPhantom, "White Orchid Phantom", ManaCost { white: 1, generic: 1, ..c }, &[Creature], &[],
         Some(2), Some(2), None, flying(), &[White],
         "Flying. When White Orchid Phantom enters, destroy target nonbasic land an opponent controls. That land's controller may search for a basic land card, put it tapped.");
     card!(CT(&[CreatureType::Archon]) ArchonOfEmeria, "Archon of Emeria", ManaCost { white: 1, generic: 2, ..c }, &[Creature], &[],
@@ -1789,8 +1788,8 @@ pub fn build_card_db() -> Vec<CardDef> {
         Some(2), Some(2), None, kw(), &[Black],
         "At the beginning of combat on your turn, exile up to one target card from a graveyard. {1}{B}: Adapt 2. Whenever one or more +1/+1 counters are put on this creature, put a creature card exiled with this creature onto the battlefield under your control with a finality counter on it. It gains haste. Sacrifice it at the beginning of the next end step.");
     card!(MaiScornfulStriker, "Mai, Scornful Striker", ManaCost { black: 1, generic: 1, ..c }, &[Creature], &[Legendary],
-        Some(2), Some(1), None, deathtouch(), &[Black],
-        "When Mai enters, each player mills two cards. Deathtouch. Whenever Mai deals combat damage to a player, you may cast a creature card from a graveyard.");
+        Some(2), Some(2), None, first_strike(), &[Black],
+        "First strike. Whenever a player casts a noncreature spell, they lose 2 life.");
     card!(OrcishBowmasters, "Orcish Bowmasters", ManaCost { black: 1, generic: 1, ..c }, &[Creature], &[],
         Some(1), Some(1), None, flash(), &[Black],
         "Flash. When Orcish Bowmasters enters and whenever an opponent draws a card except the first one they draw in each of their draw steps, amass Orcs 1 and Orcish Bowmasters deals 1 damage to any target.");
@@ -1873,10 +1872,13 @@ pub fn build_card_db() -> Vec<CardDef> {
         Some(2), Some(2), None, kw(), &[Red],
         "Whenever a player casts a spell with mana value 3 or less, Eidolon of the Great Revel deals 2 damage to that player.");
     card!(GenerousPlunderer, "Generous Plunderer", ManaCost { red: 1, generic: 1, ..c }, &[Creature], &[],
-        Some(2), Some(1), None, kw(), &[Red],
-        "When Generous Plunderer enters, each player creates a Treasure token.");
-    card!(HarshMentor, "Harsh Mentor", ManaCost { red: 1, generic: 1, ..c }, &[Creature], &[],
-        Some(2), Some(2), None, kw(), &[Red],
+    card!(GenerousPlunderer, "Generous Plunderer", ManaCost { red: 1, generic: 1, ..c }, &[Creature], &[],
+        Some(2), Some(2), None, {
+            let mut k = Keywords::empty();
+            k.add(Keyword::Menace);
+            k
+        }, &[Red],
+        "Menace. At the beginning of your upkeep, you may create a Treasure token. When you do, target opponent creates a tapped Treasure token. Whenever this creature attacks, it deals damage to defending player equal to the number of artifacts they control.");        Some(2), Some(2), None, kw(), &[Red],
         "Whenever an opponent activates an ability of an artifact, creature, or land on the battlefield, if it's not a mana ability, Harsh Mentor deals 2 damage to that player.");
     card!(MagebaneLizard, "Magebane Lizard", ManaCost { red: 1, generic: 1, ..c }, &[Creature], &[],
         Some(1), Some(4), None, kw(), &[Red],
@@ -1890,9 +1892,9 @@ pub fn build_card_db() -> Vec<CardDef> {
     card!(CT(&[CreatureType::Goblin]) NameStickerGoblin, "Name Sticker Goblin", ManaCost { red: 1, generic: 2, ..c }, &[Creature], &[],
         Some(2), Some(2), None, kw(), &[Red],
         "When this creature enters from anywhere other than a graveyard or exile, roll a 20-sided die. 1-6: Add RRRR. 7-14: Add RRRRR. 15-20: Add RRRRRR.");
-    card!(AvalancheOfSector7, "Avalanche of Sector 7", ManaCost { red: 1, generic: 2, ..c }, &[Creature], &[],
-        Some(3), Some(3), None, kw(), &[Red],
-        "When Avalanche of Sector 7 enters, it deals damage equal to its power to target creature or planeswalker an opponent controls.");
+    card!(CT(&[CreatureType::Human]) AvalancheOfSector7, "Avalanche of Sector 7", ManaCost { red: 1, generic: 2, ..c }, &[Creature], &[Legendary],
+        Some(0), Some(3), None, menace(), &[Red],
+        "Menace. Avalanche of Sector 7's power is equal to the number of artifacts your opponents control. Whenever an opponent activates an ability of an artifact they control, Avalanche of Sector 7 deals 1 damage to that player.");
     card!(ADVENTURE(AdventureDef {
         display_name: "Stomp",
         cost: ManaCost { red: 1, generic: 1, ..c },
@@ -2210,7 +2212,6 @@ pub fn build_card_db() -> Vec<CardDef> {
         Some(15), Some(15), None, {
             let mut k = Keywords::empty();
             k.add(Keyword::Flying);
-            k.add(Keyword::Trample);
             k
         }, &[],
         "This spell can't be countered. When you cast this spell, take an extra turn after this one. Flying, protection from spells that are one or more colors, annihilator 6. When Emrakul is put into a graveyard from anywhere, its owner shuffles their graveyard into their library.");
