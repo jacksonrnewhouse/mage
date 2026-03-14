@@ -4216,6 +4216,11 @@ impl GameState {
                 self.players[target_player as usize].life -= 2;
             }
 
+            TriggeredEffect::MagebaneLizardDamage { target_player, damage } => {
+                // Magebane Lizard deals damage equal to noncreature spells cast this turn
+                self.players[target_player as usize].life -= damage as i32;
+            }
+
             TriggeredEffect::AnimateDeadETB => {
                 // Handled inline in handle_etb_with_x for AnimateDead
             }

@@ -390,6 +390,27 @@ impl GameState {
             ));
         }
 
+        // Magebane Lizard: whenever a player casts a noncreature spell, deal damage to that
+        // player equal to the number of noncreature spells they've cast this turn.
+        let noncreature_count = self.players[caster as usize].noncreature_spells_cast_this_turn;
+        let lizard_triggers: Vec<(ObjectId, PlayerId)> = self
+            .battlefield
+            .iter()
+            .filter(|p| p.card_name == CardName::MagebaneLizard)
+            .map(|p| (p.id, p.controller))
+            .collect();
+        for (source_id, controller) in lizard_triggers {
+            triggers.push((
+                source_id,
+                CardName::MagebaneLizard,
+                TriggeredEffect::MagebaneLizardDamage {
+                    target_player: caster,
+                    damage: noncreature_count,
+                },
+                controller,
+            ));
+        }
+
         // Displacer Kitten: whenever you cast a noncreature spell, exile up to one target
         // nonland permanent you control, then return it to the battlefield under its owner's control.
         let kitten_triggers: Vec<(ObjectId, PlayerId)> = self

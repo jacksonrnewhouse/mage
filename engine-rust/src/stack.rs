@@ -172,6 +172,9 @@ pub enum TriggeredEffect {
     /// Harsh Mentor: whenever an opponent activates an ability of an artifact, creature, or land
     /// that isn't a mana ability, deal 2 damage to that player.
     HarshMentorDamage { target_player: PlayerId },
+    /// Magebane Lizard: whenever a player casts a noncreature spell, deal damage to that player
+    /// equal to the number of noncreature spells they've cast this turn.
+    MagebaneLizardDamage { target_player: PlayerId, damage: u16 },
     /// Animate Dead ETB: return target creature from any graveyard to the battlefield under your control with -1/-0.
     AnimateDeadETB,
     /// Mystic Remora: whenever an opponent casts a noncreature spell, draw a card.
