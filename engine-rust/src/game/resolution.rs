@@ -2103,11 +2103,16 @@ impl GameState {
     ) {
         // Torpor Orb: creatures entering the battlefield don't cause abilities to trigger.
         let torpor_orb_active = self.battlefield.iter().any(|p| p.card_name == CardName::TorporOrb);
-        if torpor_orb_active {
-            let is_creature = self.find_permanent(_card_id)
-                .map(|p| p.is_creature())
-                .unwrap_or(false);
-            if is_creature {
+        // Doorkeeper Thrull: artifacts and creatures entering don't cause abilities to trigger.
+        let doorkeeper_thrull_active = self.battlefield.iter().any(|p| p.card_name == CardName::DoorkeeperThrull);
+        if torpor_orb_active || doorkeeper_thrull_active {
+            let entering_perm = self.find_permanent(_card_id);
+            let is_creature = entering_perm.map(|p| p.is_creature()).unwrap_or(false);
+            let is_artifact = entering_perm.map(|p| p.is_artifact()).unwrap_or(false);
+            if is_creature && (torpor_orb_active || doorkeeper_thrull_active) {
+                return;
+            }
+            if is_artifact && doorkeeper_thrull_active {
                 return;
             }
         }
@@ -2125,11 +2130,15 @@ impl GameState {
     pub(crate) fn handle_etb_with_x(&mut self, card_name: CardName, _card_id: ObjectId, controller: PlayerId, x_value: u8) {
         // Torpor Orb: creatures entering the battlefield don't cause abilities to trigger.
         let torpor_orb_active = self.battlefield.iter().any(|p| p.card_name == CardName::TorporOrb);
-        if torpor_orb_active {
-            let is_creature = self.find_permanent(_card_id)
-                .map(|p| p.is_creature())
-                .unwrap_or(false);
-            if is_creature {
+        // Doorkeeper Thrull: artifacts and creatures entering don't cause abilities to trigger.
+        let doorkeeper_thrull_active = self.battlefield.iter().any(|p| p.card_name == CardName::DoorkeeperThrull);
+        if torpor_orb_active || doorkeeper_thrull_active {
+            let entering_perm = self.find_permanent(_card_id);
+            let is_creature = entering_perm.map(|p| p.is_creature()).unwrap_or(false);
+            let is_artifact = entering_perm.map(|p| p.is_artifact()).unwrap_or(false);
+            let suppressed = (is_creature && (torpor_orb_active || doorkeeper_thrull_active))
+                || (is_artifact && doorkeeper_thrull_active);
+            if suppressed {
                 // Still handle non-trigger ETB effects (counters from X spells like Chalice, Walking Ballista, etc.)
                 // These are replacement effects, not triggered abilities.
                 match card_name {
