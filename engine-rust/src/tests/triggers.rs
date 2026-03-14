@@ -638,3 +638,65 @@ fn test_monastery_mentor_triggers_on_noncreature_spell() {
         "Monk token should have Prowess"
     );
 }
+
+#[test]
+fn test_vengevine_returns_on_second_creature_spell() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+    state.phase = Phase::PreCombatMain;
+    state.step = None;
+    state.active_player = 0;
+    state.priority_player = 0;
+
+    // Put Vengevine in player 0's graveyard
+    let vengevine_id = state.new_object_id();
+    state.card_registry.push((vengevine_id, CardName::Vengevine));
+    state.players[0].graveyard.push(vengevine_id);
+
+    // Simulate casting the first creature spell — Vengevine should NOT return
+    state.players[0].creature_spells_cast_this_turn = 1;
+    state.check_vengevine_trigger(0);
+    assert!(
+        state.stack.is_empty(),
+        "Vengevine should NOT trigger on first creature spell"
+    );
+
+    // Simulate casting the second creature spell — Vengevine SHOULD return
+    state.players[0].creature_spells_cast_this_turn = 2;
+    state.check_vengevine_trigger(0);
+    assert!(
+        !state.stack.is_empty(),
+        "Vengevine should trigger on second creature spell"
+    );
+
+    // Resolve the trigger
+    state.pass_priority(&db);
+    state.pass_priority(&db);
+
+    // Vengevine should now be on the battlefield
+    let on_bf = state.battlefield.iter().any(|p| p.card_name == CardName::Vengevine);
+    assert!(on_bf, "Vengevine should be on the battlefield after trigger resolves");
+
+    // Vengevine should no longer be in the graveyard
+    let in_gy = state.players[0].graveyard.contains(&vengevine_id);
+    assert!(!in_gy, "Vengevine should not be in the graveyard after returning");
+}
+
+#[test]
+fn test_vengevine_does_not_return_on_third_creature_spell() {
+    let db = build_card_db();
+    let mut state = GameState::new_two_player();
+
+    // Put Vengevine in player 0's graveyard
+    let vengevine_id = state.new_object_id();
+    state.card_registry.push((vengevine_id, CardName::Vengevine));
+    state.players[0].graveyard.push(vengevine_id);
+
+    // Third creature spell — Vengevine should NOT trigger
+    state.players[0].creature_spells_cast_this_turn = 3;
+    state.check_vengevine_trigger(0);
+    assert!(
+        state.stack.is_empty(),
+        "Vengevine should NOT trigger on third creature spell"
+    );
+}

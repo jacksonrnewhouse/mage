@@ -448,8 +448,13 @@ impl GameState {
                                     if !def.card_types.contains(&crate::types::CardType::Artifact) {
                                         self.players[owner as usize].nonartifact_spells_cast_this_turn += 1;
                                     }
-                                    if !def.card_types.contains(&crate::types::CardType::Creature) {
+                                    let is_creature = def.card_types.contains(&crate::types::CardType::Creature);
+                                    if !is_creature {
                                         self.players[owner as usize].noncreature_spells_cast_this_turn += 1;
+                                    }
+                                    if is_creature {
+                                        self.players[owner as usize].creature_spells_cast_this_turn += 1;
+                                        self.check_vengevine_trigger(owner);
                                     }
                                 }
                                 self.storm_count += 1;

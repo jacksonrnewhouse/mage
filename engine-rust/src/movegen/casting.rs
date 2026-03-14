@@ -344,13 +344,20 @@ impl GameState {
                             if !def.card_types.contains(&CardType::Artifact) {
                                 self.players[player_id as usize].nonartifact_spells_cast_this_turn += 1;
                             }
-                            let is_noncreature = !def.card_types.contains(&CardType::Creature);
+                            let is_creature = def.card_types.contains(&CardType::Creature);
+                            let is_noncreature = !is_creature;
                             if is_noncreature {
                                 self.players[player_id as usize].noncreature_spells_cast_this_turn += 1;
+                            }
+                            if is_creature {
+                                self.players[player_id as usize].creature_spells_cast_this_turn += 1;
                             }
                             self.storm_count += 1;
                             if is_noncreature {
                                 self.check_noncreature_cast_triggers(player_id);
+                            }
+                            if is_creature {
+                                self.check_vengevine_trigger(player_id);
                             }
                             // Lurrus of the Dream-Den: track once-per-turn graveyard cast
                             if *from_graveyard
@@ -775,7 +782,10 @@ impl GameState {
                         if !def.card_types.contains(&CardType::Artifact) {
                             self.players[player_id as usize].nonartifact_spells_cast_this_turn += 1;
                         }
+                        // Adventure creature half is always a creature spell
+                        self.players[player_id as usize].creature_spells_cast_this_turn += 1;
                         self.storm_count += 1;
+                        self.check_vengevine_trigger(player_id);
                         self.reset_priority_passes();
                     }
                 }

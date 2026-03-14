@@ -264,6 +264,9 @@ pub enum TriggeredEffect {
     /// Leovold, Emissary of Trest: whenever you or a permanent you control becomes
     /// the target of a spell or ability an opponent controls, you may draw a card.
     LeovoldTargetDraw,
+    /// Vengevine: when a player casts their second creature spell this turn,
+    /// return Vengevine from their graveyard to the battlefield.
+    VengevineReturn { vengevine_id: ObjectId, owner: PlayerId },
 }
 
 /// Activated ability effects.

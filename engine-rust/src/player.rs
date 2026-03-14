@@ -27,6 +27,8 @@ pub struct Player {
     pub nonartifact_spells_cast_this_turn: u16,
     /// Number of noncreature spells cast this turn (for Deafening Silence)
     pub noncreature_spells_cast_this_turn: u16,
+    /// Number of creature spells cast this turn (for Vengevine)
+    pub creature_spells_cast_this_turn: u16,
     /// Extra turns queued
     pub extra_turns: u8,
     /// Yawgmoth's Will: until end of turn, you may play cards from your graveyard.
@@ -69,6 +71,7 @@ impl Player {
             spells_cast_this_turn: 0,
             nonartifact_spells_cast_this_turn: 0,
             noncreature_spells_cast_this_turn: 0,
+            creature_spells_cast_this_turn: 0,
             extra_turns: 0,
             yawgmoth_will_active: false,
             protection_from_everything: false,
@@ -102,6 +105,7 @@ impl Player {
         self.spells_cast_this_turn = 0;
         self.nonartifact_spells_cast_this_turn = 0;
         self.noncreature_spells_cast_this_turn = 0;
+        self.creature_spells_cast_this_turn = 0;
         self.mana_pool.empty();
         self.yawgmoth_will_active = false;
         self.protection_from_everything = false;

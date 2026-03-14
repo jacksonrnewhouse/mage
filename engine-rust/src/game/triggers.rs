@@ -812,6 +812,44 @@ impl GameState {
         }
     }
 
+    /// Check Vengevine triggered ability: whenever you cast a spell, if it's the second
+    /// creature spell you cast this turn, you may return Vengevine from your graveyard
+    /// to the battlefield. Called after a creature spell is cast and the creature spell
+    /// counter has been incremented.
+    pub(crate) fn check_vengevine_trigger(&mut self, caster: PlayerId) {
+        // Only triggers on exactly the second creature spell cast this turn
+        if self.players[caster as usize].creature_spells_cast_this_turn != 2 {
+            return;
+        }
+
+        // Grafdigger's Cage prevents creatures from entering from graveyards
+        if self.grafdiggers_cage_active() {
+            return;
+        }
+
+        // Find all Vengevines in the caster's graveyard
+        let vengevines: Vec<ObjectId> = self.players[caster as usize]
+            .graveyard
+            .iter()
+            .filter(|&&id| {
+                self.card_name_for_id(id) == Some(CardName::Vengevine)
+            })
+            .copied()
+            .collect();
+
+        for vengevine_id in vengevines {
+            self.stack.push(
+                StackItemKind::TriggeredAbility {
+                    source_id: vengevine_id,
+                    source_name: CardName::Vengevine,
+                    effect: TriggeredEffect::VengevineReturn { vengevine_id, owner: caster },
+                },
+                caster,
+                vec![],
+            );
+        }
+    }
+
     /// Check Avalanche of Sector 7 triggered ability: whenever an opponent activates an ability
     /// of an artifact they control, Avalanche of Sector 7 deals 1 damage to that player.
     /// Called after any artifact ability is activated (including mana abilities).

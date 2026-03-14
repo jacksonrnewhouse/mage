@@ -4252,6 +4252,25 @@ impl GameState {
                 // Handled inline in handle_etb_with_x for AnimateDead
             }
 
+            TriggeredEffect::VengevineReturn { vengevine_id, owner } => {
+                // Return Vengevine from graveyard to the battlefield
+                let pid = owner as usize;
+                if let Some(pos) = self.players[pid].graveyard.iter().position(|&id| id == vengevine_id) {
+                    let card_id = self.players[pid].graveyard.remove(pos);
+                    let cn = CardName::Vengevine;
+                    if let Some(def) = find_card(db, cn) {
+                        let mut perm = Permanent::new(
+                            card_id, cn, owner, owner,
+                            def.power, def.toughness, def.loyalty, def.keywords, def.card_types,
+                        );
+                        perm.creature_types = def.creature_types.to_vec();
+                        perm.colors = def.color_identity.to_vec();
+                        self.battlefield.push(perm);
+                        self.handle_etb(cn, card_id, owner);
+                    }
+                }
+            }
+
             TriggeredEffect::MysticRemoraOpponentCast => {
                 // Mystic Remora: draw a card (simplified — opponents rarely pay 4)
                 self.draw_cards(controller, 1);
