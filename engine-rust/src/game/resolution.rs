@@ -3189,6 +3189,47 @@ impl GameState {
                 });
             }
 
+            // Phyrexian Dreadnought: sacrifice unless you sacrifice 12 power of creatures.
+            // Simplified: just sacrifice it (the combo with Stifle/Show and Tell is handled elsewhere).
+            CardName::PhyrexianDreadnought => {
+                self.destroy_permanent(_card_id);
+            }
+
+            // Ichor Wellspring: draw a card on ETB
+            CardName::IchorWellspring => {
+                self.draw_cards(controller, 1);
+            }
+
+            // Pinnacle Emissary: deal 3 damage to target creature or planeswalker
+            CardName::PinnacleEmissary => {
+                // Find the best target: prefer opponent's creature/planeswalker
+                let opp = self.opponent(controller);
+                let target = self.battlefield.iter()
+                    .filter(|p| (p.is_creature() || p.is_planeswalker()) && p.controller == opp)
+                    .min_by_key(|p| p.toughness())
+                    .map(|p| p.id);
+                if let Some(target_id) = target {
+                    self.deal_damage_to_target(Target::Object(target_id), 3, controller);
+                }
+            }
+
+            // Portal to Phyrexia: each opponent sacrifices three creatures
+            CardName::PortalToPhyrexia => {
+                for pid in 0..self.num_players {
+                    if pid != controller {
+                        for _ in 0..3 {
+                            let creature = self.battlefield.iter()
+                                .filter(|p| p.controller == pid && p.is_creature())
+                                .min_by_key(|p| p.power())
+                                .map(|p| p.id);
+                            if let Some(cid) = creature {
+                                self.destroy_permanent(cid);
+                            }
+                        }
+                    }
+                }
+            }
+
             _ => {}
         }
     }
