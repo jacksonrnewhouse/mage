@@ -164,7 +164,7 @@ fn test_combat_damage_trigger_does_not_fire_when_blocked() {
 }
 
 #[test]
-fn test_psychic_frog_combat_damage_trigger_draws_when_graveyard_has_card() {
+fn test_psychic_frog_combat_damage_trigger_draws_card() {
     let db = build_card_db();
     let mut state = GameState::new_two_player();
 
@@ -172,11 +172,6 @@ fn test_psychic_frog_combat_damage_trigger_draws_when_graveyard_has_card() {
     seed_library(&mut state, 0, CardName::SolRing, 5);
 
     let frog_id = put_creature(&mut state, &db, CardName::PsychicFrog, 0);
-
-    // Put a card in player 0's graveyard
-    let card_id = state.new_object_id();
-    state.card_registry.push((card_id, CardName::SolRing));
-    state.players[0].graveyard.push(card_id);
 
     // Attack unblocked
     state.phase = Phase::Combat;
@@ -196,10 +191,8 @@ fn test_psychic_frog_combat_damage_trigger_draws_when_graveyard_has_card() {
     });
     assert!(has_frog_trigger, "PsychicFrog combat damage trigger should be on the stack");
 
-    // Resolve: should exile graveyard card and draw a card
+    // Resolve: should draw a card unconditionally
     let hand_before = state.players[0].hand.len();
-    let gy_before = state.players[0].graveyard.len();
-    let exile_before = state.exile.len();
 
     state.phase = Phase::Combat;
     state.active_player = 0;
@@ -207,7 +200,5 @@ fn test_psychic_frog_combat_damage_trigger_draws_when_graveyard_has_card() {
     state.pass_priority(&db);
     state.pass_priority(&db);
 
-    assert_eq!(state.players[0].graveyard.len(), gy_before - 1, "Psychic Frog should exile a card from graveyard");
-    assert_eq!(state.exile.len(), exile_before + 1, "Exiled card should be in exile zone");
     assert_eq!(state.players[0].hand.len(), hand_before + 1, "Psychic Frog trigger should draw a card");
 }

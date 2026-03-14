@@ -3400,16 +3400,8 @@ impl GameState {
                 self.draw_cards(controller, 1);
             }
             TriggeredEffect::PsychicFrogCombatDamage => {
-                // Psychic Frog deals combat damage to a player:
-                // you may exile a card from your graveyard; if you do, draw a card.
-                // Simplified: if the controller has a card in their graveyard, exile one and draw.
-                let pid = controller as usize;
-                if !self.players[pid].graveyard.is_empty() {
-                    let exiled_id = self.players[pid].graveyard.pop().unwrap();
-                    let exiled_name = self.card_name_for_id(exiled_id).unwrap_or(CardName::Plains);
-                    self.exile.push((exiled_id, exiled_name, controller));
-                    self.draw_cards(controller, 1);
-                }
+                // Psychic Frog deals combat damage to a player or planeswalker: draw a card.
+                self.draw_cards(controller, 1);
             }
             TriggeredEffect::MaiNoncreatureSpellCast { target_player } => {
                 // Mai, Scornful Striker: whenever a player casts a noncreature spell, they lose 2 life

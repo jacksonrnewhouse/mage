@@ -2427,7 +2427,7 @@ pub fn build_card_db() -> Vec<CardDef> {
     // === Dimir (UB) ===
     card!(PsychicFrog, "Psychic Frog", ManaCost { blue: 1, black: 1, ..c }, &[Creature], &[],
         Some(1), Some(2), None, kw(), &[Blue, Black],
-        "Discard a card: Psychic Frog gets +1/+1 until end of turn. Whenever Psychic Frog deals combat damage to a player, you may exile a card from your graveyard. If you do, draw a card. {1}{U}{B}: Psychic Frog gains flying until end of turn.");
+        "Whenever this creature deals combat damage to a player or planeswalker, draw a card. Discard a card: Put a +1/+1 counter on this creature. Exile three cards from your graveyard: This creature gains flying until end of turn.");
 
     // === Rakdos (BR) ===
     card!(MoltenCollapse, "Molten Collapse", ManaCost { black: 1, red: 1, ..c }, &[Sorcery], &[], None, None, None, kw(), &[Black, Red],

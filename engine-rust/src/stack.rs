@@ -101,7 +101,7 @@ pub enum TriggeredEffect {
     RagavanCombatDamage,
     /// ScrawlingCrawler deals combat damage to a player: draw a card
     ScrawlingCrawlerCombatDamage,
-    /// PsychicFrog deals combat damage to a player: you may exile a card from your graveyard; if you do, draw a card
+    /// PsychicFrog deals combat damage to a player or planeswalker: draw a card
     PsychicFrogCombatDamage,
     /// Mai, Scornful Striker: whenever a player casts a noncreature spell, they lose 2 life
     MaiNoncreatureSpellCast { target_player: PlayerId },
